@@ -98,6 +98,7 @@ export const translations = {
         noHistory: "no games yet",
         alreadySeated: "already seated",
         maxBuyInReached: "max buy-in reached",
+        ready: "Ready",
     },
     zh: {
         title: "GoPoker",
@@ -196,6 +197,7 @@ export const translations = {
         noHistory: "暂无对局记录",
         alreadySeated: "你已经入座了",
         maxBuyInReached: "已达最大买入上限",
+        ready: "准备",
     },
 } as const;
 

@@ -57,6 +57,7 @@ export default function Lobby() {
             return;
         }
         dispatch({ type: "setAuthError", payload: null });
+        dispatch({ type: "clearGame" });
         dispatch({ type: "setTablename", payload: name });
         saveSession({ username: appState.username ?? "", table: name, clientID: null });
         joinTable(socket, name, undefined, password);
@@ -82,6 +83,7 @@ export default function Lobby() {
             return;
         }
         dispatch({ type: "setAuthError", payload: null });
+        dispatch({ type: "clearGame" });
         dispatch({ type: "setTablename", payload: newRoom });
         saveSession({ username: appState.username ?? "", table: newRoom, clientID: null });
         createTable(socket, newRoom, {

@@ -243,14 +243,37 @@ func handleLeaveTable(c *Client, tablename string) {
 	view := c.table.game.GenerateOmniView()
 	for i := range view.Players {
 		if view.Players[i].UUID == c.uuid {
-			if _, err := flushPlayerSession(c.hub.rdb, view.Players[i].Username, c.table.name, view.Players[i].TotalBuyIn, view.Players[i].Stack, view.Players[i].Stats); err != nil {
-				slog.Default().Warn("Flush player", "error", err)
-			}
 			if err := poker.SitOut(c.table.game, uint(i), 0); err != nil {
 				slog.Default().Warn("Leave table", "error", err)
 			}
 			break
 		}
+	}
+
+	// Settle the session with the post-fold state: merge stats, return the
+	// remaining stack to the wallet, and append a history entry.
+	after := c.table.game.GenerateOmniView()
+	for j := range after.Players {
+		if after.Players[j].UUID == c.uuid {
+			if _, err := flushPlayerSession(c.hub.rdb, after.Players[j].Username, c.table.name, after.Players[j].TotalBuyIn, after.Players[j].Stack, after.Players[j].Stats); err != nil {
+				slog.Default().Warn("Flush player", "error", err)
+			}
+			// Remove the player from the room once no hand is active. If they
+			// folded mid-hand they are dropped when the hand ends.
+			if after.Stage == poker.PreDeal {
+				if err := poker.RemovePlayer(c.table.game, uint(j)); err != nil {
+					slog.Default().Warn("Remove player", "error", err)
+				}
+			}
+			break
+		}
+	}
+
+	// If the room is now empty, reset the game so a re-entering player sees
+	// a fresh table instead of a stale running flag.
+	remaining := c.table.game.GenerateOmniView()
+	if len(remaining.Players) == 0 {
+		c.table.game.Reset()
 	}
 
 	c.table.broadcast <- createUpdatedGame(c)
@@ -277,7 +300,7 @@ func handleTakeSeat(c *Client, username string, seatID uint, buyIn uint) {
 
 	// Reject if this user is already seated at the table.
 	for i := range view.Players {
-		if view.Players[i].Username == username && !view.Players[i].Left {
+		if view.Players[i].Username == username {
 			c.send <- createError("already seated")
 			return
 		}
@@ -326,13 +349,6 @@ func handleTakeSeat(c *Client, username string, seatID uint, buyIn uint) {
 	err = poker.BuyIn(c.table.game, position, amount)
 	if err != nil {
 		slog.Default().Warn("Buy in", "error", err)
-	}
-
-	// set player ready
-	// TODO make this a separate action
-	err = poker.ToggleReady(c.table.game, position, 0)
-	if err != nil {
-		slog.Default().Warn("Toggle ready", "error", err)
 	}
 
 	err = poker.SetSeatID(c.table.game, position, seatID)
@@ -399,12 +415,14 @@ func handleRebuy(c *Client, amount uint) {
 	if err := poker.BuyIn(c.table.game, uint(position), amount); err != nil {
 		slog.Default().Warn("Rebuy", "error", err)
 	}
-	// Only re-ready busted players; an already-ready player stays ready.
-	if !view.Players[position].Ready {
+	// Re-ready only players who were busted; a seated-but-not-ready player
+	// keeps control over their own ready state.
+	if view.Players[position].Stack == 0 {
 		if err := poker.ToggleReady(c.table.game, uint(position), 0); err != nil {
 			slog.Default().Warn("Rebuy ready", "error", err)
 		}
 	}
+	autoStartIfReady(c.table)
 	c.table.broadcast <- createUpdatedGame(c)
 	c.send <- createUserInfo(user, true)
 }
@@ -416,6 +434,84 @@ func handleStartGame(c *Client) {
 	}
 	broadcastDeal(c.table)
 	c.table.broadcast <- createUpdatedGame(c)
+}
+
+func handleToggleReady(c *Client) {
+	view := c.table.game.GenerateOmniView()
+	position := -1
+	for i := range view.Players {
+		if view.Players[i].UUID == c.uuid {
+			position = i
+			break
+		}
+	}
+	if position < 0 {
+		c.send <- createError("you are not seated")
+		return
+	}
+	if err := poker.ToggleReady(c.table.game, uint(position), 0); err != nil {
+		slog.Default().Warn("Toggle ready", "error", err)
+		return
+	}
+	autoStartIfReady(c.table)
+	c.table.broadcast <- createUpdatedGame(c)
+}
+
+func handleMoveSeat(c *Client, seatID uint) {
+	if seatID == 0 {
+		c.send <- createError("invalid seat")
+		return
+	}
+	view := c.table.game.GenerateOmniView()
+	position := -1
+	for i := range view.Players {
+		if view.Players[i].UUID == c.uuid {
+			position = i
+			break
+		}
+	}
+	if position < 0 {
+		c.send <- createError("you are not seated")
+		return
+	}
+	if view.Players[position].Ready {
+		c.send <- createError("cannot move while ready")
+		return
+	}
+	if err := poker.SetSeatID(c.table.game, uint(position), seatID); err != nil {
+		slog.Default().Warn("Move seat", "error", err)
+		c.send <- createError("seat is taken")
+		return
+	}
+	c.table.broadcast <- createUpdatedGame(c)
+}
+
+// autoStartIfReady starts the game once at least two seated players are ready.
+// It returns true when the game was started.
+func autoStartIfReady(t *table) bool {
+	view := t.game.GenerateOmniView()
+	if view.Running {
+		return false
+	}
+	active := 0
+	for i := range view.Players {
+		if view.Players[i].Left {
+			continue
+		}
+		active++
+		if !view.Players[i].Ready {
+			return false
+		}
+	}
+	if active < 2 {
+		return false
+	}
+	if err := t.game.Start(); err != nil {
+		slog.Default().Warn("Auto start", "error", err)
+		return false
+	}
+	broadcastDeal(t)
+	return true
 }
 
 func handleResetGame(c *Client) {

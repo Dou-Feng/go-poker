@@ -116,8 +116,6 @@ export default function TableOld({ players, setPlayers }: tableProps) {
                         player={player}
                         id={index + 1}
                         reveal={player ? revealedPlayers.includes(player) : false}
-                        selected={false}
-                        onSelect={() => undefined}
                     />
                 ))}
             </div>

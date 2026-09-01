@@ -13,7 +13,7 @@ type raiseProps = {
 };
 function button() {
     return classNames(
-        "mx-0.5 my-1 rounded-sm border border-2 border-zinc-600 px-2 py-1 text-sm text-neutral-200 hover:bg-zinc-600 font-light sm:p-2 sm:text-base"
+        "mx-0.5 my-1 rounded-sm border border-2 border-zinc-600 px-3 py-2 text-base text-neutral-200 hover:bg-zinc-600 font-light sm:px-4 sm:py-2 sm:text-lg"
     );
 }
 
@@ -136,7 +136,7 @@ export default function RaiseInput({ showRaise, setShowRaise }: raiseProps) {
                         {t("allIn")}
                     </button>
                 </div>
-                <div className="w-36 pb-2 sm:w-64">
+                <div className="w-40 pb-2 sm:w-72">
                     <Slider
                         value={inputValue}
                         onChange={setInputValue}

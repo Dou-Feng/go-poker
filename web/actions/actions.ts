@@ -1,145 +1,129 @@
+// send safely queues messages when the socket is still connecting and drops
+// them once the socket is closed, avoiding "Still in CONNECTING state" errors.
+function send(socket: WebSocket | null | undefined, payload: object) {
+    if (!socket) {
+        return;
+    }
+    const data = JSON.stringify(payload);
+    if (socket.readyState === WebSocket.OPEN) {
+        socket.send(data);
+    } else if (socket.readyState === WebSocket.CONNECTING) {
+        socket.addEventListener("open", () => socket.send(data), { once: true });
+    }
+}
+
 export function joinTable(
     socket: WebSocket,
     tablename: string,
     playerUUID?: string,
     password?: string
 ) {
-    socket.send(
-        JSON.stringify({
-            action: "join-table",
-            tablename: tablename,
-            ...(playerUUID ? { playerUUID } : {}),
-            ...(password ? { password } : {}),
-        })
-    );
+    send(socket, {
+        action: "join-table",
+        tablename: tablename,
+        ...(playerUUID ? { playerUUID } : {}),
+        ...(password ? { password } : {}),
+    });
 }
 
 export function leaveTable(socket: WebSocket, tablename: string) {
-    socket.send(
-        JSON.stringify({
-            action: "leave-table",
-            tablename: tablename,
-        })
-    );
+    send(socket, {
+        action: "leave-table",
+        tablename: tablename,
+    });
 }
 
 export function sendMessage(socket: WebSocket, username: string, message: string) {
-    socket.send(
-        JSON.stringify({
-            action: "send-message",
-            username: username,
-            message: message,
-        })
-    );
+    send(socket, {
+        action: "send-message",
+        username: username,
+        message: message,
+    });
 }
 
 export function sendLog(socket: WebSocket, message: string) {
-    socket.send(
-        JSON.stringify({
-            action: "send-log",
-            message: message,
-        })
-    );
+    send(socket, {
+        action: "send-log",
+        message: message,
+    });
 }
 
 export function takeSeat(socket: WebSocket, username: string, seatID: number, buyIn: number) {
-    socket.send(
-        JSON.stringify({
-            action: "take-seat",
-            username: username,
-            seatID: seatID,
-            buyIn: buyIn,
-        })
-    );
+    send(socket, {
+        action: "take-seat",
+        username: username,
+        seatID: seatID,
+        buyIn: buyIn,
+    });
 }
 
 export function startGame(socket: WebSocket) {
-    socket.send(
-        JSON.stringify({
-            action: "start-game",
-        })
-    );
+    send(socket, {
+        action: "start-game",
+    });
 }
 
 export function resetGame(socket: WebSocket) {
-    socket.send(
-        JSON.stringify({
-            action: "reset-game",
-        })
-    );
+    send(socket, {
+        action: "reset-game",
+    });
 }
 
 export function dealGame(socket: WebSocket) {
-    socket.send(
-        JSON.stringify({
-            action: "deal-game",
-        })
-    );
+    send(socket, {
+        action: "deal-game",
+    });
 }
 
 export function newPlayer(socket: WebSocket, username: string) {
-    socket?.send(
-        JSON.stringify({
-            action: "new-player",
-            username: username,
-        })
-    );
+    send(socket, {
+        action: "new-player",
+        username: username,
+    });
 }
 
 export function registerUser(socket: WebSocket, username: string, password: string, avatar: string) {
-    socket.send(
-        JSON.stringify({
-            action: "register-user",
-            username: username,
-            password: password,
-            avatar: avatar,
-        })
-    );
+    send(socket, {
+        action: "register-user",
+        username: username,
+        password: password,
+        avatar: avatar,
+    });
 }
 
 export function login(socket: WebSocket, username: string, password: string) {
-    socket.send(
-        JSON.stringify({
-            action: "login",
-            username: username,
-            password: password,
-        })
-    );
+    send(socket, {
+        action: "login",
+        username: username,
+        password: password,
+    });
 }
 
 export function addFriend(socket: WebSocket, username: string) {
-    socket.send(
-        JSON.stringify({
-            action: "add-friend",
-            username: username,
-        })
-    );
+    send(socket, {
+        action: "add-friend",
+        username: username,
+    });
 }
 
 export function setAvatar(socket: WebSocket, avatar: string) {
-    socket.send(
-        JSON.stringify({
-            action: "set-avatar",
-            avatar: avatar,
-        })
-    );
+    send(socket, {
+        action: "set-avatar",
+        avatar: avatar,
+    });
 }
 
 export function reconnectUser(socket: WebSocket, username: string) {
-    socket.send(
-        JSON.stringify({
-            action: "reconnect-user",
-            username: username,
-        })
-    );
+    send(socket, {
+        action: "reconnect-user",
+        username: username,
+    });
 }
 
 export function listTables(socket: WebSocket) {
-    socket.send(
-        JSON.stringify({
-            action: "list-tables",
-        })
-    );
+    send(socket, {
+        action: "list-tables",
+    });
 }
 
 export type CreateTableOptions = {
@@ -152,79 +136,74 @@ export type CreateTableOptions = {
 };
 
 export function createTable(socket: WebSocket, tablename: string, options?: CreateTableOptions) {
-    socket.send(
-        JSON.stringify({
-            action: "create-table",
-            tablename: tablename,
-            ...(options ?? {}),
-        })
-    );
+    send(socket, {
+        action: "create-table",
+        tablename: tablename,
+        ...(options ?? {}),
+    });
 }
 
 export function addChips(socket: WebSocket, amount: number) {
-    socket.send(
-        JSON.stringify({
-            action: "add-chips",
-            amount: amount,
-        })
-    );
+    send(socket, {
+        action: "add-chips",
+        amount: amount,
+    });
 }
 
 export function rebuy(socket: WebSocket, amount: number) {
-    socket.send(
-        JSON.stringify({
-            action: "rebuy",
-            amount: amount,
-        })
-    );
+    send(socket, {
+        action: "rebuy",
+        amount: amount,
+    });
 }
 
 export function getUser(socket: WebSocket, username?: string) {
-    socket.send(
-        JSON.stringify({
-            action: "get-user",
-            ...(username ? { username } : {}),
-        })
-    );
+    send(socket, {
+        action: "get-user",
+        ...(username ? { username } : {}),
+    });
 }
 
 export function getHistory(socket: WebSocket) {
-    socket.send(
-        JSON.stringify({
-            action: "get-history",
-        })
-    );
+    send(socket, {
+        action: "get-history",
+    });
+}
+
+export function toggleReady(socket: WebSocket) {
+    send(socket, {
+        action: "toggle-ready",
+    });
+}
+
+export function moveSeat(socket: WebSocket, seatID: number) {
+    send(socket, {
+        action: "move-seat",
+        seatID: seatID,
+    });
 }
 
 export function playerCall(socket: WebSocket) {
-    socket?.send(
-        JSON.stringify({
-            action: "player-call",
-        })
-    );
+    send(socket, {
+        action: "player-call",
+    });
 }
 
 export function playerCheck(socket: WebSocket) {
-    socket?.send(
-        JSON.stringify({
-            action: "player-check",
-        })
-    );
+    send(socket, {
+        action: "player-check",
+    });
 }
 
 export function playerRaise(socket: WebSocket, amount: number) {
-    socket?.send(
-        JSON.stringify({
-            action: "player-raise",
-            amount: amount,
-        })
-    );
+    send(socket, {
+        action: "player-raise",
+        amount: amount,
+    });
 }
 
 export function playerFold(socket: WebSocket) {
-    socket?.send(
-        JSON.stringify({
-            action: "player-fold",
-        })
-    );
+    send(socket, {
+        action: "player-fold",
+    });
 }

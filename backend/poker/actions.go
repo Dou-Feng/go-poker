@@ -416,8 +416,11 @@ func toggleReady(g *Game, pn uint, data uint) error {
 	}
 
 	if pn == g.dealerNum {
-		for !(g.players[g.dealerNum].Ready) {
-			g.dealerNum = g.dealerNum + 1
+		n := uint(len(g.players))
+		seen := uint(0)
+		for !(g.players[g.dealerNum].Ready) && seen < n {
+			g.dealerNum = (g.dealerNum + 1) % n
+			seen++
 		}
 	}
 

@@ -34,11 +34,13 @@ export default function Game() {
                     {appState.game.running ? t("spectating") : t("pickSeat")}
                 </div>
             )}
-            <div className="absolute bottom-14 left-0 right-0 z-10 sm:bottom-0 sm:right-auto">
-                <ChatLog />
-            </div>
-            <div className="absolute inset-x-0 bottom-0 z-20">
-                <Input />
+            <div className="absolute inset-x-0 bottom-0 z-10 flex flex-col sm:block">
+                <div className="w-full sm:absolute sm:inset-x-0 sm:bottom-0 sm:z-20">
+                    <Input />
+                </div>
+                <div className="w-full sm:absolute sm:bottom-0 sm:left-0 sm:right-auto sm:z-10">
+                    <ChatLog />
+                </div>
             </div>
             <div className="absolute left-0 top-0 z-10 flex flex-row items-center">
                 <button

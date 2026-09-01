@@ -286,6 +286,19 @@ func (c *Client) processEvents(rawMessage []byte) error {
 		handleGetHistory(c)
 		return nil
 
+	case actionToggleReady:
+		handleToggleReady(c)
+		return nil
+
+	case actionMoveSeat:
+		var seat moveSeat
+		err := json.Unmarshal(rawMessage, &seat)
+		if err != nil {
+			return err
+		}
+		handleMoveSeat(c, seat.SeatID)
+		return nil
+
 	case actionTakeSeat:
 		var seat takeSeat
 		err := json.Unmarshal(rawMessage, &seat)

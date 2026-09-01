@@ -30,6 +30,8 @@ const (
 	actionSetAvatar    string = "set-avatar"
 	actionReconnect    string = "reconnect-user"
 	actionGetHistory   string = "get-history"
+	actionToggleReady  string = "toggle-ready"
+	actionMoveSeat     string = "move-seat"
 )
 
 type base struct {
@@ -160,6 +162,15 @@ type getUser struct {
 
 type getHistory struct {
 	base // actionGetHistory
+}
+
+type toggleReady struct {
+	base // actionToggleReady
+}
+
+type moveSeat struct {
+	base         // actionMoveSeat
+	SeatID uint `json:"seatID"`
 }
 
 // outbound (server) actions

@@ -212,7 +212,55 @@ func (g *Game) canOpen(pn uint) bool {
 	return true
 }
 
+// dropPlayer removes the player at index pn from the game and remaps the
+// position bookkeeping. It assumes the game mutex is held.
+func (g *Game) dropPlayer(pn uint) {
+	shift := func(n *uint) {
+		if *n > pn {
+			*n--
+		} else if *n == pn {
+			*n = 0
+		}
+	}
+	shift(&g.dealerNum)
+	shift(&g.sbNum)
+	shift(&g.bbNum)
+	shift(&g.utgNum)
+	shift(&g.actionNum)
+
+	g.players = append(g.players[:pn], g.players[pn+1:]...)
+}
+
+// RemovePlayer removes a player from the game entirely, freeing their seat.
+// It is only safe to call when no hand is in progress (stage PreDeal).
+func RemovePlayer(g *Game, pn uint) error {
+	g.mtx.Lock()
+	defer g.mtx.Unlock()
+
+	if pn >= uint(len(g.players)) {
+		return ErrOutOfBounds
+	}
+	g.dropPlayer(pn)
+	if g.getStage() == PreDeal {
+		g.updateBlindNums()
+	}
+	return nil
+}
+
 func (g *Game) resetForNextHand() {
+
+	// Remove players who have left the room (iterate backwards so indices
+	// stay valid while dropping).
+	for i := len(g.players) - 1; i >= 0; i-- {
+		if g.players[i].Left {
+			g.dropPlayer(uint(i))
+		}
+	}
+
+	if len(g.players) == 0 {
+		g.setStageAndBetting(PreDeal, false)
+		return
+	}
 
 	for i := range g.players {
 		g.players[i].Bet = 0
@@ -225,8 +273,11 @@ func (g *Game) resetForNextHand() {
 	}
 
 	g.dealerNum = (g.dealerNum + 1) % uint(len(g.players))
-	for !g.players[g.dealerNum].Ready {
-		g.dealerNum = (g.dealerNum + 1) % uint(len(g.players))
+	n := uint(len(g.players))
+	seen := uint(0)
+	for !g.players[g.dealerNum].Ready && seen < n {
+		g.dealerNum = (g.dealerNum + 1) % n
+		seen++
 	}
 
 	g.setStageAndBetting(PreDeal, false)
@@ -438,16 +489,18 @@ func Configure(g *Game, sb uint, bb uint, buyIn uint, maxBuy uint, maxPlayers ui
 	g.config.MaxPlayers = maxPlayers
 }
 
-// Start checks that all players are ready, then sets running to true and deals the first hand
+// Start checks that all players (except those who have left) are ready, then
+// sets running to true and deals the first hand
 func (g *Game) Start() error {
 	for _, p := range g.players {
-		if !p.Ready {
+		if !p.Left && !p.Ready {
 			return ErrStartGame
 		}
 	}
 	g.running = true
 	err := Deal(g, g.dealerNum, 0)
 	if err != nil {
+		g.running = false
 		return err
 	}
 	return nil

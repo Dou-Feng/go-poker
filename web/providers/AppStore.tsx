@@ -29,6 +29,7 @@ type ACTIONTYPE =
     | { type: "updateGame"; payload: Game }
     | { type: "resetGame" }
     | { type: "leaveRoom" }
+    | { type: "clearGame" }
     | { type: "updatePlayerID"; payload: string }
     | { type: "setTablename"; payload: string }
     | { type: "setTables"; payload: TableInfo[] }
@@ -56,6 +57,8 @@ function reducer(state: AppState, action: ACTIONTYPE) {
             return { ...state, clientID: null, username: null, game: null, table: null };
         case "leaveRoom":
             return { ...state, clientID: null, game: null, table: null };
+        case "clearGame":
+            return { ...state, clientID: null, game: null };
         case "updatePlayerID":
             return { ...state, clientID: action.payload };
         case "setTablename":

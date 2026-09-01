@@ -17,40 +17,29 @@ type SocketProviderProps = {
 
 export function SocketProvider(props: SocketProviderProps) {
     const [socket, setSocket] = useState<WebSocket | null>(null);
-    const { appState, dispatch } = useContext(AppContext);
+    const { dispatch } = useContext(AppContext);
 
     useEffect(() => {
         // WebSocket api is browser side only.
         const isBrowser = typeof window !== "undefined";
-
-        let wsUrl = '';
-        if (isBrowser) {
-            wsUrl = `${window.location.origin.replace('http', 'ws')}/ws`;
-            console.log("websocket url: ", wsUrl);
+        if (!isBrowser) {
+            return;
         }
 
-        const _socket = isBrowser ? new WebSocket(wsUrl) : null;
+        const wsUrl = `${window.location.origin.replace("http", "ws")}/ws`;
+        console.log("websocket url: ", wsUrl);
 
-        if (_socket) {
-            _socket.onopen = () => {
-                console.log("websocket connected");
-            };
-            _socket.onclose = () => {
-                console.log("websocket disconnected");
-            };
-            _socket.onerror = (error) => {
-                console.error("websocket error: ", error);
-            };
-        }
-        setSocket(_socket);
-
-        return () => {
-            socket?.close();
+        const ws = new WebSocket(wsUrl);
+        ws.onopen = () => {
+            console.log("websocket connected");
         };
-    }, [dispatch]);
-
-    if (socket) {
-        socket.onmessage = (e) => {
+        ws.onclose = () => {
+            console.log("websocket disconnected");
+        };
+        ws.onerror = (error) => {
+            console.error("websocket error: ", error);
+        };
+        ws.onmessage = (e) => {
             let event = JSON.parse(e.data);
             switch (event.action) {
                 case "new-message":
@@ -179,7 +168,13 @@ export function SocketProvider(props: SocketProviderProps) {
                     throw new Error();
             }
         };
-    }
+
+        setSocket(ws);
+
+        return () => {
+            ws.close();
+        };
+    }, [dispatch]);
 
     return <SocketContext.Provider value={socket}>{props.children}</SocketContext.Provider>;
 }

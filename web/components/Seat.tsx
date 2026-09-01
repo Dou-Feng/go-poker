@@ -2,17 +2,16 @@ import { useContext } from "react";
 import { AppContext } from "../providers/AppStore";
 import { Game, Player } from "../interfaces/index";
 import Card from "./Card";
-import BuyIn from "./BuyIn";
 import classNames from "classnames";
 import { useTranslation } from "../hooks/useTranslation";
+import { useSocket } from "../hooks/useSocket";
+import { toggleReady, takeSeat, sendLog, rebuy, moveSeat } from "../actions/actions";
 import Avatar from "./Avatar";
 
 type seatProps = {
     player: Player | null;
     id: number;
     reveal: boolean;
-    selected: boolean;
-    onSelect: () => void;
 };
 
 function chipPosition(id: number) {
@@ -53,8 +52,9 @@ function active(player: Player, game: Game) {
     );
 }
 
-export default function Seat({ player, id, reveal, selected, onSelect }: seatProps) {
+export default function Seat({ player, id, reveal }: seatProps) {
     const { appState, dispatch } = useContext(AppContext);
+    const socket = useSocket();
     const { t } = useTranslation();
 
     const game = appState.game;
@@ -62,7 +62,10 @@ export default function Seat({ player, id, reveal, selected, onSelect }: seatPro
 
     // Occupied seat.
     if (player && game) {
-        const hidden = running && appState.clientID !== player.uuid;
+        const isMine = player.uuid === appState.clientID;
+        const hidden = running && !isMine;
+        const buyIn = game.config.buyIn ?? 200;
+        const atMax = game.config.maxBuy > 0 && player.stack >= game.config.maxBuy;
         const openStats = () => {
             dispatch({
                 type: "setProfile",
@@ -76,43 +79,97 @@ export default function Seat({ player, id, reveal, selected, onSelect }: seatPro
                 },
             });
         };
+        const handleClick = () => {
+            if (isMine && !running) {
+                if (socket) {
+                    toggleReady(socket);
+                }
+            } else if (!isMine) {
+                openStats();
+            }
+        };
         return (
             <div className="relative">
                 <div
-                    className={active(player, game)}
-                    onClick={openStats}
-                    title={t("viewRoomStats")}
+                    className={classNames(active(player, game), "relative")}
+                    onClick={handleClick}
+                    title={isMine ? t("ready") : t("viewRoomStats")}
                     style={{ cursor: "pointer" }}
                 >
-                    <div className="relative right-1 sm:right-2 flex flex-row items-center justify-center">
-                        {player.cards.map((c, i) => (
-                            <div key={i} className="mx-0.5">
-                                <Card
-                                    card={c}
-                                    placeholder={false}
-                                    folded={!player.in}
-                                    hidden={reveal ? false : hidden}
+                    {running ? (
+                        <>
+                            <div className="flex flex-row items-center justify-center">
+                                {player.cards.map((c, i) => (
+                                    <div key={i} className="mx-0.5">
+                                        <Card
+                                            card={c}
+                                            placeholder={false}
+                                            folded={!player.in}
+                                            hidden={reveal ? false : hidden}
+                                        />
+                                    </div>
+                                ))}
+                            </div>
+                            <div className="flex flex-1 items-center justify-center">
+                                <Avatar
+                                    username={player.username}
+                                    emoji={player.avatar || "🙂"}
+                                    hasImage={player.avatarImage}
+                                    size={44}
                                 />
                             </div>
-                        ))}
-                    </div>
-                    <div className="flex min-w-0 flex-1 flex-row items-center rounded-md px-1.5 py-0.5">
-                        <div className="flex w-1/2 items-center justify-center">
+                        </>
+                    ) : (
+                        <div className="flex flex-1 flex-row items-center justify-center gap-2">
                             <Avatar
                                 username={player.username}
                                 emoji={player.avatar || "🙂"}
                                 hasImage={player.avatarImage}
                                 size={44}
                             />
+                            <div className="flex min-w-0 flex-col justify-center leading-tight">
+                                <p className="truncate text-base font-medium text-white sm:text-lg">
+                                    {player.username}
+                                </p>
+                                <div className="flex flex-row items-center gap-1">
+                                    <p className="font-mono text-base font-semibold text-amber-300 sm:text-lg">
+                                        {player.stack}
+                                    </p>
+                                    {isMine && !player.ready && !atMax && (
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                if (socket) {
+                                                    rebuy(socket, buyIn);
+                                                }
+                                            }}
+                                            className="rounded-sm bg-emerald-800 px-1.5 py-0.5 text-xs font-medium text-white hover:bg-emerald-700"
+                                        >
+                                            +{buyIn}
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
                         </div>
-                        <div className="flex w-1/2 min-w-0 flex-col justify-center leading-tight">
-                            <p className="truncate text-sm font-normal sm:text-base">
-                                {player.username}
+                    )}
+                    {isMine && !running && player.ready && (
+                        <div className="absolute inset-0 z-10 flex items-center justify-center rounded-xl bg-black/50">
+                            <p className="text-base font-semibold text-white/90 sm:text-xl">
+                                {t("ready")}
                             </p>
-                            <p className="text-sm font-semibold sm:text-base">{player.stack}</p>
                         </div>
-                    </div>
+                    )}
                 </div>
+                {running && (
+                    <div className="mt-1 flex w-full flex-row items-center justify-between px-1 sm:px-2">
+                        <p className="truncate pr-1 text-base font-medium text-white sm:text-lg">
+                            {player.username}
+                        </p>
+                        <p className="font-mono text-base font-semibold text-amber-300 sm:text-lg">
+                            {player.stack}
+                        </p>
+                    </div>
+                )}
                 <div className={chipPosition(id)}>
                     {running && game.dealer == player.position && (
                         <div className="mx-1 my-1 flex h-5 w-6 items-center justify-center rounded-[50%] bg-white text-sm font-bold text-purple-800 sm:mx-3 sm:my-3 sm:h-7 sm:w-8 sm:text-xl">
@@ -143,24 +200,29 @@ export default function Seat({ player, id, reveal, selected, onSelect }: seatPro
         );
     }
 
-    const canSit = !appState.clientID;
-
-    if (canSit && selected) {
-        return (
-            <div>
-                <div className="m-1 h-16 w-32 rounded-2xl bg-neutral-700 text-neutral-100 sm:m-4 sm:h-20 sm:w-56">
-                    <BuyIn seatID={id} onClose={onSelect} />
-                </div>
-            </div>
-        );
-    }
+    const me = game.players.find((p) => p.uuid === appState.clientID);
+    const canMove = !!me && !me.ready && !running;
+    const canSit = !appState.clientID || canMove;
 
     if (canSit) {
+        const buyIn = game.config.buyIn ?? 200;
+        const handleClick = () => {
+            if (!socket) {
+                return;
+            }
+            if (appState.clientID) {
+                // Already seated but not ready: move to this seat.
+                moveSeat(socket, id);
+            } else if (appState.username) {
+                takeSeat(socket, appState.username, id, buyIn);
+                sendLog(socket, appState.username + " buys in for " + buyIn);
+            }
+        };
         return (
             <div>
                 <button
                     className="m-1 h-16 w-32 rounded-2xl bg-neutral-700 p-2 text-neutral-100 sm:m-4 sm:h-20 sm:w-56"
-                    onClick={onSelect}
+                    onClick={handleClick}
                 >
                     <h2 className="text-3xl sm:text-4xl">{id}</h2>
                     <p className="text-xs opacity-70 sm:text-base">{t("open")}</p>
