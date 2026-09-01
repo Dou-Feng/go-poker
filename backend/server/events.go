@@ -671,6 +671,10 @@ func createError(message string) []byte {
 	return bytes
 }
 
+func createPong() []byte {
+	return []byte(`{"action":"pong"}`)
+}
+
 func createNewLog(message string) []byte {
 	log := newLog{
 		base{actionNewLog},

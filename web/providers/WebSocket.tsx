@@ -32,6 +32,18 @@ export function SocketProvider(props: SocketProviderProps) {
         let ws: WebSocket | null = null;
         let disposed = false;
         let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+        let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
+        let lastPongAt = 0;
+
+        const scheduleReconnect = () => {
+            if (disposed) {
+                return;
+            }
+            if (reconnectTimer) {
+                clearTimeout(reconnectTimer);
+            }
+            reconnectTimer = setTimeout(connect, 1000);
+        };
 
         const connect = () => {
             if (disposed) {
@@ -41,20 +53,23 @@ export function SocketProvider(props: SocketProviderProps) {
             ws = new WebSocket(wsUrl);
             ws.onopen = () => {
                 console.log("websocket connected");
+                lastPongAt = Date.now();
                 setSocket(ws);
             };
             ws.onclose = () => {
                 console.log("websocket disconnected");
                 setSocket(null);
-                if (!disposed) {
-                    reconnectTimer = setTimeout(connect, 1000);
-                }
+                scheduleReconnect();
             };
             ws.onerror = (error) => {
                 console.error("websocket error: ", error);
             };
             ws.onmessage = (e) => {
-            let event = JSON.parse(e.data);
+            const event = JSON.parse(e.data);
+            if (event.action === "pong") {
+                lastPongAt = Date.now();
+                return;
+            }
             switch (event.action) {
                 case "new-message":
                     let newMessage: Message = {
@@ -184,6 +199,64 @@ export function SocketProvider(props: SocketProviderProps) {
             };
         };
 
+        const sendPing = () => {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                try {
+                    ws.send(JSON.stringify({ action: "ping" }));
+                } catch {
+                    try {
+                        ws.close();
+                    } catch {
+                        // ignore
+                    }
+                    scheduleReconnect();
+                }
+            }
+        };
+
+        // Detect silently-dead connections. This is common on iOS when the
+        // page is backgrounded: the socket is killed without onclose firing.
+        heartbeatTimer = setInterval(() => {
+            sendPing();
+            if (Date.now() - lastPongAt > 45000) {
+                try {
+                    ws?.close();
+                } catch {
+                    // ignore
+                }
+                scheduleReconnect();
+            }
+        }, 15000);
+
+        const handleVisibility = () => {
+            if (document.visibilityState !== "visible") {
+                return;
+            }
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                scheduleReconnect();
+                return;
+            }
+            // The socket may have been killed while backgrounded even though
+            // the browser still reports it as open. Probe it and reconnect if
+            // the server does not answer.
+            const before = lastPongAt;
+            sendPing();
+            setTimeout(() => {
+                if (!disposed && lastPongAt === before) {
+                    try {
+                        ws?.close();
+                    } catch {
+                        // ignore
+                    }
+                    scheduleReconnect();
+                }
+            }, 2500);
+        };
+
+        document.addEventListener("visibilitychange", handleVisibility);
+        window.addEventListener("focus", handleVisibility);
+        window.addEventListener("pageshow", handleVisibility);
+
         connect();
 
         return () => {
@@ -191,6 +264,12 @@ export function SocketProvider(props: SocketProviderProps) {
             if (reconnectTimer) {
                 clearTimeout(reconnectTimer);
             }
+            if (heartbeatTimer) {
+                clearInterval(heartbeatTimer);
+            }
+            document.removeEventListener("visibilitychange", handleVisibility);
+            window.removeEventListener("focus", handleVisibility);
+            window.removeEventListener("pageshow", handleVisibility);
             ws?.close();
         };
     }, [dispatch]);

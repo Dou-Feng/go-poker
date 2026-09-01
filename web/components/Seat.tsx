@@ -152,7 +152,7 @@ export default function Seat({ player, id, reveal }: seatProps) {
                             </div>
                         </div>
                     )}
-                    {isMine && !running && player.ready && (
+                    {!running && player.ready && (
                         <div className="absolute inset-0 z-10 flex items-center justify-center rounded-xl bg-black/50">
                             <p className="text-base font-semibold text-white/90 sm:text-xl">
                                 {t("ready")}

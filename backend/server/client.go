@@ -341,6 +341,10 @@ func (c *Client) processEvents(rawMessage []byte) error {
 		handleFold(c)
 		return nil
 
+	case actionPing:
+		c.send <- createPong()
+		return nil
+
 	default:
 		return errors.New("unexpected message action")
 	}

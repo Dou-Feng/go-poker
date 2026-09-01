@@ -32,6 +32,7 @@ const (
 	actionGetHistory   string = "get-history"
 	actionToggleReady  string = "toggle-ready"
 	actionMoveSeat     string = "move-seat"
+	actionPing         string = "ping"
 )
 
 type base struct {
@@ -173,6 +174,10 @@ type moveSeat struct {
 	SeatID uint `json:"seatID"`
 }
 
+type ping struct {
+	base // actionPing
+}
+
 // outbound (server) actions
 const (
 	actionNewMessage       string = "new-message"
@@ -186,6 +191,7 @@ const (
 	actionError            string = "error"
 	actionLoginResult      string = "login-result"
 	actionHistory          string = "history"
+	actionPong             string = "pong"
 )
 
 type newMessage struct {
