@@ -132,16 +132,22 @@ func (t *table) timeoutPlayer(playerUUID string) {
 		slog.Default().Warn("Timeout sit out", "error", err)
 	}
 
-	if _, err := flushPlayerSession(
-		t.rdb,
-		view.Players[position].Username,
-		t.name,
-		view.Players[position].TotalBuyIn,
-		view.Players[position].Stack,
-		view.Players[position].Stats,
-	); err != nil {
-		slog.Default().Warn("Timeout flush", "error", err)
+	// Settle the timed-out player's session with the post-fold state.
+	after := t.game.GenerateOmniView()
+	for j := range after.Players {
+		if after.Players[j].UUID == playerUUID {
+			if _, err := flushPlayerSession(t.rdb, after.Players[j].Username, t.name, after.Players[j].TotalBuyIn, after.Players[j].Stack, after.Players[j].Stats); err != nil {
+				slog.Default().Warn("Timeout flush", "error", err)
+			}
+			break
+		}
 	}
+
+	// Kick the player out and put the room back into the ready phase: every
+	// remaining player becomes not-ready, the game returns to the initial
+	// state, and stacks are preserved so players can rebuy without losing
+	// their chips.
+	poker.ResetToReadyPhase(t.game)
 
 	t.broadcast <- createUpdatedGameBytes(t)
 }

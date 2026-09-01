@@ -229,6 +229,11 @@ func (g *Game) dropPlayer(pn uint) {
 	shift(&g.actionNum)
 
 	g.players = append(g.players[:pn], g.players[pn+1:]...)
+
+	// Re-index player positions after the removal.
+	for i := range g.players {
+		g.players[i].Position = uint(i)
+	}
 }
 
 // RemovePlayer removes a player from the game entirely, freeing their seat.
@@ -245,6 +250,42 @@ func RemovePlayer(g *Game, pn uint) error {
 		g.updateBlindNums()
 	}
 	return nil
+}
+
+// ResetToReadyPhase puts the game back into the pre-game state without
+// clearing player stacks: players who have left are dropped, everyone else
+// becomes not-ready, and the hand state is cleared so players can rebuy and
+// ready up again.
+func ResetToReadyPhase(g *Game) {
+	g.mtx.Lock()
+	defer g.mtx.Unlock()
+
+	// Drop players who have left the room (e.g. offline timeout).
+	for i := len(g.players) - 1; i >= 0; i-- {
+		if g.players[i].Left {
+			g.dropPlayer(uint(i))
+		}
+	}
+
+	g.running = false
+	g.pots = []Pot{}
+	g.communityCards = make([]Card, 5)
+	g.deck = DefaultDeck
+	g.setStageAndBetting(PreDeal, false)
+
+	for i := range g.players {
+		g.players[i].Ready = false
+		g.players[i].In = false
+		g.players[i].Called = false
+		g.players[i].Bet = 0
+		g.players[i].TotalBet = 0
+		g.players[i].Cards = [2]Card{0, 0}
+		g.players[i].Left = false
+	}
+
+	if len(g.players) > 0 {
+		g.updateBlindNums()
+	}
 }
 
 func (g *Game) resetForNextHand() {

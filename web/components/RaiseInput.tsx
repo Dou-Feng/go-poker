@@ -13,7 +13,7 @@ type raiseProps = {
 };
 function button() {
     return classNames(
-        "mx-0.5 my-1 rounded-xl border border-2 border-zinc-600 px-3 py-2 text-base text-neutral-200 hover:bg-zinc-600 font-light sm:px-4 sm:py-2 sm:text-lg"
+        "mx-0.5 my-1 rounded-xl border border-2 border-zinc-600 px-3 py-2 text-base text-neutral-200 hover:bg-zinc-600 font-normal sm:px-4 sm:py-2 sm:text-lg"
     );
 }
 

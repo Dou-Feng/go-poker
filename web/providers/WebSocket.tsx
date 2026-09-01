@@ -29,19 +29,31 @@ export function SocketProvider(props: SocketProviderProps) {
         const wsUrl =
             process.env.NEXT_PUBLIC_WS_URL ??
             `${window.location.origin.replace("http", "ws")}/ws`;
-        console.log("websocket url: ", wsUrl);
+        let ws: WebSocket | null = null;
+        let disposed = false;
+        let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 
-        const ws = new WebSocket(wsUrl);
-        ws.onopen = () => {
-            console.log("websocket connected");
-        };
-        ws.onclose = () => {
-            console.log("websocket disconnected");
-        };
-        ws.onerror = (error) => {
-            console.error("websocket error: ", error);
-        };
-        ws.onmessage = (e) => {
+        const connect = () => {
+            if (disposed) {
+                return;
+            }
+            console.log("websocket url: ", wsUrl);
+            ws = new WebSocket(wsUrl);
+            ws.onopen = () => {
+                console.log("websocket connected");
+                setSocket(ws);
+            };
+            ws.onclose = () => {
+                console.log("websocket disconnected");
+                setSocket(null);
+                if (!disposed) {
+                    reconnectTimer = setTimeout(connect, 1000);
+                }
+            };
+            ws.onerror = (error) => {
+                console.error("websocket error: ", error);
+            };
+            ws.onmessage = (e) => {
             let event = JSON.parse(e.data);
             switch (event.action) {
                 case "new-message":
@@ -169,12 +181,17 @@ export function SocketProvider(props: SocketProviderProps) {
                 default:
                     throw new Error();
             }
+            };
         };
 
-        setSocket(ws);
+        connect();
 
         return () => {
-            ws.close();
+            disposed = true;
+            if (reconnectTimer) {
+                clearTimeout(reconnectTimer);
+            }
+            ws?.close();
         };
     }, [dispatch]);
 

@@ -4,7 +4,7 @@ import Register from "../components/Register";
 import Lobby from "../components/Lobby";
 import Profile from "../components/Profile";
 import Toast from "../components/Toast";
-import { useContext, useEffect, useRef } from "react";
+import { useContext, useEffect } from "react";
 import { AppContext } from "../providers/AppStore";
 import { useSocket } from "../hooks/useSocket";
 import { joinTable, reconnectUser } from "../actions/actions";
@@ -14,7 +14,6 @@ import { detectLanguage } from "../lib/language";
 export default function IndexPage() {
     const { appState, dispatch } = useContext(AppContext);
     const socket = useSocket();
-    const reconnectAttempted = useRef(false);
 
     // Restore the saved language preference, or detect a default based on
     // the browser locale and IP geolocation for first-time visitors.
@@ -30,12 +29,12 @@ export default function IndexPage() {
         });
     }, [dispatch]);
 
-    // Reconnect to a previous session if one exists in localStorage.
+    // Reconnect to a previous session if one exists in localStorage. This also
+    // re-runs whenever the socket reconnects after a disconnect.
     useEffect(() => {
-        if (!socket || reconnectAttempted.current) {
+        if (!socket) {
             return;
         }
-        reconnectAttempted.current = true;
 
         const user = loadUser();
         if (!user) {

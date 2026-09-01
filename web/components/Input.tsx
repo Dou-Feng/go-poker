@@ -57,7 +57,7 @@ export default function Input() {
             return <RaiseInput setShowRaise={setShowRaise} showRaise={showRaise} />;
         }
         return (
-            <div className="flex w-full justify-center p-2 sm:p-6">
+            <div className="flex w-full justify-center p-2 pb-4 sm:p-6">
                 <div className="flex flex-row flex-wrap items-center justify-center gap-1 rounded-2xl border-2 border-amber-300 bg-zinc-900/80 p-2 shadow-lg sm:p-3">
                     <InputButton
                         action={() => handleCall(appState.username, callAmount)}
@@ -86,7 +86,7 @@ export default function Input() {
     }
 
     return (
-        <div className="flex w-full flex-row flex-wrap items-center justify-center gap-1 p-2 sm:p-6">
+        <div className="flex w-full flex-row flex-wrap items-center justify-center gap-1 p-2 pb-4 sm:p-6">
             <InputButton
                 action={() => handleCall(appState.username, callAmount)}
                 title={canCall ? t("call") : t("call") + " (" + callAmount + ")"}
