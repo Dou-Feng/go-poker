@@ -26,7 +26,9 @@ export function SocketProvider(props: SocketProviderProps) {
             return;
         }
 
-        const wsUrl = `${window.location.origin.replace("http", "ws")}/ws`;
+        const wsUrl =
+            process.env.NEXT_PUBLIC_WS_URL ??
+            `${window.location.origin.replace("http", "ws")}/ws`;
         console.log("websocket url: ", wsUrl);
 
         const ws = new WebSocket(wsUrl);
