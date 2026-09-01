@@ -2,11 +2,7 @@ import { useContext } from "react";
 import { startGame } from "../actions/actions";
 import { useSocket } from "../hooks/useSocket";
 import { AppContext } from "../providers/AppStore";
-import { Player } from "../interfaces/index";
-
-type startProps = {
-    players: (Player | null)[];
-};
+import { useTranslation } from "../hooks/useTranslation";
 
 function handleStartGame(socket: WebSocket | null) {
     if (socket) {
@@ -14,11 +10,12 @@ function handleStartGame(socket: WebSocket | null) {
     }
 }
 
-export default function Start({ players }: startProps) {
+export default function Start() {
     const socket = useSocket();
-    const { appState, dispatch } = useContext(AppContext);
+    const { appState } = useContext(AppContext);
+    const { t } = useTranslation();
     const game = appState.game;
-    const readyPlayers = players.filter((player) => player != null);
+    const readyPlayers = game?.players ?? [];
 
     if (!game) {
         return null;
@@ -27,10 +24,10 @@ export default function Start({ players }: startProps) {
     if (!game.running && readyPlayers.length < 2) {
         return (
             <div
-                className=" m-10 rounded-sm border border-2 border-neutral-400 p-2 px-4 py-2 text-2xl font-light text-neutral-300 opacity-10"
-                title="Must have 2 or more players to start game"
+                className=" m-1 rounded-sm border border-2 border-neutral-400 p-2 px-4 py-2 text-xl font-light text-neutral-300 opacity-10 sm:m-10 sm:text-2xl"
+                title={t("mustHaveTwoPlayers")}
             >
-                Start
+                {t("start")}
             </div>
         );
     }
@@ -38,10 +35,10 @@ export default function Start({ players }: startProps) {
     if (!game.running && readyPlayers.length >= 2) {
         return (
             <button
-                className=" m-10 rounded-sm border border-2 border-neutral-400 p-2 px-4 py-2 text-2xl font-normal text-neutral-300 hover:underline"
+                className=" m-1 rounded-sm border border-2 border-neutral-400 p-2 px-4 py-2 text-xl font-normal text-neutral-300 hover:underline sm:m-10 sm:text-2xl"
                 onClick={() => handleStartGame(socket)}
             >
-                Start
+                {t("start")}
             </button>
         );
     }

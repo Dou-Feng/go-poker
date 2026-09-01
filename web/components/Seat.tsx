@@ -1,14 +1,18 @@
-import { useState, useContext, useEffect } from "react";
+import { useContext } from "react";
 import { AppContext } from "../providers/AppStore";
 import { Game, Player } from "../interfaces/index";
 import Card from "./Card";
 import BuyIn from "./BuyIn";
 import classNames from "classnames";
+import { useTranslation } from "../hooks/useTranslation";
+import Avatar from "./Avatar";
 
 type seatProps = {
     player: Player | null;
     id: number;
     reveal: boolean;
+    selected: boolean;
+    onSelect: () => void;
 };
 
 function chipPosition(id: number) {
@@ -31,7 +35,7 @@ function active(player: Player, game: Game) {
     return classNames(
         {
             // betting and player's turn
-            "shadow-[0px_0px_40px_2px_rgba(255,255,255,255.3)] bg-neutral-100 text-zinc-900":
+            "shadow-[0px_0px_40px_2px_rgba(255,255,255,255.3)] bg-neutral-100 text-zinc-900 animate-seat-glow":
                 action && game.betting,
 
             // betting and not player's turn
@@ -45,26 +49,42 @@ function active(player: Player, game: Game) {
             "bg-zinc-900 text-neutral-100 ": !winner && !game.betting,
         },
 
-        "rounded-xl m-4 h-20 w-56 flex flex-row justify-start items-center z-2"
+        "rounded-xl m-1 sm:m-4 h-16 w-32 sm:h-20 sm:w-56 flex flex-row justify-start items-center z-2"
     );
 }
 
-export default function Seat({ player, id, reveal }: seatProps) {
+export default function Seat({ player, id, reveal, selected, onSelect }: seatProps) {
     const { appState, dispatch } = useContext(AppContext);
-    const [sitDown, setSitDown] = useState(false);
+    const { t } = useTranslation();
 
-    let hidden = false;
-    if (player && appState.game) {
-        if (appState.game.running) {
-            if (appState.clientID !== player?.uuid) {
-                hidden = true;
-            }
-        }
-        // This is the player's seat
+    const game = appState.game;
+    const running = game?.running ?? false;
+
+    // Occupied seat.
+    if (player && game) {
+        const hidden = running && appState.clientID !== player.uuid;
+        const openStats = () => {
+            dispatch({
+                type: "setProfile",
+                payload: {
+                    username: player.username,
+                    avatar: player.avatar || "🙂",
+                    avatarImage: player.avatarImage,
+                    chips: player.stack,
+                    friends: [],
+                    stats: player.stats,
+                },
+            });
+        };
         return (
             <div className="relative">
-                <div className={active(player, appState.game)}>
-                    <div className="relative right-2 flex flex-row items-center justify-center">
+                <div
+                    className={active(player, game)}
+                    onClick={openStats}
+                    title={t("viewRoomStats")}
+                    style={{ cursor: "pointer" }}
+                >
+                    <div className="relative right-1 sm:right-2 flex flex-row items-center justify-center">
                         {player.cards.map((c, i) => (
                             <div key={i} className="mx-0.5">
                                 <Card
@@ -76,55 +96,84 @@ export default function Seat({ player, id, reveal }: seatProps) {
                             </div>
                         ))}
                     </div>
-                    <div className="flex flex-col py-4 pr-2 pl-1">
-                        <p className="-mb-1 text-lg font-normal">{player.username}</p>
-                        <p className="text-lg font-semibold">{player.stack}</p>
+                    <div className="flex min-w-0 flex-1 flex-row items-center rounded-md px-1.5 py-0.5">
+                        <div className="flex w-1/2 items-center justify-center">
+                            <Avatar
+                                username={player.username}
+                                emoji={player.avatar || "🙂"}
+                                hasImage={player.avatarImage}
+                                size={44}
+                            />
+                        </div>
+                        <div className="flex w-1/2 min-w-0 flex-col justify-center leading-tight">
+                            <p className="truncate text-sm font-normal sm:text-base">
+                                {player.username}
+                            </p>
+                            <p className="text-sm font-semibold sm:text-base">{player.stack}</p>
+                        </div>
                     </div>
                 </div>
                 <div className={chipPosition(id)}>
-                    {appState.game.running && appState.game.dealer == player.position && (
-                        <div className="mx-3 my-3 flex h-7 w-8 items-center justify-center rounded-[50%] bg-white text-xl font-bold text-purple-800">
+                    {running && game.dealer == player.position && (
+                        <div className="mx-1 my-1 flex h-5 w-6 items-center justify-center rounded-[50%] bg-white text-sm font-bold text-purple-800 sm:mx-3 sm:my-3 sm:h-7 sm:w-8 sm:text-xl">
                             D
                         </div>
                     )}
                     {player.bet !== 0 && (
-                        <p className=" flex h-8 w-12 items-center justify-center rounded-3xl bg-amber-300 text-xl font-semibold text-zinc-900">
+                        <p
+                            key={player.bet}
+                            className="animate-chip-pop flex h-6 w-9 items-center justify-center rounded-3xl bg-amber-300 text-sm font-semibold text-zinc-900 sm:h-8 sm:w-12 sm:text-xl"
+                        >
                             {player.bet}
                         </p>
                     )}
                 </div>
             </div>
         );
-        // player already sat down, and this seat does not belong to them
-    } else if (player?.uuid != appState.clientID && !appState.game?.running) {
+    }
+
+    // Empty seat. Only interactive once the game is loaded and not running.
+    if (!game || running) {
         return (
             <div>
-                <button className="m-4 h-20 w-56 rounded-2xl bg-neutral-700 p-2 text-neutral-400 opacity-20">
-                    <h2 className="text-4xl">{id}</h2>
+                <button className="m-1 h-16 w-32 rounded-2xl bg-neutral-700 p-2 text-neutral-400 opacity-20 sm:m-4 sm:h-20 sm:w-56">
+                    <h2 className="text-3xl sm:text-4xl">{id}</h2>
                 </button>
             </div>
         );
-        // player has not yet sat down, all seats are open
-    } else if (!appState.game?.running) {
+    }
+
+    const canSit = !appState.clientID;
+
+    if (canSit && selected) {
         return (
             <div>
-                {sitDown && (
-                    <div className="m-4 h-20 w-56 rounded-2xl bg-neutral-700 text-neutral-100">
-                        <BuyIn seatID={id} sitDown={sitDown} setSitDown={setSitDown} />
-                    </div>
-                )}
-                {!sitDown && (
-                    <button
-                        className="m-4 h-20 w-56 rounded-2xl bg-neutral-700 p-2 text-neutral-100"
-                        onClick={() => setSitDown(!sitDown)}
-                    >
-                        <h2 className="text-4xl">{id}</h2>
-                        <p className="opacity-70">Open</p>
-                    </button>
-                )}
+                <div className="m-1 h-16 w-32 rounded-2xl bg-neutral-700 text-neutral-100 sm:m-4 sm:h-20 sm:w-56">
+                    <BuyIn seatID={id} onClose={onSelect} />
+                </div>
             </div>
         );
-    } else {
-        return <div></div>;
     }
+
+    if (canSit) {
+        return (
+            <div>
+                <button
+                    className="m-1 h-16 w-32 rounded-2xl bg-neutral-700 p-2 text-neutral-100 sm:m-4 sm:h-20 sm:w-56"
+                    onClick={onSelect}
+                >
+                    <h2 className="text-3xl sm:text-4xl">{id}</h2>
+                    <p className="text-xs opacity-70 sm:text-base">{t("open")}</p>
+                </button>
+            </div>
+        );
+    }
+
+    return (
+        <div>
+            <button className="m-1 h-16 w-32 rounded-2xl bg-neutral-700 p-2 text-neutral-400 opacity-20 sm:m-4 sm:h-20 sm:w-56">
+                <h2 className="text-3xl sm:text-4xl">{id}</h2>
+            </button>
+        </div>
+    );
 }

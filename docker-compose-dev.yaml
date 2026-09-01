@@ -8,6 +8,8 @@ services:
       - 8080:8080
     environment:
       REDIS_URL: ${REDIS_URL}
+    volumes:
+      - ./.env:/app/.env   # 挂载 .env 文件到容器内
     depends_on:
       - redis
 

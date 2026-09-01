@@ -83,8 +83,27 @@ func bet(g *Game, pn uint, data uint) error {
 		return betLegalError
 	}
 
+	callAmount := minBet - p.Bet
+
 	g.players[pn].putInChips(betVal)
 	g.players[pn].Called = true
+
+	// record per-player statistics for the session
+	if betVal == 0 {
+		// check
+	} else if betVal == callAmount {
+		g.players[pn].Stats.Calls++
+	} else {
+		g.players[pn].Stats.Raises++
+		g.betsThisStreet++
+		if g.betsThisStreet == 2 {
+			g.players[pn].Stats.ThreeBets++
+		}
+	}
+	if g.getStage() == PreFlop && betVal > 0 {
+		g.players[pn].Stats.VPIP++
+		g.players[pn].Stats.VPIPByPos[g.positionLabel(pn)]++
+	}
 
 	g.updateRoundInfo()
 
@@ -127,6 +146,16 @@ func SetUsername(g *Game, pn uint, data string) error {
 	g.mtx.Lock()
 	defer g.mtx.Unlock()
 	return setUsername(g, pn, data)
+}
+
+// SetAvatar sets a player's display avatar (an emoji and/or an image flag).
+func SetAvatar(g *Game, pn uint, avatar string, hasImage bool) error {
+	g.mtx.Lock()
+	defer g.mtx.Unlock()
+
+	g.getPlayer(pn).Avatar = avatar
+	g.getPlayer(pn).AvatarImage = hasImage
+	return nil
 }
 
 func setUsername(g *Game, pn uint, data string) error {
@@ -209,6 +238,7 @@ func deal(g *Game, pn uint, data uint) error {
 		g.players[i].Called = false
 	}
 
+	g.betsThisStreet = 0
 	g.minRaise = g.config.BigBlind
 
 	//TODO: if all or all but one are all-in and its not the end, don't set betting to true on the next deal
@@ -236,6 +266,7 @@ func deal(g *Game, pn uint, data uint) error {
 				g.players[i].Cards[0] = g.deck.Pop()
 				g.players[i].Cards[1] = g.deck.Pop()
 				g.players[i].In = true
+				g.players[i].Stats.HandsPlayed++
 			} else {
 				g.players[i].Cards[0] = 0
 				g.players[i].Cards[1] = 0
@@ -306,6 +337,7 @@ func fold(g *Game, pn uint, data uint) error {
 	}
 
 	p.In = false
+	p.Stats.Folds++
 
 	g.updateRoundInfo()
 
@@ -336,6 +368,23 @@ func leave(g *Game, pn uint, data uint) error {
 	p.Left = true
 
 	return nil
+}
+
+// SitOut folds a player out of the current hand (if any) and marks them as
+// having left. Unlike Fold+Leave called separately, this works even when it is
+// not the player's turn — it is used to remove offline or departing players.
+func SitOut(g *Game, pn uint, data uint) error {
+	g.mtx.Lock()
+	defer g.mtx.Unlock()
+
+	p := g.getPlayer(pn)
+	if p.In {
+		p.In = false
+		p.Stats.Folds++
+		g.updateRoundInfo()
+	}
+
+	return leave(g, pn, data)
 }
 
 // ToggleReady marks a player as "ready" if they are currently "not ready"

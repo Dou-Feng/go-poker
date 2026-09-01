@@ -16,6 +16,56 @@ export type AppState = {
     clientID: string | null;
     table: string | null;
     game: Game | null;
+    tables: TableInfo[];
+    authError: string | null;
+    chips: number | null;
+    avatar: string | null;
+    avatarImage: boolean;
+    friends: string[];
+    stats: PlayerStats | null;
+    profile: Profile | null;
+    history: HistoryRecord[];
+    language: "en" | "zh";
+};
+
+export type TableInfo = {
+    name: string;
+    players: number;
+    running: boolean;
+    spectators: number;
+    locked: boolean;
+};
+
+export type PlayerStats = {
+    handsPlayed: number;
+    handsWon: number;
+    folds: number;
+    calls: number;
+    raises: number;
+    threeBets: number;
+    maxPotWon: number;
+    vpip: number;
+    vpipByPos: number[];
+};
+
+export type Profile = {
+    username: string;
+    avatar: string;
+    avatarImage: boolean;
+    chips: number;
+    friends: string[];
+    stats: PlayerStats;
+};
+
+export type HistoryRecord = {
+    room: string;
+    username: string;
+    time: string;
+    buyIn: number;
+    net: number;
+    avatar: string;
+    avatarImage: boolean;
+    stats: PlayerStats;
 };
 
 export type Card = string;
@@ -34,6 +84,9 @@ export type Player = {
     bet: number;
     totalBet: number;
     cards: Card[];
+    stats: PlayerStats;
+    avatar: string;
+    avatarImage: boolean;
 };
 
 export type Game = {
@@ -54,9 +107,11 @@ export type Game = {
 };
 
 export type Config = {
-    maxBuyIn: number;
+    maxBuy: number;
     bb: number;
     sb: number;
+    buyIn: number;
+    maxPlayers: number;
 };
 
 export type Pot = {

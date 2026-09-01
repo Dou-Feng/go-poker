@@ -1,49 +1,38 @@
-import React, { useState, useContext, useCallback } from "react";
+import { useContext } from "react";
 import { takeSeat, sendLog } from "../actions/actions";
 import { useSocket } from "../hooks/useSocket";
 import { AppContext } from "../providers/AppStore";
 import { FcCheckmark } from "react-icons/fc";
+import { useTranslation } from "../hooks/useTranslation";
 
 type buyInProps = {
     seatID: number;
-    sitDown: boolean;
-    setSitDown: React.Dispatch<React.SetStateAction<boolean>>;
+    onClose: () => void;
 };
 
-export default function BuyIn({ seatID, sitDown, setSitDown }: buyInProps) {
+export default function BuyIn({ seatID, onClose }: buyInProps) {
     const socket = useSocket();
-    const { appState, dispatch } = useContext(AppContext);
-    const [buyIn, setBuyIn] = useState(
-        appState.game?.config.maxBuyIn ? appState.game?.config.maxBuyIn : 2000
-    );
+    const { appState } = useContext(AppContext);
+    const { t } = useTranslation();
 
-    const handleBuyIn = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-        const amount = parseInt(e.target.value);
-        setBuyIn(amount);
-    }, []);
+    // The buy-in amount is fixed per room.
+    const buyIn = appState.game?.config.buyIn ?? 200;
 
     const handleSitDown = () => {
         if (socket && appState.username) {
             takeSeat(socket, appState.username, seatID, buyIn);
-            let message = appState.username + " buys in for " + buyIn;
-            sendLog(socket, message);
-            setSitDown(!sitDown);
+            sendLog(socket, appState.username + " buys in for " + buyIn);
         }
+        onClose();
     };
     return (
         <div className="relative right-1 m-4 flex h-full w-full flex-col items-start justify-center">
             <p className="-mb-1 text-lg font-semibold">{appState.username}</p>
             <div className="flex flex-row items-center">
-                <p>Buy In: </p>
-                <input
-                    autoFocus
-                    className="ml-4 mr-2 w-20 rounded-sm bg-neutral-500 p-1 text-white focus:outline-none"
-                    id="buyIn"
-                    type="number"
-                    value={buyIn}
-                    onChange={handleBuyIn}
-                />
-                <button onClick={handleSitDown} className="text-2xl">
+                <p>
+                    {t("buyIn")} {buyIn}
+                </p>
+                <button onClick={handleSitDown} className="ml-3 text-2xl">
                     <FcCheckmark />
                 </button>
             </div>

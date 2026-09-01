@@ -186,14 +186,14 @@ func TestIntegration_Scenarios(t *testing.T) {
 			t.Errorf("Test failed - error dealing: %s", err)
 		}
 
-		err = Bet(g, pn_a, 25)
+		err = Bet(g, pn_a, 40)
 
 		if err != nil {
 
 			t.Errorf("Test failed - error betting: %s", err)
 		}
 
-		if g.players[pn_a].Bet != 25 {
+		if g.players[pn_a].Bet != 40 {
 			t.Errorf("Betting mechanic not working.")
 		}
 	})
@@ -250,13 +250,13 @@ func TestIntegration_Scenarios(t *testing.T) {
 			t.Errorf("Test failed - error dealing: %s", err)
 		}
 
-		err = Bet(g, pn_a, 25)
+		err = Bet(g, pn_a, 20)
 
 		if err != nil {
 			t.Errorf("Test failed - error betting: %s", err)
 		}
 
-		err = Bet(g, pn_b, 15)
+		err = Bet(g, pn_b, 10)
 
 		if err != nil {
 			t.Errorf("Test failed - error betting: %s", err)
@@ -270,19 +270,19 @@ func TestIntegration_Scenarios(t *testing.T) {
 
 		// Flop
 
-		err = Bet(g, pn_b, 25)
+		err = Bet(g, pn_b, 20)
 
 		if err != nil {
 			t.Errorf("Test failed - error betting: %s", err)
 		}
 
-		err = Bet(g, pn_c, 25)
+		err = Bet(g, pn_c, 20)
 
 		if err != nil {
 			t.Errorf("Test failed - error betting: %s", err)
 		}
 
-		err = Bet(g, pn_a, 25)
+		err = Bet(g, pn_a, 20)
 
 		if err != nil {
 			t.Errorf("Test failed - error betting: %s", err)
@@ -381,13 +381,13 @@ func TestIntegration_Scenarios(t *testing.T) {
 			t.Errorf("Test failed - error dealing: %s", err)
 		}
 
-		err = Bet(g, pn_a, 25)
+		err = Bet(g, pn_a, 20)
 
 		if err != nil {
 			t.Errorf("Test failed - error betting: %s", err)
 		}
 
-		err = Bet(g, pn_b, 15)
+		err = Bet(g, pn_b, 10)
 
 		if err != nil {
 			t.Errorf("Test failed - error betting: %s", err)
@@ -401,7 +401,7 @@ func TestIntegration_Scenarios(t *testing.T) {
 
 		// Flop
 
-		err = Bet(g, pn_b, 25)
+		err = Bet(g, pn_b, 20)
 
 		if err != nil {
 			t.Errorf("Test failed - error betting: %s", err)
@@ -413,7 +413,7 @@ func TestIntegration_Scenarios(t *testing.T) {
 			t.Errorf("Test failed - error betting: %s", err)
 		}
 
-		err = Bet(g, pn_a, 25)
+		err = Bet(g, pn_a, 20)
 
 		if err != nil {
 			t.Errorf("Test failed - error betting: %s", err)
@@ -500,27 +500,13 @@ func TestIntegration_Scenarios(t *testing.T) {
 			t.Errorf("Test failed - error dealing: %s", err)
 		}
 
-		err = Bet(g, pn_a, 25)
+		err = Bet(g, pn_a, 40)
 
 		if err != nil {
 			t.Errorf("Test failed - error betting: %s", err)
 		}
 
-		err = Bet(g, pn_b, 15)
-
-		if err != nil {
-			t.Errorf("Test failed - error betting: %s", err)
-		}
-
-		err = Bet(g, pn_c, 0)
-
-		if err != nil {
-			t.Errorf("Test failed - error betting: %s", err)
-		}
-
-		// Flop
-
-		err = Bet(g, pn_b, 25)
+		err = Bet(g, pn_b, 50)
 
 		if err != nil {
 			t.Errorf("Test failed - error betting: %s", err)
@@ -532,13 +518,21 @@ func TestIntegration_Scenarios(t *testing.T) {
 			t.Errorf("Test failed - error betting: %s", err)
 		}
 
-		err = Bet(g, pn_a, 50)
+		err = Bet(g, pn_a, 20)
 
 		if err != nil {
 			t.Errorf("Test failed - error betting: %s", err)
 		}
 
-		err = Bet(g, pn_b, 25)
+		// Flop
+
+		err = Bet(g, pn_b, 20)
+
+		if err != nil {
+			t.Errorf("Test failed - error betting: %s", err)
+		}
+
+		err = Bet(g, pn_a, 20)
 
 		if err != nil {
 			t.Errorf("Test failed - error betting: %s", err)

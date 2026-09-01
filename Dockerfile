@@ -8,6 +8,7 @@ RUN npm run build
 FROM golang:1.24.3-alpine AS backend-builder
 WORKDIR /build
 COPY backend/ ./
+ENV GOPROXY=https://goproxy.cn,https://proxy.golang.org,direct
 RUN go build cmd/go-poker/main.go
 
 FROM alpine:latest

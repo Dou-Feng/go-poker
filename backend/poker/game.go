@@ -57,6 +57,8 @@ type GameConfig struct {
 	MaxBuy     uint `json:"maxBuy"`
 	BigBlind   uint `json:"bb"`
 	SmallBlind uint `json:"sb"`
+	BuyIn      uint `json:"buyIn"`
+	MaxPlayers uint `json:"maxPlayers"`
 }
 
 // Game represents a game of poker. It internally keeps track of state, can be mutated by actions,
@@ -79,6 +81,7 @@ type Game struct {
 	pots           []Pot
 	minRaise       uint
 	calledNum      uint
+	betsThisStreet uint
 }
 
 func (g *Game) getStage() GameStage {
@@ -172,6 +175,31 @@ func (g *Game) toCall() uint {
 	}
 
 	return val
+}
+
+// positionLabel returns the preflop position bucket for the given player,
+// relative to the current button. It is only meaningful after blinds are set.
+func (g *Game) positionLabel(pn uint) PositionLabel {
+	if pn == g.dealerNum {
+		return PosBTN
+	}
+	if pn == g.sbNum {
+		return PosSB
+	}
+	if pn == g.bbNum {
+		return PosBB
+	}
+
+	n := uint(len(g.players))
+	d := (pn + n - g.dealerNum) % n // seats clockwise from the button
+
+	if d == 3 {
+		return PosUTG
+	}
+	if d == n-1 {
+		return PosCO
+	}
+	return PosMP
 }
 
 func (g *Game) getLimit() uint {
@@ -277,8 +305,14 @@ func (g *Game) updateRoundInfo() {
 		}
 
 		// But this is special because cards do not need to be shown
+		var won uint = 0
 		for _, p := range g.players {
+			won += p.TotalBet
 			g.players[inPlayerNums[0]].Stack += p.TotalBet
+		}
+		g.players[inPlayerNums[0]].Stats.HandsWon++
+		if won > g.players[inPlayerNums[0]].Stats.MaxPotWon {
+			g.players[inPlayerNums[0]].Stats.MaxPotWon = won
 		}
 
 		g.resetForNextHand()
@@ -345,8 +379,13 @@ func (g *Game) updateRoundInfo() {
 			}
 
 			for _, num := range g.pots[i].WinningPlayerNums {
-				g.players[num].Stack += (g.pots[i].Amt / uint(len(g.pots[i].WinningPlayerNums)))
+				share := g.pots[i].Amt / uint(len(g.pots[i].WinningPlayerNums))
+				g.players[num].Stack += share
 				//TODO: leave the remainder in the middle! (fractional money will disappear currently)
+				g.players[num].Stats.HandsWon++
+				if share > g.players[num].Stats.MaxPotWon {
+					g.players[num].Stats.MaxPotWon = share
+				}
 			}
 		}
 
@@ -384,6 +423,19 @@ func NewGame() *Game {
 	newGame.communityCards = make([]Card, 5)
 
 	return &newGame
+}
+
+// Configure sets the table configuration before any hands are dealt.
+// It should only be called on a fresh game.
+func Configure(g *Game, sb uint, bb uint, buyIn uint, maxBuy uint, maxPlayers uint) {
+	g.mtx.Lock()
+	defer g.mtx.Unlock()
+
+	g.config.SmallBlind = sb
+	g.config.BigBlind = bb
+	g.config.BuyIn = buyIn
+	g.config.MaxBuy = maxBuy
+	g.config.MaxPlayers = maxPlayers
 }
 
 // Start checks that all players are ready, then sets running to true and deals the first hand

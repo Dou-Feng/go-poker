@@ -53,9 +53,17 @@ func New() (*Server, error) {
 	s.mountMiddleware()
 	s.mountSocket()
 	s.mountStatus()
+	s.mountAvatar()
 	s.mountStatic()
 
 	return s, nil
+}
+
+func (s *Server) mountAvatar() {
+	s.router.Route("/api/avatar", func(r chi.Router) {
+		r.Post("/", s.uploadAvatar)
+		r.Get("/", s.getAvatar)
+	})
 }
 
 func (s *Server) Run() error {

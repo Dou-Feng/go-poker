@@ -51,6 +51,9 @@ build/Release
 node_modules
 jspm_packages
 
+# TypeScript build cache
+*.tsbuildinfo
+
 # Optional npm cache directory
 .npm
 

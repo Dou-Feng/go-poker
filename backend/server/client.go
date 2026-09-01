@@ -47,6 +47,7 @@ func (c *Client) disconnect() {
 	c.hub.unregister <- c
 	if c.table != nil {
 		c.table.unregister <- c
+		c.table.markPlayerOffline(c.uuid)
 	}
 	c.conn.Close()
 }
@@ -157,7 +158,7 @@ func (c *Client) processEvents(rawMessage []byte) error {
 		if err != nil {
 			return err
 		}
-		handleJoinTable(c, table.Tablename)
+		handleJoinTable(c, table.Tablename, table.Password, table.PlayerUUID)
 		return nil
 
 	case actionLeaveTable:
@@ -194,6 +195,95 @@ func (c *Client) processEvents(rawMessage []byte) error {
 			return err
 		}
 		handleNewPlayer(c, player.Username)
+		return nil
+
+	case actionRegisterUser:
+		var user registerUser
+		err := json.Unmarshal(rawMessage, &user)
+		if err != nil {
+			return err
+		}
+		handleRegisterUser(c, user.Username, user.Password)
+		return nil
+
+	case actionLogin:
+		var login login
+		err := json.Unmarshal(rawMessage, &login)
+		if err != nil {
+			return err
+		}
+		handleLogin(c, login.Username, login.Password)
+		return nil
+
+	case actionAddFriend:
+		var friend addFriend
+		err := json.Unmarshal(rawMessage, &friend)
+		if err != nil {
+			return err
+		}
+		handleAddFriend(c, friend.Username)
+		return nil
+
+	case actionSetAvatar:
+		var avatar setAvatar
+		err := json.Unmarshal(rawMessage, &avatar)
+		if err != nil {
+			return err
+		}
+		handleSetAvatar(c, avatar.Avatar)
+		return nil
+
+	case actionReconnect:
+		var reconnect reconnectUser
+		err := json.Unmarshal(rawMessage, &reconnect)
+		if err != nil {
+			return err
+		}
+		handleReconnectUser(c, reconnect.Username)
+		return nil
+
+	case actionListTables:
+		handleListTables(c)
+		return nil
+
+	case actionCreateTable:
+		var table createTable
+		err := json.Unmarshal(rawMessage, &table)
+		if err != nil {
+			return err
+		}
+		handleCreateTable(c, table.Tablename, table.Password, table.SB, table.BB, table.BuyIn, table.MaxBuyIns, table.MaxPlayers)
+		return nil
+
+	case actionAddChips:
+		var chips addChips
+		err := json.Unmarshal(rawMessage, &chips)
+		if err != nil {
+			return err
+		}
+		handleAddChips(c, chips.Amount)
+		return nil
+
+	case actionRebuy:
+		var rebuy rebuy
+		err := json.Unmarshal(rawMessage, &rebuy)
+		if err != nil {
+			return err
+		}
+		handleRebuy(c, rebuy.Amount)
+		return nil
+
+	case actionGetUser:
+		var user getUser
+		err := json.Unmarshal(rawMessage, &user)
+		if err != nil {
+			return err
+		}
+		handleGetUser(c, user.Username)
+		return nil
+
+	case actionGetHistory:
+		handleGetHistory(c)
 		return nil
 
 	case actionTakeSeat:

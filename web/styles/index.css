@@ -1,3 +1,68 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@keyframes chip-pop {
+    0% {
+        transform: scale(0.4);
+        opacity: 0;
+    }
+    60% {
+        transform: scale(1.15);
+        opacity: 1;
+    }
+    100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+@keyframes seat-glow {
+    0%,
+    100% {
+        box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.25);
+    }
+    50% {
+        box-shadow: 0 0 24px 6px rgba(255, 255, 255, 0.55);
+    }
+}
+
+@keyframes winner-pop {
+    0% {
+        transform: scale(0.6) translateY(20px);
+        opacity: 0;
+    }
+    70% {
+        transform: scale(1.05) translateY(0);
+        opacity: 1;
+    }
+    100% {
+        transform: scale(1) translateY(0);
+        opacity: 1;
+    }
+}
+
+@keyframes fade-in {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+.animate-chip-pop {
+    animation: chip-pop 0.35s ease-out;
+}
+
+.animate-seat-glow {
+    animation: seat-glow 1.2s ease-in-out infinite;
+}
+
+.animate-winner-pop {
+    animation: winner-pop 0.5s ease-out;
+}
+
+.animate-fade-in {
+    animation: fade-in 0.3s ease-out;
+}

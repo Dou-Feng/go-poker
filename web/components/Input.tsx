@@ -2,12 +2,14 @@ import { useState, useContext } from "react";
 import { AppContext } from "../providers/AppStore";
 import { playerCall, playerCheck, playerFold, sendLog } from "../actions/actions";
 import { useSocket } from "../hooks/useSocket";
+import { useTranslation } from "../hooks/useTranslation";
 import InputButton from "./InputButton";
 import RaiseInput from "./RaiseInput";
 
 export default function Input() {
     const socket = useSocket();
     const { appState, dispatch } = useContext(AppContext);
+    const { t } = useTranslation();
     const [showRaise, setShowRaise] = useState(false);
 
     const handleCall = (user: string | null, amount: number) => {
@@ -49,48 +51,50 @@ export default function Input() {
             return <RaiseInput setShowRaise={setShowRaise} showRaise={showRaise} />;
         }
         return (
-            <div className="flex flex-row p-6">
+            <div className="flex w-full flex-row flex-wrap items-center justify-center gap-1 p-2 sm:p-6">
                 <InputButton
                     action={() => handleCall(appState.username, callAmount)}
-                    title={canCall ? "call" : "call (" + callAmount + ")"}
+                    title={canCall ? t("call") : t("call") + " (" + callAmount + ")"}
                     disabled={canCall}
                 />
                 <InputButton
                     action={() => setShowRaise(!showRaise)}
-                    title={"bet"}
+                    title={t("bet")}
                     disabled={false}
                 />
                 <InputButton
                     action={() => handleCheck(appState.username)}
-                    title={"check"}
+                    title={t("check")}
                     disabled={!canCheck}
                 />
                 <InputButton
                     action={() => handleFold(appState.username)}
-                    title={"fold"}
+                    title={t("fold")}
                     disabled={false}
+                    danger
                 />
             </div>
         );
     }
 
     return (
-        <div className="flex flex-row p-6">
+        <div className="flex w-full flex-row flex-wrap items-center justify-center gap-1 p-2 sm:p-6">
             <InputButton
                 action={() => handleCall(appState.username, callAmount)}
-                title={canCall ? "call" : "call (" + callAmount + ")"}
+                title={canCall ? t("call") : t("call") + " (" + callAmount + ")"}
                 disabled={true}
             />
-            <InputButton action={() => setShowRaise(!showRaise)} title={"bet"} disabled={true} />
+            <InputButton action={() => setShowRaise(!showRaise)} title={t("bet")} disabled={true} />
             <InputButton
                 action={() => handleCheck(appState.username)}
-                title={"check"}
+                title={t("check")}
                 disabled={true}
             />
             <InputButton
                 action={() => handleFold(appState.username)}
-                title={"fold"}
+                title={t("fold")}
                 disabled={true}
+                danger
             />
         </div>
     );

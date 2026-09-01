@@ -5,10 +5,12 @@ import { AppContext } from "../../providers/AppStore";
 import useChatScroll from "../../hooks/useChatScroll";
 import { FiSend } from "react-icons/fi";
 import { sendMessage } from "../../actions/actions";
+import { useTranslation } from "../../hooks/useTranslation";
 
 export default function Chat() {
     const socket = useSocket();
     const { appState, dispatch } = useContext(AppContext);
+    const { t } = useTranslation();
     const [inputValue, setInputValue] = useState("");
     const scrollRef = useChatScroll(appState.messages);
     const messageRef = useRef(null);
@@ -61,7 +63,7 @@ export default function Chat() {
                     id="input"
                     type="text"
                     value={inputValue}
-                    placeholder="say something..."
+                    placeholder={t("saySomething")}
                     onChange={handleChange}
                     ref={messageRef}
                 ></input>

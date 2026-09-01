@@ -8,10 +8,15 @@ type cardProps = {
     hidden: boolean;
 };
 
-function cardToString(card: CardType) {
-    // convert int32 cards to a unicode string that we can display directly
+type ParsedCard = {
+    rank: string;
+    suit: string;
+};
 
-    // card is the type representing a single laying card. It is 32 bits long, packed according to the following schematic:
+function cardToString(card: CardType): ParsedCard | null {
+    // convert int32 cards to a rank/suit pair that we can display directly
+
+    // card is the type representing a single playing card. It is 32 bits long, packed according to the following schematic:
     // 	+--------+--------+--------+--------+
     // 	|xxxbbbbb|bbbbbbbb|cdhsrrrr|xxpppppp|
     // 	+--------+--------+--------+--------+
@@ -23,7 +28,7 @@ function cardToString(card: CardType) {
 
     // opponents cards represented with "?"
     if (card === "?") {
-        return "?";
+        return null;
     }
 
     let c = parseInt(card);
@@ -31,14 +36,19 @@ function cardToString(card: CardType) {
     let rank = (c >> 8) & 0x0f;
     let suit = c & 0xf000;
 
-    const numToCharRanks = ["2", "3", "4", "5", "6", "7", "8", "9", "T", "J", "Q", "K", "A"];
-    const numToCharSuits = new Map();
+    const numToCharRanks = ["2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K", "A"];
+    const numToCharSuits = new Map<number, string>();
     numToCharSuits.set(0x8000, "C");
     numToCharSuits.set(0x4000, "D");
     numToCharSuits.set(0x2000, "H");
     numToCharSuits.set(0x1000, "S");
 
-    return numToCharRanks[rank] + numToCharSuits.get(suit);
+    const suitChar = numToCharSuits.get(suit);
+    if (!suitChar) {
+        return null;
+    }
+
+    return { rank: numToCharRanks[rank], suit: suitChar };
 }
 
 function getSuitChar(letter: string) {
@@ -52,64 +62,66 @@ function getSuitChar(letter: string) {
             return "\u2663";
         case "S":
             return "\u2660";
+        default:
+            return "";
     }
 }
 
-function color(card: CardType) {
+function color(suit: string) {
     return classNames(
         {
-            "text-red-700": card[1] == "H",
-            "text-blue-700": card[1] == "D",
-            "text-green-700": card[1] == "C",
-            "text-black": card[1] == "S",
+            "text-red-700": suit == "H",
+            "text-blue-700": suit == "D",
+            "text-green-700": suit == "C",
+            "text-black": suit == "S",
         },
-        "rounded-md border border-zinc-100 shadow-2xl bg-white pt-1 px-2.5 text-5xl font-normal w-16 h-24 flex items-center justify-start flex-col"
+        "rounded-md border border-zinc-100 shadow-2xl bg-white pt-0.5 px-1 text-2xl font-normal w-9 h-14 sm:pt-1 sm:px-2.5 sm:text-5xl sm:w-16 sm:h-24 flex items-center justify-start flex-col"
     );
 }
 
 export default function Card({ card, placeholder, folded, hidden }: cardProps) {
     if (placeholder) {
         return (
-            <div className="flex h-24 w-16 items-center justify-center rounded-md bg-green-900 opacity-20"></div>
+            <div className="flex h-14 w-9 items-center justify-center rounded-md bg-green-900 opacity-20 sm:h-24 sm:w-16"></div>
         );
     }
 
     const c = cardToString(card);
-    if (c == "2\u0000" || card == "0") {
+    if (!c) {
         return null;
     }
     if (hidden) {
         if (folded) {
-            return <div className={"flex h-24 w-16  "}></div>;
+            return <div className={"flex h-14 w-9 sm:h-24 sm:w-16"}></div>;
         }
         return (
             <div
                 className={
-                    "flex h-24 w-16 items-center justify-center rounded-md border-4 border border-white bg-red-900"
+                    "flex h-14 w-9 items-center justify-center rounded-md border-4 border border-white bg-red-900 sm:h-24 sm:w-16"
                 }
             ></div>
         );
     }
     if (folded) {
         return (
-            <div className={color(c)}>
+            <div className={color(c.suit)}>
                 <div
                     className={
-                        "flex w-full items-start justify-start text-3xl font-semibold opacity-40"
+                        "flex w-full items-start justify-start text-xl font-semibold opacity-40 sm:text-3xl"
                     }
                 >
-                    {c[0]}
+                    {c.rank}
                 </div>
-                <div className="opacity-40">{getSuitChar(c[1])}</div>
+                <div className="opacity-40">{getSuitChar(c.suit)}</div>
             </div>
         );
     }
     return (
-        <div className={color(c)}>
-            <div className={"flex w-full items-start justify-start text-3xl font-semibold"}>
-                {c[0]}
+        <div className={color(c.suit)}>
+            <div className={"flex w-full items-start justify-start text-xl font-semibold sm:text-3xl"}>
+                {c.rank}
             </div>
-            <div>{getSuitChar(c[1])}</div>
+            <div>{getSuitChar(c.suit)}</div>
         </div>
     );
 }

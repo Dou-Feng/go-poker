@@ -1,7 +1,23 @@
-export function joinTable(socket: WebSocket, tablename: string) {
+export function joinTable(
+    socket: WebSocket,
+    tablename: string,
+    playerUUID?: string,
+    password?: string
+) {
     socket.send(
         JSON.stringify({
             action: "join-table",
+            tablename: tablename,
+            ...(playerUUID ? { playerUUID } : {}),
+            ...(password ? { password } : {}),
+        })
+    );
+}
+
+export function leaveTable(socket: WebSocket, tablename: string) {
+    socket.send(
+        JSON.stringify({
+            action: "leave-table",
             tablename: tablename,
         })
     );
@@ -66,6 +82,116 @@ export function newPlayer(socket: WebSocket, username: string) {
         JSON.stringify({
             action: "new-player",
             username: username,
+        })
+    );
+}
+
+export function registerUser(socket: WebSocket, username: string, password: string, avatar: string) {
+    socket.send(
+        JSON.stringify({
+            action: "register-user",
+            username: username,
+            password: password,
+            avatar: avatar,
+        })
+    );
+}
+
+export function login(socket: WebSocket, username: string, password: string) {
+    socket.send(
+        JSON.stringify({
+            action: "login",
+            username: username,
+            password: password,
+        })
+    );
+}
+
+export function addFriend(socket: WebSocket, username: string) {
+    socket.send(
+        JSON.stringify({
+            action: "add-friend",
+            username: username,
+        })
+    );
+}
+
+export function setAvatar(socket: WebSocket, avatar: string) {
+    socket.send(
+        JSON.stringify({
+            action: "set-avatar",
+            avatar: avatar,
+        })
+    );
+}
+
+export function reconnectUser(socket: WebSocket, username: string) {
+    socket.send(
+        JSON.stringify({
+            action: "reconnect-user",
+            username: username,
+        })
+    );
+}
+
+export function listTables(socket: WebSocket) {
+    socket.send(
+        JSON.stringify({
+            action: "list-tables",
+        })
+    );
+}
+
+export type CreateTableOptions = {
+    password?: string;
+    sb?: number;
+    bb?: number;
+    buyIn?: number;
+    maxBuyIns?: number;
+    maxPlayers?: number;
+};
+
+export function createTable(socket: WebSocket, tablename: string, options?: CreateTableOptions) {
+    socket.send(
+        JSON.stringify({
+            action: "create-table",
+            tablename: tablename,
+            ...(options ?? {}),
+        })
+    );
+}
+
+export function addChips(socket: WebSocket, amount: number) {
+    socket.send(
+        JSON.stringify({
+            action: "add-chips",
+            amount: amount,
+        })
+    );
+}
+
+export function rebuy(socket: WebSocket, amount: number) {
+    socket.send(
+        JSON.stringify({
+            action: "rebuy",
+            amount: amount,
+        })
+    );
+}
+
+export function getUser(socket: WebSocket, username?: string) {
+    socket.send(
+        JSON.stringify({
+            action: "get-user",
+            ...(username ? { username } : {}),
+        })
+    );
+}
+
+export function getHistory(socket: WebSocket) {
+    socket.send(
+        JSON.stringify({
+            action: "get-history",
         })
     );
 }

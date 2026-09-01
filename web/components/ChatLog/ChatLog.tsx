@@ -2,20 +2,22 @@ import React, { useState } from "react";
 import { MdExpandLess } from "react-icons/md";
 import { MdExpandMore } from "react-icons/md";
 import classNames from "classnames";
+import { useTranslation } from "../../hooks/useTranslation";
 import Chat from "./Chat";
 import Log from "./Log";
 
 export default function ChatLog() {
     const [expand, setExpand] = useState(false);
     const [showChat, setShowChat] = useState(true);
+    const { t } = useTranslation();
 
     function chatHeight(expand: boolean) {
         return classNames(
             {
-                "h-96": expand,
-                "h-36": !expand,
+                "h-64 sm:h-96": expand,
+                "h-32 sm:h-36": !expand,
             },
-            "relative flex w-96 flex-col items-start justify-between rounded-tr-lg bg-zinc-700 p-3 text-neutral-400"
+            "relative flex w-full sm:w-96 flex-col items-start justify-between rounded-tr-lg bg-zinc-700 p-3 text-neutral-400"
         );
     }
 
@@ -32,10 +34,10 @@ export default function ChatLog() {
     return (
         <div>
             <button className={tabStyle(showChat)} onClick={() => setShowChat(true)}>
-                chat
+                {t("chat")}
             </button>
             <button className={tabStyle(!showChat)} onClick={() => setShowChat(false)}>
-                log
+                {t("log")}
             </button>
             <div className={chatHeight(expand)}>
                 {showChat && <Chat />}

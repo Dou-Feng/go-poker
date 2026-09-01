@@ -1,7 +1,8 @@
-import { useState, useContext, useEffect, useCallback } from "react";
+import { useState, useContext, useCallback } from "react";
 import { AppContext } from "../providers/AppStore";
 import { playerRaise, sendLog } from "../actions/actions";
 import { useSocket } from "../hooks/useSocket";
+import { useTranslation } from "../hooks/useTranslation";
 import InputButton from "./InputButton";
 import { Slider } from "@mantine/core";
 import classNames from "classnames";
@@ -12,13 +13,14 @@ type raiseProps = {
 };
 function button() {
     return classNames(
-        "mx-0.5 my-1.5 rounded-sm  border border-2 border-zinc-600  p-2 text-neutral-200 hover:bg-zinc-600 font-light"
+        "mx-0.5 my-1 rounded-sm border border-2 border-zinc-600 px-2 py-1 text-sm text-neutral-200 hover:bg-zinc-600 font-light sm:p-2 sm:text-base"
     );
 }
 
 export default function RaiseInput({ showRaise, setShowRaise }: raiseProps) {
     const socket = useSocket();
     const { appState, dispatch } = useContext(AppContext);
+    const { t } = useTranslation();
 
     if (!appState.game) {
         return null;
@@ -78,17 +80,17 @@ export default function RaiseInput({ showRaise, setShowRaise }: raiseProps) {
     };
 
     return (
-        <div className="flex flex-row items-end p-6">
+        <div className="flex w-full flex-row flex-wrap items-center justify-center gap-1 p-2 sm:p-6">
             <input
                 autoFocus
-                className="mx-1 w-24 rounded-sm border border-2 border-zinc-600 bg-zinc-800 p-2 text-2xl font-normal text-neutral-200 focus:outline-none"
+                className="mx-1 w-16 rounded-sm border border-2 border-zinc-600 bg-zinc-800 p-2 text-xl font-normal text-neutral-200 focus:outline-none sm:w-24 sm:text-2xl"
                 id="input"
                 type="text"
                 value={inputValue ? inputValue : ""}
                 onChange={handleChange}
             />
             <div className="mx-1 flex flex-col items-center justify-center rounded-sm border border-2 border-zinc-600 px-2">
-                <div className="flex flex-row items-center justify-between">
+                <div className="flex flex-row flex-wrap items-center justify-center">
                     <button
                         className={button()}
                         onClick={() =>
@@ -97,7 +99,7 @@ export default function RaiseInput({ showRaise, setShowRaise }: raiseProps) {
                             )
                         }
                     >
-                        min{" "}
+                        {t("min")}
                     </button>
                     <button
                         className={button()}
@@ -105,7 +107,7 @@ export default function RaiseInput({ showRaise, setShowRaise }: raiseProps) {
                             setInputValue(betValidator(half, minRaise, currentStack + currentBet))
                         }
                     >
-                        1/2 pot
+                        {t("halfPot")}
                     </button>
                     <button
                         className={button()}
@@ -115,7 +117,7 @@ export default function RaiseInput({ showRaise, setShowRaise }: raiseProps) {
                             )
                         }
                     >
-                        3/4 pot
+                        {t("threeQuarterPot")}
                     </button>
                     <button
                         className={button()}
@@ -123,7 +125,7 @@ export default function RaiseInput({ showRaise, setShowRaise }: raiseProps) {
                             setInputValue(betValidator(full, minRaise, currentStack + currentBet))
                         }
                     >
-                        pot
+                        {t("pot")}
                     </button>
                     <button
                         className={button()}
@@ -131,10 +133,10 @@ export default function RaiseInput({ showRaise, setShowRaise }: raiseProps) {
                             setInputValue(betValidator(allIn, minRaise, currentStack + currentBet))
                         }
                     >
-                        all in
+                        {t("allIn")}
                     </button>
                 </div>
-                <div className="w-64 pb-2">
+                <div className="w-36 pb-2 sm:w-64">
                     <Slider
                         value={inputValue}
                         onChange={setInputValue}
@@ -150,10 +152,15 @@ export default function RaiseInput({ showRaise, setShowRaise }: raiseProps) {
             </div>
             <InputButton
                 action={() => handleRaise(appState.username, inputValue - currentBet)}
-                title={"bet"}
+                title={t("bet")}
                 disabled={inputValue < minRaise || inputValue > currentStack + currentBet}
             />
-            <InputButton action={() => setShowRaise(!showRaise)} title={"close"} disabled={false} />
+            <InputButton
+                action={() => setShowRaise(!showRaise)}
+                title={t("close")}
+                disabled={false}
+                danger
+            />
         </div>
     );
 }
