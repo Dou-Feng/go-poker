@@ -44,6 +44,11 @@ func bet(g *Game, pn uint, data uint) error {
 
 	p := g.getPlayer(pn)
 
+	// A player who is already all-in cannot act again.
+	if p.allIn() {
+		return ErrIllegalAction
+	}
+
 	//rename this for readability
 	betVal := data
 
@@ -333,6 +338,11 @@ func fold(g *Game, pn uint, data uint) error {
 	p := g.getPlayer(pn)
 
 	if g.actionNum != pn {
+		return ErrIllegalAction
+	}
+
+	// A player who is all-in cannot fold.
+	if p.allIn() {
 		return ErrIllegalAction
 	}
 

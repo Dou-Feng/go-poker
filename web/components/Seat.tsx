@@ -34,7 +34,7 @@ function active(player: Player, game: Game) {
     return classNames(
         {
             // betting and player's turn
-            "shadow-[0px_0px_40px_2px_rgba(255,255,255,255.3)] bg-neutral-100 text-zinc-900 animate-seat-glow":
+            "shadow-[0px_0px_40px_2px_rgba(255,255,255,255.3)] bg-neutral-100 text-zinc-900":
                 action && game.betting,
 
             // betting and not player's turn

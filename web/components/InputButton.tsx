@@ -16,7 +16,7 @@ const getAction = (danger: boolean, disabled: boolean) => {
             "opacity-20 ": disabled,
         },
 
-        "mx-0.5 sm:mx-1 rounded-sm border-2 px-3 py-2 text-base sm:px-4 sm:text-xl"
+        "mx-0.5 sm:mx-1 rounded-xl border-2 px-3 py-2 text-base sm:px-4 sm:text-xl"
     );
 };
 

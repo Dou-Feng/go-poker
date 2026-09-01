@@ -143,7 +143,7 @@ export const translations = {
         halfPot: "1/2 底池",
         threeQuarterPot: "3/4 底池",
         pot: "底池",
-        allIn: "全下",
+        allIn: "all in",
         buyIn: "买入：",
         rebuy: "补码",
         handsPlayed: "手数",
