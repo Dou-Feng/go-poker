@@ -36,6 +36,7 @@ const (
 	actionMoveSeat     string = "move-seat"
 	actionVoteSettle   string = "vote-settle"
 	actionShowHand     string = "show-hand"
+	actionSpectate     string = "spectate"
 	actionPing         string = "ping"
 )
 
@@ -192,6 +193,9 @@ type voteSettle struct {
 
 type showHand struct {
 	base // actionShowHand
+}
+type spectate struct {
+	base // actionSpectate
 }
 type ping struct {
 	base // actionPing

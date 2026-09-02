@@ -255,17 +255,19 @@ func handleLeaveTable(c *Client, tablename string) {
 	if pos >= 0 {
 		pre := view.Players[pos]
 
-		// Fold the player out (if in a hand) and mark them as left.
-		if err := poker.SitOut(c.table.game, uint(pos), 0); err != nil {
+		// Mark the player as left; they fold on their turn (or immediately if
+		// it is already their turn).
+		if err := poker.LeaveHand(c.table.game, uint(pos)); err != nil {
 			slog.Default().Warn("Leave table", "error", err)
 		}
 
 		// Settle the session: merge stats, return the remaining stack to the
-		// wallet, and append a history entry. Prefer the post-fold snapshot,
-		// but fall back to the pre-fold one if the hand already ended and the
-		// player was dropped from the game.
+		// wallet, and append a history entry. The fold is counted here even if
+		// it happens later, when the action reaches the departed player. An
+		// all-in player who leaves is shown down instead of folded, so no fold
+		// is counted for them.
 		stats := pre.Stats
-		if pre.In {
+		if pre.In && pre.Stack > 0 {
 			stats.Folds++
 		}
 		after := c.table.game.GenerateOmniView()
@@ -273,7 +275,6 @@ func handleLeaveTable(c *Client, tablename string) {
 		for j := range after.Players {
 			if after.Players[j].UUID == c.uuid {
 				stillSeated = j
-				stats = after.Players[j].Stats
 				break
 			}
 		}
@@ -295,7 +296,15 @@ func handleLeaveTable(c *Client, tablename string) {
 	remaining := c.table.game.GenerateOmniView()
 	if len(remaining.Players) == 0 {
 		c.table.game.Reset()
+	} else if remaining.Stage == poker.PreDeal {
+		// A player left between hands: put the room back into the ready phase
+		// so the next hand waits for everyone to ready up.
+		poker.Pause(c.table.game)
 	}
+
+	// Detach the client from the departed player so re-joining is treated as
+	// a fresh spectator rather than re-seating them.
+	c.uuid = ""
 
 	c.table.broadcastGame()
 	c.table.unregister <- c
@@ -765,6 +774,16 @@ func handleShowHand(c *Client) {
 		return
 	}
 	c.table.broadcastGame()
+}
+
+// handleSpectate removes a seated player and turns their client into a
+// spectator.
+func handleSpectate(c *Client) {
+	if c.table == nil {
+		c.send <- createError("not in a room")
+		return
+	}
+	c.table.toggleSpectate(c)
 }
 
 func createSettlement(players []settlementPlayer, biggestWinner string, biggestAmount uint) []byte {

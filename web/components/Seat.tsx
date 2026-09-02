@@ -278,6 +278,10 @@ export default function Seat({ player, id, reveal }: seatProps) {
         // Already seated but not ready: move to this seat.
         moveSeat(socket, id);
       } else if (appState.username) {
+        if (appState.chips != null && appState.chips < buyIn) {
+          dispatch({ type: "setAuthError", payload: "not enough chips" });
+          return;
+        }
         takeSeat(socket, appState.username, id, buyIn);
         sendLog(socket, appState.username + " buys in for " + buyIn);
       }

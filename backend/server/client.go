@@ -32,6 +32,10 @@ type Client struct {
 	uuid     string          // UUID
 	username string
 	table    *table // Player's table
+
+	// spectateReserved marks that the player wants to move to the spectator
+	// side once the current hand ends.
+	spectateReserved bool
 }
 
 func newClient(conn *websocket.Conn, hub *Hub) *Client {
@@ -313,6 +317,10 @@ func (c *Client) processEvents(rawMessage []byte) error {
 
 	case actionShowHand:
 		handleShowHand(c)
+		return nil
+
+	case actionSpectate:
+		handleSpectate(c)
 		return nil
 
 	case actionTakeSeat:

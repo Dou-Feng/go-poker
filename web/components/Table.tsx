@@ -2,7 +2,7 @@ import Seat from "./Seat";
 import Felt from "./Felt";
 import { Game as GameType, Player } from "../interfaces";
 import { AppContext } from "../providers/AppStore";
-import { sendLog, dealGame } from "../actions/actions";
+import { sendLog, dealGame, queueNext } from "../actions/actions";
 import { useSocket } from "../hooks/useSocket";
 import { useTranslation } from "../hooks/useTranslation";
 import { useContext, useState, useEffect, useRef } from "react";
@@ -14,7 +14,7 @@ function seatPosition(
   total: number
 ): { left: string; top: string } {
   const angle = Math.PI / 2 + index * ((2 * Math.PI) / total);
-  const rx = 42;
+  const rx = 36;
   const ry = 40;
   return {
     left: `${50 + rx * Math.cos(angle)}%`,
@@ -47,6 +47,17 @@ function getWinners(game: GameType): WinnerResult[] {
     }
   }
   return results;
+}
+
+function getForfeitPot(game: GameType) {
+  // A settled pot with committed chips but no winners means the pot was
+  // forfeited (a departing player with the best hand).
+  for (const pot of game.pots) {
+    if (pot.amount > 0 && pot.winningPlayerNums.length === 0) {
+      return pot;
+    }
+  }
+  return null;
 }
 
 function handleWinner(game: GameType | null, socket: WebSocket | null) {
@@ -85,11 +96,23 @@ export default function Table() {
   const { appState } = useContext(AppContext);
   const { t } = useTranslation();
   const game = appState.game;
+  const me = game?.players.find((p) => p.uuid === appState.clientID);
+  const queued = !me && !!game?.waiting.includes(appState.username ?? "");
+  const buyIn = game?.config.buyIn ?? 0;
+  const maxBuyIns =
+    buyIn > 0 ? Math.floor((game?.config.maxBuy ?? 0) / buyIn) : 0;
+  const usedBuyIns = buyIn > 0 ? Math.floor((me?.totalBuyIn ?? 0) / buyIn) : 0;
+  const remainingBuyIns = Math.max(0, maxBuyIns - usedBuyIns);
   const [revealedPlayers, setRevealedPlayers] = useState<Player[]>([]);
   const [winners, setWinners] = useState<WinnerResult[]>([]);
+  const [forfeited, setForfeited] = useState(false);
   const shownHandRef = useRef<string>("");
 
   const maxPlayers = game?.config.maxPlayers ?? 6;
+
+  // Number of revealed board cards: each flip changes this even though the
+  // flop cards all share the same stage.
+  const boardCount = game?.communityCards?.filter((c) => !!c).length ?? 0;
 
   // Map game players to their visual seats (seatID is 1-based).
   const seats: (Player | null)[] = new Array(maxPlayers).fill(null);
@@ -115,7 +138,7 @@ export default function Table() {
       dealGame(socket);
     }, 900);
     return () => clearTimeout(timer);
-  }, [game?.running, game?.betting, game?.stage, socket]);
+  }, [game?.running, game?.betting, game?.stage, boardCount, socket]);
 
   useEffect(() => {
     // this effect triggers when betting is over
@@ -131,12 +154,13 @@ export default function Table() {
       return;
     }
     const results = getWinners(game);
-    if (results.length === 0) {
+    const forfeitPot = results.length === 0 ? getForfeitPot(game) : null;
+    if (results.length === 0 && !forfeitPot) {
       return;
     }
-    const sig = results
-      .map((r) => r.player.position + ":" + r.amount)
-      .join(",");
+    const sig = forfeitPot
+      ? "forfeit:" + forfeitPot.amount
+      : results.map((r) => r.player.position + ":" + r.amount).join(",");
     if (shownHandRef.current === sig) {
       // Already shown for this settled hand (e.g. a failed deal).
       return;
@@ -144,10 +168,18 @@ export default function Table() {
     shownHandRef.current = sig;
     setRevealedPlayers(getRevealedPlayers(game));
     setWinners(results);
-    handleWinner(game, socket);
+    setForfeited(!!forfeitPot);
+    if (forfeitPot) {
+      if (socket) {
+        sendLog(socket, "chips forfeited");
+      }
+    } else {
+      handleWinner(game, socket);
+    }
     const timer = setTimeout(() => {
       setRevealedPlayers([]);
       setWinners([]);
+      setForfeited(false);
       if (socket) {
         dealGame(socket);
       }
@@ -155,15 +187,15 @@ export default function Table() {
     return () => {
       clearTimeout(timer);
     };
-  }, [game?.pots]);
+  }, [game?.stage, game?.pots?.length]);
 
   return (
     <div className="relative flex h-full w-full items-start justify-center">
-      {winners.length > 0 && (
+      {(winners.length > 0 || forfeited) && (
         <div className="pointer-events-none absolute inset-0 z-30 flex items-center justify-center">
           <div className="animate-winner-pop rounded-2xl border-2 border-amber-300 bg-zinc-900/90 px-8 py-4 text-center shadow-2xl">
             <p className="text-lg font-semibold text-neutral-300">
-              {t("winner")}
+              {forfeited ? t("chipsForfeited") : t("winner")}
             </p>
             {winners.map((w) => (
               <p
@@ -176,13 +208,46 @@ export default function Table() {
           </div>
         </div>
       )}
-      <div className="relative mt-2 h-2/3 w-full max-w-screen-xl sm:mt-28 sm:h-3/5">
+      <div className="relative mt-10 h-2/3 w-full max-w-screen-xl sm:mt-28 sm:h-3/5">
         <div
           className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2"
           style={{ width: "56%", height: "50%" }}
         >
           <Felt />
         </div>
+        {game && (!appState.clientID || (me && !game.running && !me.ready)) && (
+          <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center">
+            <div className="pointer-events-auto flex flex-col items-center gap-1 rounded-lg bg-black/50 px-4 py-2 text-center">
+              {!appState.clientID ? (
+                game.running ? (
+                  <button
+                    onClick={() => socket && queueNext(socket)}
+                    className={`text-sm font-medium sm:text-base ${
+                      queued ? "text-amber-300" : "text-white hover:underline"
+                    }`}
+                  >
+                    {queued ? t("queuedNextHand") : t("joinNextHand")}
+                  </button>
+                ) : (
+                  <p className="text-sm font-medium text-white sm:text-base">
+                    {t("pickSeat")}
+                  </p>
+                )
+              ) : (
+                <>
+                  <p className="text-sm font-medium text-white sm:text-base">
+                    {t("clickAvatarToReady")}
+                  </p>
+                  {maxBuyIns > 0 && (
+                    <p className="text-xs text-neutral-300">
+                      {t("buyInsLeft")}: {remainingBuyIns}
+                    </p>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
+        )}
         {seats.map((player, i) => {
           const pos = seatPosition(i, maxPlayers);
           return (

@@ -106,7 +106,13 @@ export default function Card({ card, placeholder, folded, hidden }: cardProps) {
   }
   if (hidden) {
     if (folded) {
-      return <div className={"flex h-14 w-9 sm:h-24 sm:w-16"}></div>;
+      return (
+        <div
+          className={
+            "animate-fold-away flex h-14 w-9 items-center justify-center rounded-md border-4 border border-white bg-red-900 sm:h-24 sm:w-16"
+          }
+        ></div>
+      );
     }
     return (
       <div

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { FiSettings } from "react-icons/fi";
 import { useTranslation } from "../hooks/useTranslation";
 
 export default function Settings() {
@@ -19,7 +20,7 @@ export default function Settings() {
         title={t("settings")}
         className="rounded-sm border border-neutral-600 px-2 py-1 text-xs text-neutral-400 hover:text-neutral-200"
       >
-        ⚙️
+        <FiSettings size="1rem" />
       </button>
 
       {open && (

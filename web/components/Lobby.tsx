@@ -17,18 +17,7 @@ import History from "./History";
 import WalletButton from "./WalletButton";
 import Recharge from "./Recharge";
 import { useTranslation } from "../hooks/useTranslation";
-
-const BLINDS_PRESETS: [string, number, number][] = [
-  ["1/2", 1, 2],
-  ["10/20", 10, 20],
-  ["25/50", 25, 50],
-  ["50/100", 50, 100],
-  ["100/200", 100, 200],
-];
-const BUYIN_PRESETS = [200, 500, 1000, 5000];
-const BUYINS_PRESETS = [1, 2, 3, 5];
-const PLAYERS_PRESETS = [2, 3, 4, 5, 6, 7, 8];
-const HANDS_PRESETS = [10, 20, 50];
+import { FiUsers, FiClock, FiLogOut } from "react-icons/fi";
 
 export default function Lobby() {
   const socket = useSocket();
@@ -40,12 +29,14 @@ export default function Lobby() {
   const [friendName, setFriendName] = useState("");
   const [showHistory, setShowHistory] = useState(false);
   const [showRecharge, setShowRecharge] = useState(false);
+  const [showCreate, setShowCreate] = useState(false);
+  const [showFriends, setShowFriends] = useState(false);
   const [sb, setSb] = useState(1);
   const [bb, setBb] = useState(2);
   const [buyIn, setBuyIn] = useState(200);
-  const [maxBuyIns, setMaxBuyIns] = useState(2);
+  const [maxBuyIns, setMaxBuyIns] = useState(3);
   const [maxPlayers, setMaxPlayers] = useState(6);
-  const [handsLimit, setHandsLimit] = useState(0);
+  const [handsLimit, setHandsLimit] = useState(20);
   const { t } = useTranslation();
 
   useEffect(() => {
@@ -87,18 +78,22 @@ export default function Lobby() {
   };
 
   const create = () => {
-    if (!socket || newRoom == "") {
+    if (!socket) {
       return;
     }
+    const name =
+      newRoom.trim() === ""
+        ? "room-" + Math.random().toString(36).slice(2, 8)
+        : newRoom.trim();
     dispatch({ type: "setAuthError", payload: null });
     dispatch({ type: "clearGame" });
-    dispatch({ type: "setTablename", payload: newRoom });
+    dispatch({ type: "setTablename", payload: name });
     saveSession({
       username: appState.username ?? "",
-      table: newRoom,
+      table: name,
       clientID: null,
     });
-    createTable(socket, newRoom, {
+    createTable(socket, name, {
       password: newPassword || undefined,
       sb,
       bb,
@@ -148,7 +143,7 @@ export default function Lobby() {
   };
 
   return (
-    <div className="flex min-h-screen flex-col">
+    <div className="app-screen flex flex-col overflow-hidden">
       <div className="flex w-full flex-row items-center justify-between px-4 py-2">
         <div className="flex flex-row items-center gap-3">
           <button onClick={viewSelf} className="text-3xl" title={t("myStats")}>
@@ -160,12 +155,19 @@ export default function Lobby() {
               version={appState.avatarVersion}
             />
           </button>
-          <div className="flex flex-col items-start gap-1">
-            <p className="text-white">{appState.username}</p>
+          <div className="flex flex-col items-center gap-1">
             <WalletButton onOpen={() => setShowRecharge(true)} />
+            <p className="text-sm text-white">{appState.username}</p>
           </div>
         </div>
-        <div className="flex flex-row flex-wrap items-center gap-2">
+        <div className="flex flex-row items-center gap-2">
+          <button
+            onClick={() => setShowFriends(true)}
+            title={t("friends")}
+            className="rounded-sm border border-neutral-600 px-2 py-1 text-xs text-neutral-400 hover:text-neutral-200"
+          >
+            <FiUsers size="1rem" />
+          </button>
           <button
             onClick={() => {
               setShowHistory(!showHistory);
@@ -173,212 +175,45 @@ export default function Lobby() {
                 getHistory(socket);
               }
             }}
-            className="rounded-sm border border-neutral-600 px-3 py-1 text-sm text-neutral-400 hover:text-neutral-200"
+            title={t("history")}
+            className="rounded-sm border border-neutral-600 px-2 py-1 text-xs text-neutral-400 hover:text-neutral-200"
           >
-            {t("history")}
+            <FiClock size="1rem" />
           </button>
           <Settings />
           <button
             onClick={logout}
-            className="rounded-sm border border-neutral-600 px-3 py-1 text-sm text-neutral-400 hover:text-neutral-200"
+            title={t("logout")}
+            className="rounded-sm border border-neutral-600 px-2 py-1 text-xs text-neutral-400 hover:text-neutral-200"
           >
-            {t("logout")}
+            <FiLogOut size="1rem" />
           </button>
         </div>
       </div>
 
-      <div className="flex flex-grow flex-col items-center px-4">
-        <h1 className="mb-8 mt-4 text-4xl font-semibold text-white">
+      <div className="flex min-h-0 flex-1 flex-col items-center px-4">
+        <h1 className="mb-6 mt-4 text-4xl font-semibold text-white">
           {t("lobby")}
         </h1>
 
-        <div className="mb-4 flex w-full max-w-md flex-col gap-2">
-          <div className="flex flex-row items-center gap-2">
-            <input
-              className="flex-1 rounded-sm bg-neutral-700 py-2 pl-4 text-white focus:outline-none"
-              type="text"
-              value={newRoom}
-              placeholder={t("newRoomName")}
-              maxLength={20}
-              onChange={(e) => setNewRoom(e.target.value)}
-            />
-            <input
-              className="w-32 rounded-sm bg-neutral-700 py-2 pl-4 text-white focus:outline-none"
-              type="password"
-              value={newPassword}
-              placeholder={t("password")}
-              maxLength={20}
-              onChange={(e) => setNewPassword(e.target.value)}
-            />
-            <button
-              onClick={create}
-              disabled={newRoom == ""}
-              className="rounded-sm bg-cyan-900 px-4 py-2 text-white hover:bg-cyan-800 disabled:opacity-40"
-            >
-              {t("create")}
-            </button>
-          </div>
-
-          <div className="flex flex-row flex-wrap items-center gap-2 rounded-sm bg-neutral-800 px-3 py-2 text-xs">
-            <span className="text-neutral-500">{t("blinds")}</span>
-            {BLINDS_PRESETS.map(([label, s, b]) => (
-              <button
-                key={label}
-                onClick={() => {
-                  setSb(s);
-                  setBb(b);
-                }}
-                className={`rounded-sm px-2 py-1 ${
-                  sb === s && bb === b
-                    ? "bg-cyan-900 text-white"
-                    : "bg-neutral-700 text-neutral-300 hover:bg-neutral-600"
-                }`}
-              >
-                {label}
-              </button>
-            ))}
-            <span className="ml-2 flex flex-row items-center gap-1">
-              <input
-                type="number"
-                min={1}
-                value={sb}
-                onChange={(e) => setSb(Math.max(1, Number(e.target.value)))}
-                className="w-12 rounded-sm bg-neutral-700 px-1 py-0.5 text-white focus:outline-none"
-              />
-              <span className="text-neutral-500">/</span>
-              <input
-                type="number"
-                min={2}
-                value={bb}
-                onChange={(e) => setBb(Math.max(2, Number(e.target.value)))}
-                className="w-12 rounded-sm bg-neutral-700 px-1 py-0.5 text-white focus:outline-none"
-              />
-            </span>
-          </div>
-
-          <div className="flex flex-row flex-wrap items-center gap-2 rounded-sm bg-neutral-800 px-3 py-2 text-xs">
-            <span className="text-neutral-500">{t("buyIn")}</span>
-            {BUYIN_PRESETS.map((v) => (
-              <button
-                key={v}
-                onClick={() => setBuyIn(v)}
-                className={`rounded-sm px-2 py-1 ${
-                  buyIn === v
-                    ? "bg-cyan-900 text-white"
-                    : "bg-neutral-700 text-neutral-300 hover:bg-neutral-600"
-                }`}
-              >
-                {v}
-              </button>
-            ))}
-            <input
-              type="number"
-              min={1}
-              value={buyIn}
-              onChange={(e) => setBuyIn(Math.max(1, Number(e.target.value)))}
-              className="ml-2 w-16 rounded-sm bg-neutral-700 px-1 py-0.5 text-white focus:outline-none"
-            />
-          </div>
-
-          <div className="flex flex-row flex-wrap items-center gap-2 rounded-sm bg-neutral-800 px-3 py-2 text-xs">
-            <span className="text-neutral-500">{t("buyIns")}</span>
-            {BUYINS_PRESETS.map((v) => (
-              <button
-                key={v}
-                onClick={() => setMaxBuyIns(v)}
-                className={`rounded-sm px-2 py-1 ${
-                  maxBuyIns === v
-                    ? "bg-cyan-900 text-white"
-                    : "bg-neutral-700 text-neutral-300 hover:bg-neutral-600"
-                }`}
-              >
-                {v}
-              </button>
-            ))}
-            <input
-              type="number"
-              min={1}
-              value={maxBuyIns}
-              onChange={(e) =>
-                setMaxBuyIns(Math.max(1, Number(e.target.value)))
-              }
-              className="ml-2 w-12 rounded-sm bg-neutral-700 px-1 py-0.5 text-white focus:outline-none"
-            />
-            <span className="ml-2 text-neutral-500">{t("maxPlayers")}</span>
-            {PLAYERS_PRESETS.map((v) => (
-              <button
-                key={v}
-                onClick={() => setMaxPlayers(v)}
-                className={`rounded-sm px-2 py-1 ${
-                  maxPlayers === v
-                    ? "bg-cyan-900 text-white"
-                    : "bg-neutral-700 text-neutral-300 hover:bg-neutral-600"
-                }`}
-              >
-                {v}
-              </button>
-            ))}
-            <input
-              type="number"
-              min={2}
-              max={8}
-              value={maxPlayers}
-              onChange={(e) =>
-                setMaxPlayers(Math.min(8, Math.max(2, Number(e.target.value))))
-              }
-              className="ml-2 w-12 rounded-sm bg-neutral-700 px-1 py-0.5 text-white focus:outline-none"
-            />
-          </div>
-
-          <div className="flex flex-row flex-wrap items-center gap-2 rounded-sm bg-neutral-800 px-3 py-2 text-xs">
-            <span className="text-neutral-500">{t("hands")}</span>
-            <button
-              onClick={() => setHandsLimit(0)}
-              className={`rounded-sm px-2 py-1 ${
-                handsLimit === 0
-                  ? "bg-cyan-900 text-white"
-                  : "bg-neutral-700 text-neutral-300 hover:bg-neutral-600"
-              }`}
-            >
-              {t("unlimited")}
-            </button>
-            {HANDS_PRESETS.map((v) => (
-              <button
-                key={v}
-                onClick={() => setHandsLimit(v)}
-                className={`rounded-sm px-2 py-1 ${
-                  handsLimit === v
-                    ? "bg-cyan-900 text-white"
-                    : "bg-neutral-700 text-neutral-300 hover:bg-neutral-600"
-                }`}
-              >
-                {v}
-              </button>
-            ))}
-            <input
-              type="number"
-              min={0}
-              value={handsLimit}
-              onChange={(e) =>
-                setHandsLimit(Math.max(0, Number(e.target.value)))
-              }
-              className="ml-2 w-14 rounded-sm bg-neutral-700 px-1 py-0.5 text-white focus:outline-none"
-            />
-          </div>
+        <div className="mb-4 flex w-full max-w-md flex-row items-center justify-between">
+          <button
+            onClick={() => socket && listTables(socket)}
+            className="rounded-sm border border-neutral-600 px-4 py-1.5 text-sm text-neutral-300 hover:bg-neutral-700"
+          >
+            {t("refresh")}
+          </button>
+          <button
+            onClick={() => setShowCreate(true)}
+            className="rounded-sm bg-cyan-900 px-4 py-1.5 text-sm text-white hover:bg-cyan-800"
+          >
+            {t("newRoom")}
+          </button>
         </div>
 
-        <div className="flex w-full max-w-md flex-col gap-4">
-          {" "}
+        <div className="flex min-h-0 w-full max-w-md flex-1 flex-col gap-4 overflow-y-auto pb-4">
           <div className="flex flex-col gap-2">
-            <div className="flex flex-row items-center justify-between">
-              <p className="text-sm text-neutral-500">{t("rooms")}</p>
-              <button
-                onClick={() => socket && listTables(socket)}
-                className="text-xs text-neutral-500 hover:text-neutral-300"
-              >
-                {t("refresh")}
-              </button>
-            </div>
+            <p className="text-sm text-neutral-500">{t("rooms")}</p>
             {appState.tables.length === 0 && (
               <p className="text-sm text-neutral-600">{t("noRooms")}</p>
             )}
@@ -442,43 +277,199 @@ export default function Lobby() {
               </div>
             ))}
           </div>
-          <div className="flex flex-col gap-2">
-            <p className="text-sm text-neutral-500">{t("friends")}</p>
-            <div className="flex flex-row items-center gap-2">
-              <input
-                className="flex-1 rounded-sm bg-neutral-700 py-2 pl-4 text-white focus:outline-none"
-                type="text"
-                value={friendName}
-                placeholder={t("friendName")}
-                maxLength={20}
-                onChange={(e) => setFriendName(e.target.value)}
-              />
-              <button
-                onClick={onAddFriend}
-                disabled={friendName == ""}
-                className="rounded-sm bg-neutral-700 px-4 py-2 text-white hover:bg-neutral-600 disabled:opacity-40"
-              >
-                {t("add")}
-              </button>
-            </div>
-            {appState.friends.length === 0 && (
-              <p className="text-sm text-neutral-600">{t("noFriends")}</p>
-            )}
-            {appState.friends.map((f) => (
-              <div
-                key={f}
-                className="flex flex-row items-center justify-between rounded-sm bg-neutral-800 px-4 py-2"
-              >
-                <p className="text-white">{f}</p>
-                <button
-                  onClick={() => socket && getUser(socket, f)}
-                  className="text-xs text-neutral-500 hover:text-neutral-300"
-                >
-                  {t("viewStats")}
-                </button>
+          {showCreate && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+              <div className="flex max-h-[85vh] w-full max-w-md flex-col gap-3 overflow-y-auto rounded-lg bg-zinc-800 p-6 shadow-2xl">
+                <div className="flex flex-row items-center justify-between">
+                  <p className="text-lg font-semibold text-white">
+                    {t("newRoom")}
+                  </p>
+                  <button
+                    onClick={() => setShowCreate(false)}
+                    className="text-neutral-400 hover:text-white"
+                  >
+                    ✕
+                  </button>
+                </div>
+
+                <div className="flex flex-row items-center gap-2">
+                  <input
+                    className="flex-1 rounded-sm bg-neutral-700 py-2 pl-4 text-white focus:outline-none"
+                    type="text"
+                    value={newRoom}
+                    placeholder={t("newRoomName")}
+                    maxLength={20}
+                    onChange={(e) => setNewRoom(e.target.value)}
+                  />
+                  <input
+                    className="w-32 rounded-sm bg-neutral-700 py-2 pl-4 text-white focus:outline-none"
+                    type="password"
+                    value={newPassword}
+                    placeholder={t("password")}
+                    maxLength={20}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                  />
+                </div>
+
+                <div className="flex flex-row items-center gap-2 rounded-sm bg-neutral-700 px-3 py-2 text-xs">
+                  <span className="w-16 shrink-0 text-neutral-400">
+                    {t("blinds")}
+                  </span>
+                  <input
+                    type="number"
+                    min={1}
+                    value={sb}
+                    onChange={(e) => setSb(Math.max(1, Number(e.target.value)))}
+                    className="w-20 flex-1 rounded-sm bg-neutral-600 px-2 py-1 text-white focus:outline-none"
+                  />
+                  <span className="text-neutral-400">/</span>
+                  <input
+                    type="number"
+                    min={2}
+                    value={bb}
+                    onChange={(e) => setBb(Math.max(2, Number(e.target.value)))}
+                    className="w-20 flex-1 rounded-sm bg-neutral-600 px-2 py-1 text-white focus:outline-none"
+                  />
+                </div>
+
+                <div className="flex flex-row items-center gap-2 rounded-sm bg-neutral-700 px-3 py-2 text-xs">
+                  <span className="w-16 shrink-0 text-neutral-400">
+                    {t("buyIn")}
+                  </span>
+                  <input
+                    type="number"
+                    min={1}
+                    value={buyIn}
+                    onChange={(e) =>
+                      setBuyIn(Math.max(1, Number(e.target.value)))
+                    }
+                    className="flex-1 rounded-sm bg-neutral-600 px-2 py-1 text-white focus:outline-none"
+                  />
+                </div>
+
+                <div className="flex flex-row items-center gap-2 rounded-sm bg-neutral-700 px-3 py-2 text-xs">
+                  <span className="w-16 shrink-0 text-neutral-400">
+                    {t("buyIns")}
+                  </span>
+                  <input
+                    type="number"
+                    min={1}
+                    value={maxBuyIns}
+                    onChange={(e) =>
+                      setMaxBuyIns(Math.max(1, Number(e.target.value)))
+                    }
+                    className="flex-1 rounded-sm bg-neutral-600 px-2 py-1 text-white focus:outline-none"
+                  />
+                </div>
+
+                <div className="flex flex-row items-center gap-2 rounded-sm bg-neutral-700 px-3 py-2 text-xs">
+                  <span className="w-16 shrink-0 text-neutral-400">
+                    {t("maxPlayers")}
+                  </span>
+                  <input
+                    type="number"
+                    min={2}
+                    max={8}
+                    value={maxPlayers}
+                    onChange={(e) =>
+                      setMaxPlayers(
+                        Math.min(8, Math.max(2, Number(e.target.value)))
+                      )
+                    }
+                    className="flex-1 rounded-sm bg-neutral-600 px-2 py-1 text-white focus:outline-none"
+                  />
+                </div>
+
+                <div className="flex flex-row items-center gap-2 rounded-sm bg-neutral-700 px-3 py-2 text-xs">
+                  <span className="w-16 shrink-0 text-neutral-400">
+                    {t("hands")}
+                  </span>
+                  <input
+                    type="number"
+                    min={0}
+                    value={handsLimit}
+                    onChange={(e) =>
+                      setHandsLimit(Math.max(0, Number(e.target.value)))
+                    }
+                    className="flex-1 rounded-sm bg-neutral-600 px-2 py-1 text-white focus:outline-none"
+                  />
+                  <span className="shrink-0 text-neutral-500">
+                    0 = {t("unlimited")}
+                  </span>
+                </div>
+
+                <div className="mt-2 flex flex-row justify-end gap-2">
+                  <button
+                    onClick={() => setShowCreate(false)}
+                    className="rounded-sm border border-neutral-600 px-4 py-2 text-sm text-neutral-300 hover:bg-neutral-700"
+                  >
+                    {t("cancel")}
+                  </button>
+                  <button
+                    onClick={create}
+                    className="rounded-sm bg-cyan-900 px-4 py-2 text-sm text-white hover:bg-cyan-800"
+                  >
+                    {t("create")}
+                  </button>
+                </div>
               </div>
-            ))}
-          </div>
+            </div>
+          )}
+          {showFriends && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+              <div className="w-full max-w-md rounded-lg bg-zinc-800 p-6 shadow-2xl">
+                <div className="mb-4 flex flex-row items-center justify-between">
+                  <p className="text-lg font-semibold text-white">
+                    {t("friends")}
+                  </p>
+                  <button
+                    onClick={() => setShowFriends(false)}
+                    className="text-neutral-400 hover:text-white"
+                  >
+                    ✕
+                  </button>
+                </div>
+                <div className="flex flex-row items-center gap-2">
+                  <input
+                    className="flex-1 rounded-sm bg-neutral-700 py-2 pl-4 text-white focus:outline-none"
+                    type="text"
+                    value={friendName}
+                    placeholder={t("friendName")}
+                    maxLength={20}
+                    onChange={(e) => setFriendName(e.target.value)}
+                  />
+                  <button
+                    onClick={onAddFriend}
+                    disabled={friendName == ""}
+                    className="rounded-sm bg-neutral-600 px-4 py-2 text-white hover:bg-neutral-500 disabled:opacity-40"
+                  >
+                    {t("add")}
+                  </button>
+                </div>
+                {appState.friends.length === 0 && (
+                  <p className="mt-3 text-sm text-neutral-500">
+                    {t("noFriends")}
+                  </p>
+                )}
+                <div className="mt-2 flex flex-col gap-2">
+                  {appState.friends.map((f) => (
+                    <div
+                      key={f}
+                      className="flex flex-row items-center justify-between rounded-sm bg-neutral-700 px-4 py-2"
+                    >
+                      <p className="text-white">{f}</p>
+                      <button
+                        onClick={() => socket && getUser(socket, f)}
+                        className="text-xs text-neutral-400 hover:text-neutral-200"
+                      >
+                        {t("viewStats")}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
           {showRecharge && <Recharge onClose={() => setShowRecharge(false)} />}
           {showHistory && <History onClose={() => setShowHistory(false)} />}
         </div>

@@ -2,6 +2,44 @@
 @tailwind components;
 @tailwind utilities;
 
+/* 方正兰亭黑：仅用于中文字符，英文与数字沿用默认字体。 */
+@font-face {
+  font-family: "FZLanTingHei";
+  src: url("/fonts/FZLTTHJW.TTF") format("truetype");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+2000-206F, U+3000-303F, U+3400-4DBF, U+4E00-9FFF, U+FF00-FFEF;
+}
+
+html,
+body {
+  font-family: "FZLanTingHei", ui-sans-serif, system-ui, -apple-system,
+    BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans",
+    sans-serif, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei",
+    "Noto Sans SC", "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol",
+    "Noto Color Emoji";
+  overflow-x: hidden;
+  overscroll-behavior: none;
+}
+
+/* 全屏页面：使用动态视口高度，避免手机端整页滚动 */
+.app-screen {
+  height: 100vh;
+  height: 100dvh;
+}
+
+/* 隐藏数字输入框的上下调节箭头 */
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+input[type="number"] {
+  -moz-appearance: textfield;
+}
+
 @keyframes chip-pop {
   0% {
     transform: scale(0.4);
@@ -76,6 +114,21 @@
 
 .animate-deal-in {
   animation: deal-in 0.4s ease-out;
+}
+
+@keyframes fold-away {
+  0% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(14px);
+    opacity: 0;
+  }
+}
+
+.animate-fold-away {
+  animation: fold-away 0.3s ease-in forwards;
 }
 
 .animate-active-pulse {

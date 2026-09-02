@@ -232,6 +232,24 @@ func (g *Game) dropPlayer(pn uint) {
 	shift(&g.utgNum)
 	shift(&g.actionNum)
 
+	// Re-map pot position references: positions above pn shift down by one,
+	// and the dropped player is removed from any pot lists.
+	for i := range g.pots {
+		remap := func(nums []uint) []uint {
+			out := make([]uint, 0, len(nums))
+			for _, n := range nums {
+				if n > pn {
+					out = append(out, n-1)
+				} else if n < pn {
+					out = append(out, n)
+				}
+			}
+			return out
+		}
+		g.pots[i].EligiblePlayerNums = remap(g.pots[i].EligiblePlayerNums)
+		g.pots[i].WinningPlayerNums = remap(g.pots[i].WinningPlayerNums)
+	}
+
 	g.players = append(g.players[:pn], g.players[pn+1:]...)
 
 	// Re-index player positions after the removal.
@@ -291,6 +309,26 @@ func ResetToReadyPhase(g *Game) {
 	if len(g.players) > 0 {
 		g.updateBlindNums()
 	}
+}
+
+// Pause puts the game into the ready phase without clearing player stacks or
+// the hand counter: everyone becomes not-ready and the running flag is
+// cleared, so the table waits for players to ready up again.
+func Pause(g *Game) {
+	g.mtx.Lock()
+	defer g.mtx.Unlock()
+
+	for i := range g.players {
+		g.players[i].Ready = false
+		g.players[i].In = false
+		g.players[i].Called = false
+		g.players[i].Bet = 0
+		g.players[i].TotalBet = 0
+		g.players[i].Cards = [2]Card{0, 0}
+		g.players[i].Revealed = false
+	}
+	g.running = false
+	g.setStageAndBetting(PreDeal, false)
 }
 
 func (g *Game) resetForNextHand() {
@@ -371,6 +409,17 @@ func (g *Game) recordBiggestPot(amt uint, winners []uint) {
 }
 
 func (g *Game) updateRoundInfo() {
+	// Fold any player who has left the table but is still in the hand. This
+	// runs on the next hand evaluation (e.g. the next action) so a departed
+	// player is folded on their turn rather than immediately. A departed
+	// player who is all-in is not folded: their cards stay in contention and
+	// are resolved at showdown (their winnings are forfeited below).
+	for i := range g.players {
+		if g.players[i].In && g.players[i].Left && !g.players[i].allIn() {
+			g.players[i].In = false
+			g.players[i].Stats.Folds++
+		}
+	}
 
 	var allCalled = true
 	var allInPlayerNums = []uint{}
@@ -440,6 +489,16 @@ func (g *Game) updateRoundInfo() {
 		for i := range g.pots {
 			g.pots[i].WinningScore = 8000
 			g.pots[i].WinningPlayerNums = inPlayerNums
+		}
+
+		// A departed all-in player who is the last one standing forfeits the
+		// pot: nobody is awarded the chips.
+		if g.players[inPlayerNums[0]].Left {
+			for i := range g.pots {
+				g.pots[i].WinningPlayerNums = []uint{}
+			}
+			g.resetForNextHand()
+			return
 		}
 
 		// But this is special because cards do not need to be shown
@@ -517,16 +576,32 @@ func (g *Game) updateRoundInfo() {
 				}
 			}
 
+			// Drop winners who left while all-in: their share is forfeited
+			// (the chips vanish) as a penalty for leaving. If every winner
+			// forfeited, the whole pot disappears.
+			totalWinners := uint(len(g.pots[i].WinningPlayerNums))
+			legit := []uint{}
 			for _, num := range g.pots[i].WinningPlayerNums {
-				share := g.pots[i].Amt / uint(len(g.pots[i].WinningPlayerNums))
-				g.players[num].Stack += share
-				//TODO: leave the remainder in the middle! (fractional money will disappear currently)
-				g.players[num].Stats.HandsWon++
-				if share > g.players[num].Stats.MaxPotWon {
-					g.players[num].Stats.MaxPotWon = share
+				if !g.players[num].Left {
+					legit = append(legit, num)
 				}
 			}
-			g.recordBiggestPot(g.pots[i].Amt, g.pots[i].WinningPlayerNums)
+			g.pots[i].WinningPlayerNums = legit
+
+			if totalWinners > 0 {
+				share := g.pots[i].Amt / totalWinners
+				for _, num := range legit {
+					g.players[num].Stack += share
+					//TODO: leave the remainder in the middle! (fractional money will disappear currently)
+					g.players[num].Stats.HandsWon++
+					if share > g.players[num].Stats.MaxPotWon {
+						g.players[num].Stats.MaxPotWon = share
+					}
+				}
+			}
+			if len(legit) > 0 {
+				g.recordBiggestPot(g.pots[i].Amt, legit)
+			}
 		}
 
 		g.resetForNextHand()

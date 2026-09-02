@@ -428,6 +428,50 @@ func leave(g *Game, pn uint, data uint) error {
 	return nil
 }
 
+// LeaveHand marks a player as having left the table and folds them if it is
+// currently their turn. A departing player is therefore folded on their turn
+// rather than immediately when it is someone else's turn. A departing player
+// who is already all-in is not folded: their cards are revealed and they stay
+// in the hand until showdown (see updateRoundInfo).
+func LeaveHand(g *Game, pn uint) error {
+	g.mtx.Lock()
+	defer g.mtx.Unlock()
+	return leaveHand(g, pn)
+}
+
+func leaveHand(g *Game, pn uint) error {
+	p := g.getPlayer(pn)
+
+	// Unready the player. Mid-hand the ready flag is cleared directly so their
+	// hole cards remain until they fold; otherwise toggleReady fixes up the
+	// dealer and blinds.
+	if p.Ready {
+		if p.In {
+			p.Ready = false
+		} else if err := toggleReady(g, pn, 0); err != nil {
+			return err
+		}
+	}
+
+	p.Left = true
+
+	// A departing all-in player shows down instead of folding: their cards are
+	// revealed and they remain in the hand, so the hand runs to a showdown. If
+	// they would have won, their winnings are forfeited in updateRoundInfo.
+	if p.allIn() {
+		p.Revealed = true
+		return nil
+	}
+
+	// If it is already their turn, fold them now so the hand doesn't hang.
+	if g.actionNum == pn && p.In {
+		p.In = false
+		p.Stats.Folds++
+		g.updateRoundInfo()
+	}
+	return nil
+}
+
 // SitOut folds a player out of the current hand (if any) and marks them as
 // having left. Unlike Fold+Leave called separately, this works even when it is
 // not the player's turn — it is used to remove offline or departing players.

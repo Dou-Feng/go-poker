@@ -392,6 +392,8 @@ func (t *table) broadcastGame() {
 	if t.maybeSettle() {
 		return
 	}
+	t.autoSpectateBusted()
+	t.applySpectateReservations()
 	t.broadcast <- createUpdatedGameBytes(t)
 }
 
@@ -532,6 +534,137 @@ func (t *table) voteSettle(c *Client) {
 	}
 
 	t.broadcastGame()
+}
+
+// toggleSpectate toggles a player's reservation to move to the spectator side.
+// Between hands the reservation is applied immediately; during a hand it is
+// applied once the hand ends.
+func (t *table) toggleSpectate(c *Client) {
+	if c.uuid == "" {
+		return
+	}
+
+	c.spectateReserved = !c.spectateReserved
+
+	view := t.game.GenerateOmniView()
+	if c.spectateReserved && view.Stage == poker.PreDeal {
+		t.applySpectate(c)
+	}
+	t.broadcastGame()
+}
+
+// applySpectate removes a reserved player from the game and turns their client
+// into a spectator. It reports whether the player was removed.
+func (t *table) applySpectate(c *Client) bool {
+	if c.uuid == "" {
+		return false
+	}
+
+	view := t.game.GenerateOmniView()
+	pos := -1
+	for i := range view.Players {
+		if view.Players[i].UUID == c.uuid {
+			pos = i
+			break
+		}
+	}
+	if pos < 0 {
+		return false
+	}
+
+	pre := view.Players[pos]
+	stats := pre.Stats
+	if pre.In {
+		stats.Folds++
+	}
+
+	if err := poker.RemovePlayer(t.game, uint(pos)); err != nil {
+		slog.Default().Warn("Spectate remove", "error", err)
+	}
+	if _, err := flushPlayerSession(t.rdb, pre.Username, t.name, pre.TotalBuyIn, pre.Stack, stats); err != nil {
+		slog.Default().Warn("Spectate flush", "error", err)
+	}
+
+	c.uuid = ""
+	c.spectateReserved = false
+	c.send <- createUpdatedPlayerUUID(c)
+
+	if len(t.game.GenerateOmniView().Players) == 0 {
+		t.game.Reset()
+	}
+	return true
+}
+
+// applySpectateReservations moves every player who reserved spectate to the
+// spectator side, between hands.
+func (t *table) applySpectateReservations() {
+	for {
+		view := t.game.GenerateOmniView()
+		if view.Stage != poker.PreDeal {
+			return
+		}
+
+		t.clientsMu.Lock()
+		var target *Client
+		for client := range t.clients {
+			if client.spectateReserved && client.uuid != "" {
+				target = client
+				break
+			}
+		}
+		t.clientsMu.Unlock()
+
+		if target == nil {
+			return
+		}
+		if !t.applySpectate(target) {
+			target.spectateReserved = false
+		}
+	}
+}
+
+// autoSpectateBusted moves players who are busted with no remaining buy-ins to
+// the spectator side, between hands.
+func (t *table) autoSpectateBusted() {
+	for {
+		view := t.game.GenerateOmniView()
+		if view.Running || view.Stage != poker.PreDeal {
+			return
+		}
+		pos := -1
+		for i := range view.Players {
+			p := view.Players[i]
+			if p.Stack == 0 && view.Config.MaxBuy > 0 && p.TotalBuyIn >= view.Config.MaxBuy {
+				pos = i
+				break
+			}
+		}
+		if pos < 0 {
+			return
+		}
+
+		p := view.Players[pos]
+		if _, err := flushPlayerSession(t.rdb, p.Username, t.name, p.TotalBuyIn, p.Stack, p.Stats); err != nil {
+			slog.Default().Warn("Auto spectate flush", "error", err)
+		}
+		t.clearClientUUID(p.UUID)
+		if err := poker.RemovePlayer(t.game, uint(pos)); err != nil {
+			slog.Default().Warn("Auto spectate remove", "error", err)
+		}
+	}
+}
+
+// clearClientUUID detaches the client seated as the given player so they become
+// a spectator.
+func (t *table) clearClientUUID(uuid string) {
+	t.clientsMu.Lock()
+	defer t.clientsMu.Unlock()
+	for client := range t.clients {
+		if client.uuid == uuid {
+			client.uuid = ""
+			client.send <- createUpdatedPlayerUUID(client)
+		}
+	}
 }
 
 // startNewSession clears settlement state when players begin a new game.

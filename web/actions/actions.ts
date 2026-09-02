@@ -226,6 +226,12 @@ export function showHand(socket: WebSocket) {
   });
 }
 
+export function spectate(socket: WebSocket) {
+  send(socket, {
+    action: "spectate",
+  });
+}
+
 export function playerCall(socket: WebSocket) {
   send(socket, {
     action: "player-call",
