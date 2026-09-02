@@ -5,7 +5,7 @@ import Card from "./Card";
 import classNames from "classnames";
 import { useTranslation } from "../hooks/useTranslation";
 import { useSocket } from "../hooks/useSocket";
-import { toggleReady, takeSeat, sendLog, rebuy, moveSeat } from "../actions/actions";
+import { toggleReady, takeSeat, sendLog, rebuy, undoBuyIn, moveSeat } from "../actions/actions";
 import Avatar from "./Avatar";
 
 type seatProps = {
@@ -65,7 +65,7 @@ export default function Seat({ player, id, reveal }: seatProps) {
         const isMine = player.uuid === appState.clientID;
         const hidden = running && !isMine;
         const buyIn = game.config.buyIn ?? 200;
-        const atMax = game.config.maxBuy > 0 && player.stack >= game.config.maxBuy;
+        const atMax = game.config.maxBuy > 0 && player.totalBuyIn + buyIn > game.config.maxBuy;
         const openStats = () => {
             dispatch({
                 type: "setProfile",
@@ -146,6 +146,20 @@ export default function Seat({ player, id, reveal }: seatProps) {
                                             className="rounded-sm bg-emerald-800 px-1.5 py-0.5 text-xs font-medium text-white hover:bg-emerald-700"
                                         >
                                             +{buyIn}
+                                        </button>
+                                    )}
+                                    {isMine && !player.ready && player.totalBuyIn > 0 && (
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                if (socket) {
+                                                    undoBuyIn(socket);
+                                                }
+                                            }}
+                                            title={t("undo")}
+                                            className="rounded-sm bg-neutral-600 px-1.5 py-0.5 text-xs font-medium text-white hover:bg-neutral-500"
+                                        >
+                                            ↩
                                         </button>
                                     )}
                                 </div>

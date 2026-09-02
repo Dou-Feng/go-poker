@@ -273,6 +273,10 @@ func (c *Client) processEvents(rawMessage []byte) error {
 		handleRebuy(c, rebuy.Amount)
 		return nil
 
+	case actionUndoBuyIn:
+		handleUndoRebuy(c)
+		return nil
+
 	case actionGetUser:
 		var user getUser
 		err := json.Unmarshal(rawMessage, &user)

@@ -157,6 +157,12 @@ export function rebuy(socket: WebSocket, amount: number) {
     });
 }
 
+export function undoBuyIn(socket: WebSocket) {
+    send(socket, {
+        action: "undo-buyin",
+    });
+}
+
 export function getUser(socket: WebSocket, username?: string) {
     send(socket, {
         action: "get-user",

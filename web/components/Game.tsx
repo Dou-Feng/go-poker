@@ -24,6 +24,13 @@ export default function Game() {
         dispatch({ type: "leaveRoom" });
     };
 
+    const game = appState.game;
+    const me = game?.players.find((p) => p.uuid === appState.clientID);
+    const buyIn = game?.config.buyIn ?? 0;
+    const maxBuyIns = buyIn > 0 ? Math.floor((game?.config.maxBuy ?? 0) / buyIn) : 0;
+    const usedBuyIns = buyIn > 0 ? Math.floor((me?.totalBuyIn ?? 0) / buyIn) : 0;
+    const remainingBuyIns = Math.max(0, maxBuyIns - usedBuyIns);
+
     return (
         <div className="relative h-screen w-screen overflow-hidden">
             <div className="flex h-screen w-screen items-start justify-center">
@@ -32,6 +39,16 @@ export default function Game() {
             {!appState.clientID && appState.game && (
                 <div className="absolute left-1/2 top-0 z-40 -translate-x-1/2 rounded-b-lg bg-zinc-900/80 px-4 py-1.5 text-sm font-medium text-neutral-200">
                     {appState.game.running ? t("spectating") : t("pickSeat")}
+                </div>
+            )}
+            {me && game && !game.running && !me.ready && (
+                <div className="absolute left-1/2 top-0 z-40 flex -translate-x-1/2 flex-col items-center rounded-b-lg bg-zinc-900/80 px-4 py-1.5">
+                    <p className="text-sm font-medium text-white">{t("clickAvatarToReady")}</p>
+                    {maxBuyIns > 0 && (
+                        <p className="text-xs text-neutral-400">
+                            {t("buyInsLeft")}: {remainingBuyIns}
+                        </p>
+                    )}
                 </div>
             )}
             <div className="absolute inset-x-0 bottom-0 z-10 flex flex-col sm:block">

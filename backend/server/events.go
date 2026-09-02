@@ -413,7 +413,7 @@ func handleRebuy(c *Client, amount uint) {
 
 	// Refuse a rebuy that would push the player past the room's maximum
 	// buy-in cap, instead of silently draining their wallet.
-	if view.Config.MaxBuy != 0 && view.Players[position].Stack+amount > view.Config.MaxBuy {
+	if view.Config.MaxBuy != 0 && view.Players[position].TotalBuyIn+amount > view.Config.MaxBuy {
 		c.send <- createError("max buy-in reached")
 		return
 	}
@@ -444,6 +444,62 @@ func handleRebuy(c *Client, amount uint) {
 		}
 	}
 	autoStartIfReady(c.table)
+	c.table.broadcast <- createUpdatedGame(c)
+	c.send <- createUserInfo(user, true)
+}
+
+func handleUndoRebuy(c *Client) {
+	if c.table == nil {
+		c.send <- createError("not in a room")
+		return
+	}
+
+	view := c.table.game.GenerateOmniView()
+	amount := view.Config.BuyIn
+	if amount == 0 {
+		c.send <- createError("amount must be positive")
+		return
+	}
+
+	position := -1
+	for i := range view.Players {
+		if view.Players[i].UUID == c.uuid {
+			position = i
+			break
+		}
+	}
+	if position < 0 {
+		c.send <- createError("you are not seated")
+		return
+	}
+	if view.Players[position].In {
+		c.send <- createError("cannot undo during a hand")
+		return
+	}
+	if view.Players[position].Ready {
+		c.send <- createError("cannot undo after ready")
+		return
+	}
+	if view.Players[position].Stack < amount {
+		c.send <- createError("not enough chips")
+		return
+	}
+
+	user, err := loadUser(c.hub.rdb, c.username)
+	if err != nil {
+		c.send <- createError("could not load user")
+		return
+	}
+	user.Chips += amount
+	if err := saveUser(c.hub.rdb, user); err != nil {
+		c.send <- createError("could not save user")
+		return
+	}
+
+	if err := poker.UndoBuyIn(c.table.game, uint(position), amount); err != nil {
+		slog.Default().Warn("Undo buy in", "error", err)
+	}
+
 	c.table.broadcast <- createUpdatedGame(c)
 	c.send <- createUserInfo(user, true)
 }

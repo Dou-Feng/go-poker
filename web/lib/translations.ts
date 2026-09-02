@@ -102,6 +102,11 @@ export const translations = {
         alreadySeated: "already seated",
         maxBuyInReached: "max buy-in reached",
         ready: "Ready",
+        clickAvatarToReady: "Tap your avatar to get ready",
+        buyInsLeft: "buy-ins left",
+        undo: "undo",
+        cannotUndoDuringHand: "cannot undo during a hand",
+        cannotUndoAfterReady: "cannot undo after readying up",
     },
     zh: {
         title: "GoPoker",
@@ -204,6 +209,11 @@ export const translations = {
         alreadySeated: "你已经入座了",
         maxBuyInReached: "已达最大买入上限",
         ready: "准备",
+        clickAvatarToReady: "点击头像准备",
+        buyInsLeft: "剩余买入次数",
+        undo: "撤回",
+        cannotUndoDuringHand: "牌局进行中不能撤回",
+        cannotUndoAfterReady: "已准备，不能撤回",
     },
 } as const;
 
@@ -229,4 +239,7 @@ export const errorKeyByMessage: Record<string, TranslationKey> = {
     "Could not create room": "couldNotCreateRoom",
     "already seated": "alreadySeated",
     "max buy-in reached": "maxBuyInReached",
+    "not in a room": "youAreNotSeated",
+    "cannot undo during a hand": "cannotUndoDuringHand",
+    "cannot undo after ready": "cannotUndoAfterReady",
 };

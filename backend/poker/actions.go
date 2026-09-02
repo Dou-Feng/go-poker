@@ -133,7 +133,7 @@ func buyIn(g *Game, pn uint, data uint) error {
 	}
 
 	//Can't buy more than the maximum buy, if it's configured
-	if g.config.MaxBuy != 0 && p.Stack+data > g.config.MaxBuy {
+	if g.config.MaxBuy != 0 && p.TotalBuyIn+data > g.config.MaxBuy {
 		return ErrIllegalAction
 	}
 
@@ -143,6 +143,29 @@ func buyIn(g *Game, pn uint, data uint) error {
 	//And add it to your total
 	p.TotalBuyIn = p.TotalBuyIn + data
 
+	return nil
+}
+
+// UndoBuyIn reverses the most recent buy-in, returning chips to the player's
+// stack and total. data is the amount to withdraw (one buy-in). It is only
+// valid before a hand starts and before the player has readied up.
+func UndoBuyIn(g *Game, pn uint, data uint) error {
+	g.mtx.Lock()
+	defer g.mtx.Unlock()
+
+	p := g.getPlayer(pn)
+	if p.In || p.Ready {
+		return ErrIllegalAction
+	}
+	if p.Stack < data {
+		return ErrIllegalAction
+	}
+	p.Stack -= data
+	if p.TotalBuyIn >= data {
+		p.TotalBuyIn -= data
+	} else {
+		p.TotalBuyIn = 0
+	}
 	return nil
 }
 

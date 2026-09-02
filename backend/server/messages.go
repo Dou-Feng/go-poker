@@ -24,6 +24,7 @@ const (
 	actionCreateTable  string = "create-table"
 	actionAddChips     string = "add-chips"
 	actionRebuy        string = "rebuy"
+	actionUndoBuyIn    string = "undo-buyin"
 	actionGetUser      string = "get-user"
 	actionLogin        string = "login"
 	actionAddFriend    string = "add-friend"
@@ -154,6 +155,10 @@ type addChips struct {
 type rebuy struct {
 	base        // actionRebuy
 	Amount uint `json:"amount"`
+}
+
+type undoBuyIn struct {
+	base // actionUndoBuyIn
 }
 
 type getUser struct {
