@@ -124,9 +124,9 @@ export default function Game() {
             {t("voteSettle")}
           </button>
         )}
-        <div className="sm:hidden">
-          <Wallet />
-        </div>
+      </div>
+      <div className="absolute top-0 right-0 z-10 p-2 sm:hidden">
+        <Wallet />
       </div>
       <div className="absolute top-0 right-0 z-10 hidden flex-col items-end gap-2 p-2 sm:flex">
         <GameInfo />
