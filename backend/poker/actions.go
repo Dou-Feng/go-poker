@@ -53,16 +53,25 @@ func bet(g *Game, pn uint, data uint) error {
 	betVal := data
 
 	var minBet uint = g.toCall()
-	var maxBet uint = g.getLimit()
 
 	var betLegalError error = nil
 
 	if !g.canOpen(pn) {
 		//Won't hit now, reserved for future implementations
 		betLegalError = ErrIllegalAction
-	} else if betVal >= maxBet {
-		//You can always go all-in
+	} else if betVal >= p.Stack {
+		// An all-in is always a legal bet, even when it is less than the
+		// full amount needed to call or less than a minimum raise. It only
+		// reopens the betting when it is at least a full minimum raise over
+		// the previous bet; otherwise players can only call.
 		betLegalError = nil
+		if betVal+p.Bet >= minBet+g.minRaise {
+			g.minRaise = betVal + p.Bet - minBet
+			for i := range g.players {
+				g.players[i].Called = false
+				g.calledNum = pn
+			}
+		}
 	} else if betVal < (minBet - p.Bet) {
 		//Not calling the minimum needed
 		betLegalError = ErrIllegalAction
@@ -194,6 +203,15 @@ func setUsername(g *Game, pn uint, data string) error {
 	return nil
 }
 
+// ShowHand marks a player's hole cards as voluntarily revealed (e.g. an
+// all-in player choosing to show). data is ignored.
+func ShowHand(g *Game, pn uint, data uint) error {
+	g.mtx.Lock()
+	defer g.mtx.Unlock()
+	g.getPlayer(pn).Revealed = true
+	return nil
+}
+
 // SetSeatID assigns a seat to each player. Seat position is not the same as the index of each player in g.players.
 // While positions must be contiguous, seatIDs do not have to be.
 // i.e. pn1 has seat 1, pn2 has seat 4, and pn3 has seat 5.
@@ -244,6 +262,18 @@ func Deal(g *Game, pn uint, data uint) error {
 	g.mtx.Lock()
 	defer g.mtx.Unlock()
 	return deal(g, pn, data)
+}
+
+// nextToAct advances actionNum to the next player who can still act (in the
+// hand and not all-in). If every in-hand player is all-in, actionNum is left
+// as-is; callers that run out the board disable betting in that case.
+func (g *Game) nextToAct() {
+	n := uint(len(g.players))
+	seen := uint(0)
+	for (g.players[g.actionNum].allIn() || !g.players[g.actionNum].In) && seen < n {
+		g.actionNum = (g.actionNum + 1) % n
+		seen++
+	}
 }
 
 func deal(g *Game, pn uint, data uint) error {
@@ -301,6 +331,7 @@ func deal(g *Game, pn uint, data uint) error {
 			}
 
 			g.players[i].Called = false
+			g.players[i].Revealed = false
 		}
 
 		g.players[g.sbNum].putInChips(g.config.SmallBlind)
@@ -309,9 +340,7 @@ func deal(g *Game, pn uint, data uint) error {
 	case PreFlop:
 
 		g.actionNum = (g.dealerNum + 1) % uint(len(g.players))
-		for !g.players[g.actionNum].In {
-			g.actionNum = (g.actionNum + 1) % uint(len(g.players))
-		}
+		g.nextToAct()
 		g.calledNum = g.actionNum
 
 		g.communityCards[0] = g.deck.Pop()
@@ -320,18 +349,14 @@ func deal(g *Game, pn uint, data uint) error {
 
 	case Flop:
 		g.actionNum = (g.dealerNum + 1) % uint(len(g.players))
-		for !g.players[g.actionNum].In {
-			g.actionNum = (g.actionNum + 1) % uint(len(g.players))
-		}
+		g.nextToAct()
 		g.calledNum = g.actionNum
 
 		g.communityCards[3] = g.deck.Pop()
 
 	case Turn:
 		g.actionNum = (g.dealerNum + 1) % uint(len(g.players))
-		for !g.players[g.actionNum].In {
-			g.actionNum = (g.actionNum + 1) % uint(len(g.players))
-		}
+		g.nextToAct()
 		g.calledNum = g.actionNum
 
 		g.communityCards[4] = g.deck.Pop()

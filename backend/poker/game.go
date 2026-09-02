@@ -59,6 +59,7 @@ type GameConfig struct {
 	SmallBlind uint `json:"sb"`
 	BuyIn      uint `json:"buyIn"`
 	MaxPlayers uint `json:"maxPlayers"`
+	HandsLimit uint `json:"handsLimit"`
 }
 
 // Game represents a game of poker. It internally keeps track of state, can be mutated by actions,
@@ -67,21 +68,24 @@ type GameConfig struct {
 type Game struct {
 	mtx sync.Mutex
 
-	running        bool
-	dealerNum      uint
-	actionNum      uint
-	utgNum         uint
-	sbNum          uint
-	bbNum          uint
-	communityCards []Card
-	flags          gameFlags
-	config         GameConfig
-	players        []player
-	deck           Deck
-	pots           []Pot
-	minRaise       uint
-	calledNum      uint
-	betsThisStreet uint
+	running           bool
+	dealerNum         uint
+	actionNum         uint
+	utgNum            uint
+	sbNum             uint
+	bbNum             uint
+	communityCards    []Card
+	flags             gameFlags
+	config            GameConfig
+	players           []player
+	deck              Deck
+	pots              []Pot
+	minRaise          uint
+	calledNum         uint
+	betsThisStreet    uint
+	handsPlayed       uint
+	biggestPotAmt     uint
+	biggestPotWinners []uint
 }
 
 func (g *Game) getStage() GameStage {
@@ -131,7 +135,7 @@ func (g *Game) isCalled(pn uint) bool {
 	return g.players[pn].allIn() || (g.players[pn].Called)
 }
 
-//Returns nil if there are more than 2 players ready, ErrIllegalAction otherwise
+// Returns nil if there are more than 2 players ready, ErrIllegalAction otherwise
 func (g *Game) updateBlindNums() {
 	readyCount := g.readyCount()
 
@@ -281,6 +285,7 @@ func ResetToReadyPhase(g *Game) {
 		g.players[i].TotalBet = 0
 		g.players[i].Cards = [2]Card{0, 0}
 		g.players[i].Left = false
+		g.players[i].Revealed = false
 	}
 
 	if len(g.players) > 0 {
@@ -292,13 +297,45 @@ func (g *Game) resetForNextHand() {
 
 	// Remove players who have left the room (iterate backwards so indices
 	// stay valid while dropping).
+	hadLeft := false
 	for i := len(g.players) - 1; i >= 0; i-- {
 		if g.players[i].Left {
 			g.dropPlayer(uint(i))
+			hadLeft = true
 		}
 	}
 
 	if len(g.players) == 0 {
+		g.setStageAndBetting(PreDeal, false)
+		return
+	}
+
+	g.handsPlayed++
+
+	paused := hadLeft
+	if !paused {
+		for i := range g.players {
+			if g.players[i].Stack == 0 {
+				paused = true
+				break
+			}
+		}
+	}
+
+	if paused {
+		// Someone left or busted: pause after this hand so the table can
+		// regroup. Everyone becomes not-ready, but the hand counter is
+		// preserved so a fixed-length session still ends on schedule.
+		for i := range g.players {
+			g.players[i].Ready = false
+			g.players[i].In = false
+			g.players[i].Called = false
+			g.players[i].Bet = 0
+			g.players[i].TotalBet = 0
+			g.players[i].Cards = [2]Card{0, 0}
+			g.players[i].Revealed = false
+		}
+		g.running = false
 		g.setStageAndBetting(PreDeal, false)
 		return
 	}
@@ -322,6 +359,15 @@ func (g *Game) resetForNextHand() {
 	}
 
 	g.setStageAndBetting(PreDeal, false)
+}
+
+// recordBiggestPot tracks the largest single pot of the session along with its
+// winners, for display on the settlement screen.
+func (g *Game) recordBiggestPot(amt uint, winners []uint) {
+	if amt > g.biggestPotAmt {
+		g.biggestPotAmt = amt
+		g.biggestPotWinners = append([]uint{}, winners...)
+	}
 }
 
 func (g *Game) updateRoundInfo() {
@@ -406,6 +452,7 @@ func (g *Game) updateRoundInfo() {
 		if won > g.players[inPlayerNums[0]].Stats.MaxPotWon {
 			g.players[inPlayerNums[0]].Stats.MaxPotWon = won
 		}
+		g.recordBiggestPot(won, inPlayerNums)
 
 		g.resetForNextHand()
 
@@ -479,11 +526,16 @@ func (g *Game) updateRoundInfo() {
 					g.players[num].Stats.MaxPotWon = share
 				}
 			}
+			g.recordBiggestPot(g.pots[i].Amt, g.pots[i].WinningPlayerNums)
 		}
 
 		g.resetForNextHand()
 
 		// otherwise, just set betting to false so the dealer can deal the next part of the hand
+	} else if len(inPlayerNums) == len(allInPlayerNums) {
+		// Every player still in the hand is all-in: stop betting. The board
+		// is then revealed one card at a time by the client via RunoutNext.
+		g.setBetting(false)
 	} else {
 		g.setBetting(false)
 		deal(g, g.dealerNum, 0)
@@ -494,14 +546,15 @@ func (g *Game) updateRoundInfo() {
 
 // NewGame is a factory method that returns a pointer to an initialized game.
 // This freshly created game will have the following default values:
-// 	Players: []
-// 	GameStage: PreDeal
-// 	Betting: False
-// 	Config: {
-// 		BigBlind:	25
-// 		SmallBlind:	10
-// 		MaxBuy:		0
-// 	}
+//
+//	Players: []
+//	GameStage: PreDeal
+//	Betting: False
+//	Config: {
+//		BigBlind:	25
+//		SmallBlind:	10
+//		MaxBuy:		0
+//	}
 func NewGame() *Game {
 	newGame := Game{}
 
@@ -519,7 +572,7 @@ func NewGame() *Game {
 
 // Configure sets the table configuration before any hands are dealt.
 // It should only be called on a fresh game.
-func Configure(g *Game, sb uint, bb uint, buyIn uint, maxBuy uint, maxPlayers uint) {
+func Configure(g *Game, sb uint, bb uint, buyIn uint, maxBuy uint, maxPlayers uint, handsLimit uint) {
 	g.mtx.Lock()
 	defer g.mtx.Unlock()
 
@@ -528,6 +581,7 @@ func Configure(g *Game, sb uint, bb uint, buyIn uint, maxBuy uint, maxPlayers ui
 	g.config.BuyIn = buyIn
 	g.config.MaxBuy = maxBuy
 	g.config.MaxPlayers = maxPlayers
+	g.config.HandsLimit = handsLimit
 }
 
 // Start checks that all players (except those who have left) are ready, then
@@ -555,6 +609,46 @@ func (g *Game) Reset() {
 	g.communityCards = make([]Card, 5)
 	g.deck = DefaultDeck
 	g.setStageAndBetting(PreDeal, false)
+	g.handsPlayed = 0
+	g.biggestPotAmt = 0
+	g.biggestPotWinners = nil
+}
+
+// RunoutNext reveals the next board card when every remaining player is
+// all-in. It reveals one card at a time (the flop cards individually, then the
+// turn and river) so the client can animate each flip. Once the river has been
+// dealt it resolves the showdown and resets for the next hand.
+func RunoutNext(g *Game) error {
+	g.mtx.Lock()
+	defer g.mtx.Unlock()
+
+	if g.getStage() == River {
+		g.updateRoundInfo()
+		return nil
+	}
+
+	revealed := 0
+	for _, c := range g.communityCards {
+		if c != 0 {
+			revealed++
+		}
+	}
+	if revealed >= 5 {
+		g.updateRoundInfo()
+		return nil
+	}
+
+	g.communityCards[revealed] = g.deck.Pop()
+	switch revealed {
+	case 0, 1, 2:
+		g.setStage(Flop)
+	case 3:
+		g.setStage(Turn)
+	case 4:
+		g.setStage(River)
+	}
+	g.setBetting(false)
+	return nil
 }
 
 func (g *Game) AddPlayer() uint {

@@ -202,7 +202,7 @@ func handleListTables(c *Client) {
 	c.send <- createTableList(c.hub.listTables())
 }
 
-func handleCreateTable(c *Client, tablename string, password string, sb uint, bb uint, buyIn uint, maxBuyIns uint, maxPlayers uint) {
+func handleCreateTable(c *Client, tablename string, password string, sb uint, bb uint, buyIn uint, maxBuyIns uint, maxPlayers uint, handsLimit uint) {
 	table, created := c.hub.createTableIfAbsent(tablename, password)
 	if !created {
 		c.send <- createResult(actionCreateResult, false, "room already exists", "")
@@ -224,7 +224,7 @@ func handleCreateTable(c *Client, tablename string, password string, sb uint, bb
 	if maxPlayers == 0 {
 		maxPlayers = 6
 	}
-	poker.Configure(table.game, sb, bb, buyIn, buyIn*maxBuyIns, maxPlayers)
+	poker.Configure(table.game, sb, bb, buyIn, buyIn*maxBuyIns, maxPlayers, handsLimit)
 
 	c.table = table
 	table.register <- c
@@ -297,7 +297,7 @@ func handleLeaveTable(c *Client, tablename string) {
 		c.table.game.Reset()
 	}
 
-	c.table.broadcast <- createUpdatedGame(c)
+	c.table.broadcastGame()
 	c.table.unregister <- c
 	c.table = nil
 }
@@ -318,6 +318,13 @@ func handleNewPlayer(c *Client, username string) {
 
 func handleTakeSeat(c *Client, username string, seatID uint, buyIn uint) {
 	view := c.table.game.GenerateOmniView()
+
+	// New players can't sit down while a hand is in progress: they queue up
+	// and are seated at the start of the next hand instead.
+	if view.Running {
+		c.send <- createError("game already running")
+		return
+	}
 
 	// Reject if this user is already seated at the table.
 	for i := range view.Players {
@@ -376,7 +383,7 @@ func handleTakeSeat(c *Client, username string, seatID uint, buyIn uint) {
 	if err != nil {
 		slog.Default().Warn("Set seat id", "error", err)
 	}
-	c.table.broadcast <- createUpdatedGame(c)
+	c.table.broadcastGame()
 	c.send <- createUserInfo(user, true)
 }
 
@@ -439,7 +446,7 @@ func handleRebuy(c *Client, amount uint) {
 	// Buying in never changes the player's ready state: they stay not-ready
 	// and must explicitly tap their avatar to get ready.
 	autoStartIfReady(c.table)
-	c.table.broadcast <- createUpdatedGame(c)
+	c.table.broadcastGame()
 	c.send <- createUserInfo(user, true)
 }
 
@@ -495,7 +502,7 @@ func handleUndoRebuy(c *Client) {
 		slog.Default().Warn("Undo buy in", "error", err)
 	}
 
-	c.table.broadcast <- createUpdatedGame(c)
+	c.table.broadcastGame()
 	c.send <- createUserInfo(user, true)
 }
 
@@ -503,9 +510,11 @@ func handleStartGame(c *Client) {
 	err := c.table.game.Start()
 	if err != nil {
 		fmt.Println(err)
+		return
 	}
+	c.table.startNewSession()
 	broadcastDeal(c.table)
-	c.table.broadcast <- createUpdatedGame(c)
+	c.table.broadcastGame()
 }
 
 func handleToggleReady(c *Client) {
@@ -526,7 +535,59 @@ func handleToggleReady(c *Client) {
 		return
 	}
 	autoStartIfReady(c.table)
-	c.table.broadcast <- createUpdatedGame(c)
+	c.table.broadcastGame()
+}
+
+// handleQueueNext lets a spectator reserve a seat for the next hand. It acts
+// as a toggle: queued clients are seated automatically between hands, and
+// sending it again while queued cancels the reservation.
+func handleQueueNext(c *Client) {
+	if c.table == nil {
+		c.send <- createError("not in a room")
+		return
+	}
+	if c.username == "" {
+		c.send <- createError("not logged in")
+		return
+	}
+
+	view := c.table.game.GenerateOmniView()
+	if !view.Running {
+		c.send <- createError("game not running")
+		return
+	}
+
+	// Already seated players have nothing to queue for.
+	for i := range view.Players {
+		if view.Players[i].UUID == c.uuid {
+			c.send <- createError("already seated")
+			return
+		}
+	}
+
+	if view.Config.MaxPlayers != 0 && uint(len(view.Players)) >= view.Config.MaxPlayers {
+		c.send <- createError("table is full")
+		return
+	}
+
+	// Validate the buy-in up front for immediate feedback. The final check
+	// happens again when the seat is actually assigned.
+	if view.Config.BuyIn == 0 {
+		c.send <- createError("amount must be positive")
+		return
+	}
+	user, err := loadUser(c.hub.rdb, c.username)
+	if err != nil {
+		c.send <- createError("could not load user")
+		return
+	}
+	if user.Chips < view.Config.BuyIn {
+		c.send <- createError("not enough chips")
+		return
+	}
+
+	c.table.toggleQueue(c)
+	c.table.broadcastGame()
 }
 
 func handleMoveSeat(c *Client, seatID uint) {
@@ -555,7 +616,7 @@ func handleMoveSeat(c *Client, seatID uint) {
 		c.send <- createError("seat is taken")
 		return
 	}
-	c.table.broadcast <- createUpdatedGame(c)
+	c.table.broadcastGame()
 }
 
 // autoStartIfReady starts the game once at least two seated players are ready.
@@ -582,24 +643,36 @@ func autoStartIfReady(t *table) bool {
 		slog.Default().Warn("Auto start", "error", err)
 		return false
 	}
+	t.startNewSession()
 	broadcastDeal(t)
 	return true
 }
 
 func handleResetGame(c *Client) {
 	c.table.game.Reset()
-	c.table.broadcast <- createUpdatedGame(c)
+	c.table.broadcastGame()
 }
 
 func handleDealGame(c *Client) {
-	broadcastDeal(c.table)
-
 	view := c.table.game.GenerateOmniView()
+
+	// All-in runout: reveal the board one card at a time and resolve at the
+	// river. Betting is off and the board is incomplete in this state.
+	if !view.Betting && view.Stage >= poker.PreFlop && view.Stage <= poker.River {
+		if err := poker.RunoutNext(c.table.game); err != nil {
+			slog.Default().Warn("Runout next", "error", err)
+		}
+		c.table.broadcastGame()
+		return
+	}
+
+	// Normal flow: deal the next hand (PreDeal) or next street.
+	broadcastDeal(c.table)
 	err := poker.Deal(c.table.game, view.DealerNum, 0)
 	if err != nil {
 		slog.Default().Warn("Deal table", "error", err)
 	}
-	c.table.broadcast <- createUpdatedGame(c)
+	c.table.broadcastGame()
 }
 
 func handleCall(c *Client) {
@@ -625,7 +698,7 @@ func handleCall(c *Client) {
 	if err != nil {
 		slog.Default().Warn("Handle call", "error", err)
 	}
-	c.table.broadcast <- createUpdatedGame(c)
+	c.table.broadcastGame()
 }
 
 func handleRaise(c *Client, raise uint) {
@@ -636,7 +709,7 @@ func handleRaise(c *Client, raise uint) {
 		slog.Default().Warn("Handle raise", "error", err)
 	}
 
-	c.table.broadcast <- createUpdatedGame(c)
+	c.table.broadcastGame()
 }
 
 func handleCheck(c *Client) {
@@ -646,7 +719,7 @@ func handleCheck(c *Client) {
 	if err != nil {
 		slog.Default().Warn("Handle check", "error", err)
 	}
-	c.table.broadcast <- createUpdatedGame(c)
+	c.table.broadcastGame()
 }
 
 func handleFold(c *Client) {
@@ -657,7 +730,55 @@ func handleFold(c *Client) {
 		slog.Default().Warn("Handle fold", "error", err)
 		return
 	}
-	c.table.broadcast <- createUpdatedGame(c)
+	c.table.broadcastGame()
+}
+
+// handleVoteSettle registers a vote to settle the current session early.
+func handleVoteSettle(c *Client) {
+	if c.table == nil {
+		c.send <- createError("not in a room")
+		return
+	}
+	c.table.voteSettle(c)
+}
+
+// handleShowHand reveals a player's hole cards at showdown.
+func handleShowHand(c *Client) {
+	if c.table == nil {
+		c.send <- createError("not in a room")
+		return
+	}
+	view := c.table.game.GenerateOmniView()
+	position := -1
+	for i := range view.Players {
+		if view.Players[i].UUID == c.uuid {
+			position = i
+			break
+		}
+	}
+	if position < 0 {
+		c.send <- createError("you are not seated")
+		return
+	}
+	if err := poker.ShowHand(c.table.game, uint(position), 0); err != nil {
+		slog.Default().Warn("Show hand", "error", err)
+		return
+	}
+	c.table.broadcastGame()
+}
+
+func createSettlement(players []settlementPlayer, biggestWinner string, biggestAmount uint) []byte {
+	resp := settlement{
+		base{actionSettlement},
+		players,
+		biggestWinner,
+		biggestAmount,
+	}
+	bytes, err := json.Marshal(resp)
+	if err != nil {
+		slog.Default().Warn("Marshal settlement", "error", err)
+	}
+	return bytes
 }
 
 func createNewMessage(username string, message string) []byte {
@@ -769,6 +890,8 @@ func createUpdatedGameBytes(t *table) []byte {
 	game := updateGame{
 		base{actionUpdateGame},
 		t.game.GenerateOmniView(),
+		t.waitingUsernames(),
+		t.settleVoteList(),
 	}
 
 	resp, err := json.Marshal(game)

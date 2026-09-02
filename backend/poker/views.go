@@ -6,21 +6,24 @@ import (
 
 // GameView is the type that represents a snapshot of a Game's state.
 type GameView struct {
-	Running        bool        `json:"running"`
-	DealerNum      uint        `json:"dealer"`
-	ActionNum      uint        `json:"action"`
-	UTGNum         uint        `json:"utg"`
-	SBNum          uint        `json:"sb"`
-	BBNum          uint        `json:"bb"`
-	CommunityCards []eval.Card `json:"communityCards"`
-	Stage          GameStage   `json:"stage"`
-	Betting        bool        `json:"betting"`
-	Config         GameConfig  `json:"config"`
-	Players        []player    `json:"players"`
-	Deck           eval.Deck   `json:"-"`
-	Pots           []Pot       `json:"pots"`
-	MinRaise       uint        `json:"minRaise"`
-	ReadyCount     uint        `json:"readyCount"`
+	Running           bool        `json:"running"`
+	DealerNum         uint        `json:"dealer"`
+	ActionNum         uint        `json:"action"`
+	UTGNum            uint        `json:"utg"`
+	SBNum             uint        `json:"sb"`
+	BBNum             uint        `json:"bb"`
+	CommunityCards    []eval.Card `json:"communityCards"`
+	Stage             GameStage   `json:"stage"`
+	Betting           bool        `json:"betting"`
+	Config            GameConfig  `json:"config"`
+	Players           []player    `json:"players"`
+	Deck              eval.Deck   `json:"-"`
+	Pots              []Pot       `json:"pots"`
+	MinRaise          uint        `json:"minRaise"`
+	ReadyCount        uint        `json:"readyCount"`
+	HandsPlayed       uint        `json:"handsPlayed"`
+	BiggestPotAmt     uint        `json:"biggestPotAmt"`
+	BiggestPotWinners []uint      `json:"biggestPotWinners"`
 }
 
 func cardReader(cards []eval.Card) []string {
@@ -41,21 +44,24 @@ func (g *Game) copyToView() *GameView {
 	//make sure that it is. An example: copying a slice of structs, where the struct
 	//has a field that is a slice: this doesn't work by default. Write a helper function.
 	view := &GameView{
-		Running:        g.running,
-		DealerNum:      g.dealerNum,
-		ActionNum:      g.actionNum,
-		UTGNum:         g.utgNum,
-		SBNum:          g.sbNum,
-		BBNum:          g.bbNum,
-		CommunityCards: append([]eval.Card{}, g.communityCards...),
-		Stage:          g.getStage(),
-		Betting:        g.getBetting(),
-		Config:         g.config,
-		Players:        append([]player{}, g.players...),
-		Deck:           append([]eval.Card{}, g.deck...),
-		Pots:           copyPots(g.pots),
-		MinRaise:       g.minRaise,
-		ReadyCount:     g.readyCount(),
+		Running:           g.running,
+		DealerNum:         g.dealerNum,
+		ActionNum:         g.actionNum,
+		UTGNum:            g.utgNum,
+		SBNum:             g.sbNum,
+		BBNum:             g.bbNum,
+		CommunityCards:    append([]eval.Card{}, g.communityCards...),
+		Stage:             g.getStage(),
+		Betting:           g.getBetting(),
+		Config:            g.config,
+		Players:           append([]player{}, g.players...),
+		Deck:              append([]eval.Card{}, g.deck...),
+		Pots:              copyPots(g.pots),
+		MinRaise:          g.minRaise,
+		ReadyCount:        g.readyCount(),
+		HandsPlayed:       g.handsPlayed,
+		BiggestPotAmt:     g.biggestPotAmt,
+		BiggestPotWinners: append([]uint{}, g.biggestPotWinners...),
 	}
 
 	return view

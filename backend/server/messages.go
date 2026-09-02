@@ -32,7 +32,10 @@ const (
 	actionReconnect    string = "reconnect-user"
 	actionGetHistory   string = "get-history"
 	actionToggleReady  string = "toggle-ready"
+	actionQueueNext    string = "queue-next"
 	actionMoveSeat     string = "move-seat"
+	actionVoteSettle   string = "vote-settle"
+	actionShowHand     string = "show-hand"
 	actionPing         string = "ping"
 )
 
@@ -145,6 +148,7 @@ type createTable struct {
 	BuyIn      uint   `json:"buyIn"`
 	MaxBuyIns  uint   `json:"maxBuyIns"`
 	MaxPlayers uint   `json:"maxPlayers"`
+	HandsLimit uint   `json:"handsLimit"`
 }
 
 type addChips struct {
@@ -174,11 +178,21 @@ type toggleReady struct {
 	base // actionToggleReady
 }
 
-type moveSeat struct {
-	base         // actionMoveSeat
-	SeatID uint `json:"seatID"`
+type queueNext struct {
+	base // actionQueueNext
 }
 
+type moveSeat struct {
+	base        // actionMoveSeat
+	SeatID uint `json:"seatID"`
+}
+type voteSettle struct {
+	base // actionVoteSettle
+}
+
+type showHand struct {
+	base // actionShowHand
+}
 type ping struct {
 	base // actionPing
 }
@@ -196,6 +210,7 @@ const (
 	actionError            string = "error"
 	actionLoginResult      string = "login-result"
 	actionHistory          string = "history"
+	actionSettlement       string = "settlement"
 	actionPong             string = "pong"
 )
 
@@ -215,8 +230,10 @@ type newLog struct {
 }
 
 type updateGame struct {
-	base                 // actionUpdateGame
-	Game *poker.GameView `json:"game"`
+	base                        // actionUpdateGame
+	Game        *poker.GameView `json:"game"`
+	Waiting     []string        `json:"waiting"`
+	SettleVotes []string        `json:"settleVotes"`
 }
 
 type updatePlayerUUID struct {
@@ -258,6 +275,21 @@ type userInfo struct {
 type historyList struct {
 	base                    // actionHistory
 	History []HistoryRecord `json:"history"`
+}
+
+type settlementPlayer struct {
+	Username    string `json:"username"`
+	Avatar      string `json:"avatar"`
+	AvatarImage bool   `json:"avatarImage"`
+	BuyIn       uint   `json:"buyIn"`
+	Net         int    `json:"net"`
+}
+
+type settlement struct {
+	base                                // actionSettlement
+	Players          []settlementPlayer `json:"players"`
+	BiggestPotWinner string             `json:"biggestPotWinner"`
+	BiggestPotAmount uint               `json:"biggestPotAmount"`
 }
 
 type errorMessage struct {

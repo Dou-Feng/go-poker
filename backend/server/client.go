@@ -252,7 +252,7 @@ func (c *Client) processEvents(rawMessage []byte) error {
 		if err != nil {
 			return err
 		}
-		handleCreateTable(c, table.Tablename, table.Password, table.SB, table.BB, table.BuyIn, table.MaxBuyIns, table.MaxPlayers)
+		handleCreateTable(c, table.Tablename, table.Password, table.SB, table.BB, table.BuyIn, table.MaxBuyIns, table.MaxPlayers, table.HandsLimit)
 		return nil
 
 	case actionAddChips:
@@ -294,6 +294,10 @@ func (c *Client) processEvents(rawMessage []byte) error {
 		handleToggleReady(c)
 		return nil
 
+	case actionQueueNext:
+		handleQueueNext(c)
+		return nil
+
 	case actionMoveSeat:
 		var seat moveSeat
 		err := json.Unmarshal(rawMessage, &seat)
@@ -301,6 +305,14 @@ func (c *Client) processEvents(rawMessage []byte) error {
 			return err
 		}
 		handleMoveSeat(c, seat.SeatID)
+		return nil
+
+	case actionVoteSettle:
+		handleVoteSettle(c)
+		return nil
+
+	case actionShowHand:
+		handleShowHand(c)
 		return nil
 
 	case actionTakeSeat:

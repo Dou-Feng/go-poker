@@ -21,14 +21,14 @@ const (
 // PlayerStats accumulates a single session's worth of per-player statistics.
 // The server merges these into a user's lifetime record when they leave.
 type PlayerStats struct {
-	HandsPlayed uint `json:"handsPlayed"`
-	HandsWon    uint `json:"handsWon"`
-	Folds       uint `json:"folds"`
-	Calls       uint `json:"calls"`
-	Raises      uint `json:"raises"`
-	ThreeBets   uint `json:"threeBets"`
-	MaxPotWon   uint `json:"maxPotWon"`
-	VPIP        uint `json:"vpip"`
+	HandsPlayed uint                `json:"handsPlayed"`
+	HandsWon    uint                `json:"handsWon"`
+	Folds       uint                `json:"folds"`
+	Calls       uint                `json:"calls"`
+	Raises      uint                `json:"raises"`
+	ThreeBets   uint                `json:"threeBets"`
+	MaxPotWon   uint                `json:"maxPotWon"`
+	VPIP        uint                `json:"vpip"`
 	VPIPByPos   [PosLabelCount]uint `json:"vpipByPos"`
 }
 
@@ -49,6 +49,7 @@ type player struct {
 	Stats       PlayerStats `json:"stats"`
 	Avatar      string      `json:"avatar"`
 	AvatarImage bool        `json:"avatarImage"`
+	Revealed    bool        `json:"revealed"`
 }
 
 func (p *player) allIn() bool {
@@ -65,7 +66,7 @@ func (p *player) initialize() {
 
 }
 
-//putInChips is simply a helper function that transfers the amounts between fields
+// putInChips is simply a helper function that transfers the amounts between fields
 func (p *player) putInChips(amt uint) {
 	if p.Stack > amt {
 		p.Bet += amt

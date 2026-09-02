@@ -3,36 +3,39 @@ import { AppContext } from "../providers/AppStore";
 import Card from "./Card";
 
 export default function CommunityCards() {
-    const { appState, dispatch } = useContext(AppContext);
+  const { appState, dispatch } = useContext(AppContext);
 
-    const cards = [0, 1, 2, 3, 4];
+  const cards = [0, 1, 2, 3, 4];
 
-    if (appState.game?.communityCards) {
-        return (
-            <div className="mb-4 flex flex-row p-2 text-2xl text-black">
-                {cards.map((num, i) => (
-                    <div key={i} className="m-0.5">
-                        {appState.game?.communityCards[num] ? (
-                            // show dealt card
-                            <Card
-                                card={appState.game.communityCards[num]}
-                                placeholder={false}
-                                folded={false}
-                                hidden={false}
-                            />
-                        ) : (
-                            // show placeholder
-                            <Card
-                                card="placeholder"
-                                placeholder={true}
-                                folded={false}
-                                hidden={false}
-                            />
-                        )}
-                    </div>
-                ))}
+  if (appState.game?.communityCards) {
+    return (
+      <div className="mb-4 flex flex-row p-2 text-2xl text-black">
+        {cards.map((num) => {
+          const card = appState.game?.communityCards[num];
+          return (
+            <div key={card || `placeholder-${num}`} className="m-0.5">
+              {card ? (
+                // show dealt card
+                <Card
+                  card={card}
+                  placeholder={false}
+                  folded={false}
+                  hidden={false}
+                />
+              ) : (
+                // show placeholder
+                <Card
+                  card="placeholder"
+                  placeholder={true}
+                  folded={false}
+                  hidden={false}
+                />
+              )}
             </div>
-        );
-    }
-    return null;
+          );
+        })}
+      </div>
+    );
+  }
+  return null;
 }
