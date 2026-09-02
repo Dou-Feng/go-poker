@@ -54,6 +54,7 @@ export default function Profile() {
                                 emoji={avatarEmoji}
                                 hasImage={avatarImage}
                                 size={40}
+                                version={isSelf ? appState.avatarVersion : undefined}
                             />
                         </button>
                         <div>

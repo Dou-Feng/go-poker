@@ -14,11 +14,14 @@ type AvatarProps = {
     emoji: string;
     hasImage: boolean;
     size?: number;
+    version?: number;
 };
 
-export default function Avatar({ username, emoji, hasImage, size = 32 }: AvatarProps) {
+export default function Avatar({ username, emoji, hasImage, size = 32, version }: AvatarProps) {
     if (hasImage && username) {
-        const src = `/api/avatar?username=${encodeURIComponent(username)}&size=${pickSize(size)}`;
+        const src = `/api/avatar?username=${encodeURIComponent(username)}&size=${pickSize(size)}${
+            version !== undefined ? `&v=${version}` : ""
+        }`;
         return (
             <img
                 src={src}

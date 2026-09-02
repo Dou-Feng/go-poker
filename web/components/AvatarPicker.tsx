@@ -37,6 +37,8 @@ export default function AvatarPicker({ onClose }: AvatarPickerProps) {
         try {
             const res = await fetch("/api/avatar", { method: "POST", body: fd });
             if (res.ok) {
+                // Bump the version so the cached avatar image is refreshed.
+                dispatch({ type: "bumpAvatar" });
                 getUser(socket);
             } else {
                 dispatch({ type: "setAuthError", payload: t("uploadFailed") });

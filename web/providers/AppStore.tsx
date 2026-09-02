@@ -15,6 +15,7 @@ const initialState: AppState = {
     chips: null,
     avatar: null,
     avatarImage: false,
+    avatarVersion: 0,
     friends: [],
     stats: null,
     profile: null,
@@ -37,6 +38,7 @@ type ACTIONTYPE =
     | { type: "setChips"; payload: number }
     | { type: "setAvatar"; payload: string }
     | { type: "setAvatarImage"; payload: boolean }
+    | { type: "bumpAvatar" }
     | { type: "setFriends"; payload: string[] }
     | { type: "setStats"; payload: PlayerStats }
     | { type: "setProfile"; payload: Profile | null }
@@ -73,6 +75,8 @@ function reducer(state: AppState, action: ACTIONTYPE) {
             return { ...state, avatar: action.payload };
         case "setAvatarImage":
             return { ...state, avatarImage: action.payload };
+        case "bumpAvatar":
+            return { ...state, avatarVersion: state.avatarVersion + 1 };
         case "setFriends":
             return { ...state, friends: action.payload };
         case "setStats":

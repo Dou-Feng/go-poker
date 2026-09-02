@@ -171,6 +171,8 @@ func handleSetAvatar(c *Client, avatar string) {
 		return
 	}
 	user.Avatar = avatar
+	// Choosing an emoji replaces any uploaded image avatar.
+	user.AvatarImage = false
 	if err := saveUser(c.hub.rdb, user); err != nil {
 		c.send <- createError("could not save user")
 		return

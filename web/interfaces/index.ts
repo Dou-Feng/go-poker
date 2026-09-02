@@ -21,6 +21,7 @@ export type AppState = {
     chips: number | null;
     avatar: string | null;
     avatarImage: boolean;
+    avatarVersion: number;
     friends: string[];
     stats: PlayerStats | null;
     profile: Profile | null;

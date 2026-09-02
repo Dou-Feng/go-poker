@@ -154,6 +154,7 @@ export default function Lobby() {
                             emoji={appState.avatar ?? "🙂"}
                             hasImage={appState.avatarImage}
                             size={32}
+                            version={appState.avatarVersion}
                         />
                     </button>
                     <div className="flex flex-col">
