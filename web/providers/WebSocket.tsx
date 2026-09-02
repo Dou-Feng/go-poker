@@ -28,7 +28,7 @@ export function SocketProvider(props: SocketProviderProps) {
 
         const wsUrl =
             process.env.NEXT_PUBLIC_WS_URL ??
-            `${window.location.origin.replace("http", "ws")}/ws`;
+            `${window.location.protocol === "https:" ? "wss" : "ws"}://${window.location.hostname}:8080/ws`;
         let ws: WebSocket | null = null;
         let disposed = false;
         let reconnectTimer: ReturnType<typeof setTimeout> | null = null;

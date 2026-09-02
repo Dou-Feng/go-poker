@@ -1,7 +1,6 @@
 import { createContext, useReducer, ReactChild } from "react";
 import { AppState, Message, Game, Log, TableInfo, PlayerStats, Profile, HistoryRecord } from "../interfaces";
 import { Language } from "../lib/translations";
-import { initialLanguage } from "../lib/language";
 
 const initialState: AppState = {
     messages: [],
@@ -20,7 +19,10 @@ const initialState: AppState = {
     stats: null,
     profile: null,
     history: [],
-    language: initialLanguage(),
+    // Deterministic on server and client: the real language is applied in a
+    // useEffect (pages/index.tsx) after hydration, to avoid a hydration
+    // mismatch (the server has no `navigator`).
+    language: "en",
 };
 
 type ACTIONTYPE =

@@ -2,8 +2,10 @@ import { Language } from "./translations";
 
 const CHINESE_COUNTRIES = new Set(["CN", "TW", "HK", "MO", "SG"]);
 
-// initialLanguage is a synchronous check of the browser locale, used to seed
-// the app before any network call can complete.
+// initialLanguage is a synchronous check of the browser locale. It must NOT be
+// used to seed the initial app state during SSR: the server has no `navigator`,
+// so it would render a different language than the client and cause a hydration
+// mismatch. It is only used by detectLanguage() as a fast path.
 export function initialLanguage(): Language {
     if (typeof navigator !== "undefined") {
         const lang = (navigator.language || "").toLowerCase();
