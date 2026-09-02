@@ -241,33 +241,52 @@ func handleLeaveTable(c *Client, tablename string) {
 		return
 	}
 
-	// Fold the player out (if in a hand) and mark them as left.
+	// Snapshot the player before folding so the session can be settled even
+	// when the fold immediately ends the hand and drops the player.
 	view := c.table.game.GenerateOmniView()
+	pos := -1
 	for i := range view.Players {
 		if view.Players[i].UUID == c.uuid {
-			if err := poker.SitOut(c.table.game, uint(i), 0); err != nil {
-				slog.Default().Warn("Leave table", "error", err)
-			}
+			pos = i
 			break
 		}
 	}
 
-	// Settle the session with the post-fold state: merge stats, return the
-	// remaining stack to the wallet, and append a history entry.
-	after := c.table.game.GenerateOmniView()
-	for j := range after.Players {
-		if after.Players[j].UUID == c.uuid {
-			if _, err := flushPlayerSession(c.hub.rdb, after.Players[j].Username, c.table.name, after.Players[j].TotalBuyIn, after.Players[j].Stack, after.Players[j].Stats); err != nil {
-				slog.Default().Warn("Flush player", "error", err)
+	if pos >= 0 {
+		pre := view.Players[pos]
+
+		// Fold the player out (if in a hand) and mark them as left.
+		if err := poker.SitOut(c.table.game, uint(pos), 0); err != nil {
+			slog.Default().Warn("Leave table", "error", err)
+		}
+
+		// Settle the session: merge stats, return the remaining stack to the
+		// wallet, and append a history entry. Prefer the post-fold snapshot,
+		// but fall back to the pre-fold one if the hand already ended and the
+		// player was dropped from the game.
+		stats := pre.Stats
+		if pre.In {
+			stats.Folds++
+		}
+		after := c.table.game.GenerateOmniView()
+		stillSeated := -1
+		for j := range after.Players {
+			if after.Players[j].UUID == c.uuid {
+				stillSeated = j
+				stats = after.Players[j].Stats
+				break
 			}
-			// Remove the player from the room once no hand is active. If they
-			// folded mid-hand they are dropped when the hand ends.
-			if after.Stage == poker.PreDeal {
-				if err := poker.RemovePlayer(c.table.game, uint(j)); err != nil {
-					slog.Default().Warn("Remove player", "error", err)
-				}
+		}
+		if _, err := flushPlayerSession(c.hub.rdb, pre.Username, c.table.name, pre.TotalBuyIn, pre.Stack, stats); err != nil {
+			slog.Default().Warn("Flush player", "error", err)
+		}
+
+		// Remove the player from the room once no hand is active. If they
+		// folded mid-hand they are dropped when the hand ends.
+		if stillSeated >= 0 && after.Stage == poker.PreDeal {
+			if err := poker.RemovePlayer(c.table.game, uint(stillSeated)); err != nil {
+				slog.Default().Warn("Remove player", "error", err)
 			}
-			break
 		}
 	}
 

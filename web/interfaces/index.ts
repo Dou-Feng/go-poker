@@ -56,6 +56,8 @@ export type Profile = {
     chips: number;
     friends: string[];
     stats: PlayerStats;
+    buyIn?: number;
+    net?: number;
 };
 
 export type HistoryRecord = {

@@ -453,7 +453,7 @@ export default function Lobby() {
                         ))}
                     </div>
 
-                    {showHistory && <History />}
+                    {showHistory && <History onClose={() => setShowHistory(false)} />}
                 </div>
             </div>
             <Footer />

@@ -36,8 +36,14 @@ export default function Profile() {
     }
 
     const isSelf = profile.username === appState.username;
-    const avatarEmoji = isSelf ? appState.avatar || profile.avatar || "🙂" : profile.avatar || "🙂";
-    const avatarImage = isSelf ? appState.avatarImage : profile.avatarImage;
+    // A history entry is shown as a session view: its own stats, no avatar editing.
+    const isSession = profile.net !== undefined || profile.buyIn !== undefined;
+    const avatarEmoji = isSession
+        ? profile.avatar || "🙂"
+        : isSelf
+        ? appState.avatar || profile.avatar || "🙂"
+        : profile.avatar || "🙂";
+    const avatarImage = isSession ? profile.avatarImage : isSelf ? appState.avatarImage : profile.avatarImage;
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
@@ -45,21 +51,28 @@ export default function Profile() {
                 <div className="mb-4 flex flex-row items-center justify-between">
                     <div className="flex flex-row items-center gap-3">
                         <button
-                            onClick={isSelf ? () => setShowPicker(!showPicker) : undefined}
-                            className={isSelf ? "cursor-pointer rounded-full hover:opacity-80" : "cursor-default"}
-                            title={isSelf ? t("changeAvatar") : undefined}
+                            onClick={isSelf && !isSession ? () => setShowPicker(!showPicker) : undefined}
+                            className={isSelf && !isSession ? "cursor-pointer rounded-full hover:opacity-80" : "cursor-default"}
+                            title={isSelf && !isSession ? t("changeAvatar") : undefined}
                         >
                             <Avatar
                                 username={profile.username}
                                 emoji={avatarEmoji}
                                 hasImage={avatarImage}
                                 size={40}
-                                version={isSelf ? appState.avatarVersion : undefined}
+                                version={isSelf && !isSession ? appState.avatarVersion : undefined}
                             />
                         </button>
                         <div>
                             <p className="text-lg font-semibold text-white">{profile.username}</p>
-                            {profile.chips > 0 && (
+                            {isSession && (
+                                <p className="text-sm text-neutral-500">
+                                    {t("buyInLabel")}: {profile.buyIn} · {t("net")}:{" "}
+                                    {profile.net !== undefined && profile.net >= 0 ? "+" : ""}
+                                    {profile.net}
+                                </p>
+                            )}
+                            {!isSession && profile.chips > 0 && (
                                 <p className="text-sm text-neutral-500">
                                     {t("chips")}: {profile.chips}
                                 </p>
@@ -77,7 +90,7 @@ export default function Profile() {
                     </button>
                 </div>
 
-                {isSelf && showPicker && (
+                {isSelf && !isSession && showPicker && (
                     <div className="mb-4">
                         <AvatarPicker onClose={() => setShowPicker(false)} />
                     </div>
