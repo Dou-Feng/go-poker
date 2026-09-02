@@ -436,13 +436,8 @@ func handleRebuy(c *Client, amount uint) {
 	if err := poker.BuyIn(c.table.game, uint(position), amount); err != nil {
 		slog.Default().Warn("Rebuy", "error", err)
 	}
-	// Re-ready only players who were busted; a seated-but-not-ready player
-	// keeps control over their own ready state.
-	if view.Players[position].Stack == 0 {
-		if err := poker.ToggleReady(c.table.game, uint(position), 0); err != nil {
-			slog.Default().Warn("Rebuy ready", "error", err)
-		}
-	}
+	// Buying in never changes the player's ready state: they stay not-ready
+	// and must explicitly tap their avatar to get ready.
 	autoStartIfReady(c.table)
 	c.table.broadcast <- createUpdatedGame(c)
 	c.send <- createUserInfo(user, true)

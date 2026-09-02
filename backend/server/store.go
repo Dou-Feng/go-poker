@@ -149,6 +149,13 @@ func flushPlayerSession(rdb *redis.Client, username string, room string, totalBu
 		return 0, err
 	}
 
+	// Don't record sessions where the player never played a hand (e.g. they
+	// sat down and left before any deal). Each player's history therefore
+	// only reflects the hands they actually participated in.
+	if stats.HandsPlayed == 0 {
+		return user.Chips, nil
+	}
+
 	rec := HistoryRecord{
 		Room:        room,
 		Username:    username,
