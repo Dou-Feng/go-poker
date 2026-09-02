@@ -1,13 +1,16 @@
-import React, { useContext } from "react";
+import React, { useContext, useState } from "react";
 import { AppContext } from "../providers/AppStore";
 import { useSocket } from "../hooks/useSocket";
 import { rebuy } from "../actions/actions";
 import { useTranslation } from "../hooks/useTranslation";
+import WalletButton from "./WalletButton";
+import Recharge from "./Recharge";
 
 export default function Wallet() {
     const socket = useSocket();
     const { appState } = useContext(AppContext);
     const { t } = useTranslation();
+    const [showRecharge, setShowRecharge] = useState(false);
 
     const player = appState.game?.players.find((p) => p.uuid === appState.clientID);
     const buyIn = appState.game?.config.buyIn ?? 200;
@@ -20,9 +23,7 @@ export default function Wallet() {
 
     return (
         <div className="flex flex-col items-end">
-            <p className="text-neutral-400">
-                {t("chips")}: <span className="text-white">{appState.chips ?? 0}</span>
-            </p>
+            <WalletButton onOpen={() => setShowRecharge(true)} />
             {canRebuy && (
                 <button
                     onClick={() => socket && rebuy(socket, buyIn)}
@@ -34,6 +35,7 @@ export default function Wallet() {
             {atMax && (
                 <p className="mt-1 text-xs text-neutral-500">{t("maxBuyInReached")}</p>
             )}
+            {showRecharge && <Recharge onClose={() => setShowRecharge(false)} />}
         </div>
     );
 }

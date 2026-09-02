@@ -6,7 +6,6 @@ import {
     listTables,
     joinTable,
     createTable,
-    addChips,
     getUser,
     addFriend,
     getHistory,
@@ -15,6 +14,8 @@ import { saveSession, clearSession, clearUser } from "../lib/session";
 import LanguageToggle from "./LanguageToggle";
 import Avatar from "./Avatar";
 import History from "./History";
+import WalletButton from "./WalletButton";
+import Recharge from "./Recharge";
 import { useTranslation } from "../hooks/useTranslation";
 
 const BLINDS_PRESETS: [string, number, number][] = [
@@ -37,6 +38,7 @@ export default function Lobby() {
     const [joinPassword, setJoinPassword] = useState("");
     const [friendName, setFriendName] = useState("");
     const [showHistory, setShowHistory] = useState(false);
+    const [showRecharge, setShowRecharge] = useState(false);
     const [sb, setSb] = useState(1);
     const [bb, setBb] = useState(2);
     const [buyIn, setBuyIn] = useState(200);
@@ -96,12 +98,6 @@ export default function Lobby() {
         });
     };
 
-    const topUp = (amount: number) => {
-        if (socket) {
-            addChips(socket, amount);
-        }
-    };
-
     const logout = () => {
         clearUser();
         clearSession();
@@ -157,11 +153,9 @@ export default function Lobby() {
                             version={appState.avatarVersion}
                         />
                     </button>
-                    <div className="flex flex-col">
+                    <div className="flex flex-col items-start gap-1">
                         <p className="text-white">{appState.username}</p>
-                        <p className="text-xs text-neutral-500">
-                            {t("chips")}: {appState.chips ?? 0}
-                        </p>
+                        <WalletButton onOpen={() => setShowRecharge(true)} />
                     </div>
                 </div>
                 <div className="flex flex-row flex-wrap items-center gap-2">
@@ -184,21 +178,6 @@ export default function Lobby() {
                         {t("logout")}
                     </button>
                 </div>
-            </div>
-
-            <div className="flex w-full flex-row flex-wrap items-center justify-center gap-2 px-4 pb-2">
-                <span className="text-xs text-neutral-500">
-                    {t("chips")}: {appState.chips ?? 0}
-                </span>
-                {BUYIN_PRESETS.map((amount) => (
-                    <button
-                        key={amount}
-                        onClick={() => topUp(amount)}
-                        className="rounded-sm bg-emerald-800 px-3 py-1 text-xs text-white hover:bg-emerald-700"
-                    >
-                        +{amount}
-                    </button>
-                ))}
             </div>
 
             <div className="flex flex-grow flex-col items-center px-4">
@@ -453,6 +432,7 @@ export default function Lobby() {
                         ))}
                     </div>
 
+                    {showRecharge && <Recharge onClose={() => setShowRecharge(false)} />}
                     {showHistory && <History onClose={() => setShowHistory(false)} />}
                 </div>
             </div>
