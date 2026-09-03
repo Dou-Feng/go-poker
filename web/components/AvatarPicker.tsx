@@ -29,6 +29,7 @@ export default function AvatarPicker({ onClose }: AvatarPickerProps) {
     }
     if (file.size > 10 * 1024 * 1024) {
       dispatch({ type: "setAuthError", payload: t("fileTooLarge") });
+      e.target.value = "";
       return;
     }
     const fd = new FormData();
@@ -41,7 +42,11 @@ export default function AvatarPicker({ onClose }: AvatarPickerProps) {
         dispatch({ type: "bumpAvatar" });
         getUser(socket);
       } else {
-        dispatch({ type: "setAuthError", payload: t("uploadFailed") });
+        const text = await res.text().catch(() => "");
+        dispatch({
+          type: "setAuthError",
+          payload: text.trim() || t("uploadFailed"),
+        });
       }
     } catch {
       dispatch({ type: "setAuthError", payload: t("uploadFailed") });

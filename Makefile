@@ -1,4 +1,4 @@
-.PHONY: start hot
+.PHONY: start hot deploy
 
 go :
 	cd backend && go run .
@@ -14,3 +14,6 @@ start :
 
 hot :
 	docker compose -f docker-compose-hot.yaml up --build
+
+deploy :
+	./deploy.sh

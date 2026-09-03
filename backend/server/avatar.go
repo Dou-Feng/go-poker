@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"image"
 	_ "image/gif"
@@ -13,9 +14,15 @@ import (
 	"log/slog"
 	"net/http"
 	"strconv"
+
+	_ "golang.org/x/image/webp" // decode-only WebP support
 )
 
 const maxAvatarUpload = 10 << 20 // 10 MB
+
+// errUnsupportedImage reports a file that could not be decoded as a supported
+// image format (jpg, png, gif, webp).
+var errUnsupportedImage = errors.New("unsupported image format (use jpg, png, gif or webp)")
 
 // avatarSizes are the pre-rendered sizes we store, largest first.
 var avatarSizes = []int{1024, 512, 256, 128, 64}
@@ -58,7 +65,12 @@ func encodeJPEG(img image.Image) (string, error) {
 func (s *Server) uploadAvatar(w http.ResponseWriter, r *http.Request) {
 	r.Body = http.MaxBytesReader(w, r.Body, maxAvatarUpload)
 	if err := r.ParseMultipartForm(maxAvatarUpload); err != nil {
-		http.Error(w, "file too large", http.StatusBadRequest)
+		var maxBytes *http.MaxBytesError
+		if errors.As(err, &maxBytes) {
+			http.Error(w, "file too large", http.StatusBadRequest)
+			return
+		}
+		http.Error(w, "invalid upload", http.StatusBadRequest)
 		return
 	}
 
@@ -83,7 +95,7 @@ func (s *Server) uploadAvatar(w http.ResponseWriter, r *http.Request) {
 
 	src, _, err := image.Decode(bytes.NewReader(data))
 	if err != nil {
-		http.Error(w, "unsupported image", http.StatusBadRequest)
+		http.Error(w, errUnsupportedImage.Error(), http.StatusBadRequest)
 		return
 	}
 
