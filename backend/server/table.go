@@ -463,6 +463,25 @@ func (t *table) settle() {
 		})
 	}
 
+	// Departed players already had their session flushed when they left, so
+	// they are only added to the display (not settled again). Without them
+	// the nets would not sum to zero: chips they lost (or won) before leaving
+	// stayed on the table and are reflected in the seated players' nets.
+	for _, p := range view.DepartedPlayers {
+		if p.TotalBuyIn == 0 {
+			// Never bought in (e.g. queued seat never dealt in): skip.
+			continue
+		}
+		results = append(results, settlementPlayer{
+			Username:    p.Username,
+			UUID:        p.AccountUUID,
+			Avatar:      p.Avatar,
+			AvatarImage: p.AvatarImage,
+			BuyIn:       p.TotalBuyIn,
+			Net:         int(p.Stack) - int(p.TotalBuyIn),
+		})
+	}
+
 	biggestWinner := ""
 	for _, p := range view.Players {
 		for _, num := range view.BiggestPotWinners {

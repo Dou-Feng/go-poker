@@ -3,6 +3,7 @@ import { useSocket } from "../hooks/useSocket";
 import { AppContext } from "../providers/AppStore";
 import { setAvatar, getUser } from "../actions/actions";
 import { useTranslation } from "../hooks/useTranslation";
+import { API_BASE } from "../lib/api";
 
 const AVATARS = ["🙂", "😎", "🦊", "🐸", "🐯", "🐼", "🐨", "🐷"];
 
@@ -36,16 +37,22 @@ export default function AvatarPicker({ onClose }: AvatarPickerProps) {
     fd.append("uuid", appState.uuid ?? "");
     fd.append("file", file);
     try {
-      const res = await fetch("/api/avatar", { method: "POST", body: fd });
+      const res = await fetch(`${API_BASE}/api/avatar`, {
+        method: "POST",
+        body: fd,
+      });
       if (res.ok) {
         // Bump the version so the cached avatar image is refreshed.
         dispatch({ type: "bumpAvatar" });
         getUser(socket);
       } else {
-        const text = await res.text().catch(() => "");
+        const text = (await res.text().catch(() => "")).trim();
+        // A proxied dev server may answer with a whole HTML error page:
+        // keep the toast readable.
+        const message = text.startsWith("<") ? "" : text.slice(0, 160);
         dispatch({
           type: "setAuthError",
-          payload: text.trim() || t("uploadFailed"),
+          payload: message || t("uploadFailed"),
         });
       }
     } catch {

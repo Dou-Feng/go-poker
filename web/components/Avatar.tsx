@@ -1,3 +1,5 @@
+import { API_BASE } from "../lib/api";
+
 const SIZES = [64, 128, 256, 512, 1024];
 
 function pickSize(px: number): number {
@@ -27,7 +29,7 @@ export default function Avatar({
   version,
 }: AvatarProps) {
   if (hasImage && (uuid || username)) {
-    const src = `/api/avatar?uuid=${encodeURIComponent(
+    const src = `${API_BASE}/api/avatar?uuid=${encodeURIComponent(
       uuid || username
     )}&size=${pickSize(size)}${version !== undefined ? `&v=${version}` : ""}`;
     return (

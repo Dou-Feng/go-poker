@@ -37,9 +37,9 @@ export default function Settlement() {
         )}
 
         <div className="flex flex-col gap-2">
-          {settlement.players.map((p) => (
+          {settlement.players.map((p, i) => (
             <div
-              key={p.username}
+              key={(p.uuid || p.username) + "-" + i}
               className="flex flex-row items-center justify-between rounded-md bg-neutral-700 px-3 py-2"
             >
               <div className="flex flex-row items-center gap-2">
