@@ -87,11 +87,15 @@ func (s *Server) mountMiddleware() {
 	s.router.Use(middleware.Logger)
 	s.router.Use(middleware.Recoverer)
 	s.router.Use(cors.Handler(cors.Options{
-		AllowedOrigins:   []string{"https://*", "http://*", "http://localhost", "ws://*"},
-		AllowedMethods:   []string{"PUT, GET, POST, DELETE, OPTIONS"},
+		// The frontend may be served from any origin: production (same
+		// origin, no CORS needed) and hot dev (localhost:8080 talking to
+		// the backend on :3000). chi/cors only treats a bare "*" as a
+		// wildcard — patterns like "http://*" never match.
+		AllowedOrigins:   []string{"*"},
+		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token", "X-Requested-With"},
 		ExposedHeaders:   []string{"Link"},
-		AllowCredentials: true,
+		AllowCredentials: false,
 		MaxAge:           500,
 	}))
 }

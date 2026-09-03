@@ -68,11 +68,25 @@ export function SocketProvider(props: SocketProviderProps) {
       console.log("websocket url: ", wsUrl);
       ws = new WebSocket(wsUrl);
       ws.onopen = () => {
+        // A stale socket from a previous effect pass (React StrictMode
+        // mounts twice in dev) may still be draining; only the live one
+        // updates state.
+        if (disposed) {
+          ws?.close();
+          return;
+        }
         console.log("websocket connected");
         lastPongAt = Date.now();
         setSocket(ws);
       };
       ws.onclose = () => {
+        // StrictMode's first-pass socket is closed intentionally by the
+        // cleanup; that close must not trigger a reconnect (the second
+        // mount owns the connection now).
+        if (disposed) {
+          console.log("websocket closed (stale)");
+          return;
+        }
         console.log("websocket disconnected");
         setSocket(null);
         scheduleReconnect();
