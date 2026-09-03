@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/evanofslack/go-poker/poker"
+	"github.com/go-redis/redis/v8"
 	"github.com/google/uuid"
 )
 
@@ -40,6 +41,7 @@ func reconnectPlayer(c *Client, playerUUID string) {
 		if view.Players[i].UUID == playerUUID {
 			c.uuid = playerUUID
 			c.username = view.Players[i].Username
+			c.accountUUID = view.Players[i].AccountUUID
 			c.table.markPlayerOnline(playerUUID)
 			c.send <- createUpdatedPlayerUUID(c)
 			c.send <- createUpdatedGame(c)
@@ -48,66 +50,103 @@ func reconnectPlayer(c *Client, playerUUID string) {
 	}
 }
 
-func handleRegisterUser(c *Client, username string, password string) {
-	if username == "" || password == "" {
+func handleRegisterUser(c *Client, username string, accountUUID string, password string, avatar string) {
+	if username == "" || accountUUID == "" || password == "" {
 		c.send <- createResult(actionRegisterResult, false, "username and password required", "")
+		return
+	}
+	if !validUUID(accountUUID) {
+		c.send <- createResult(actionRegisterResult, false, "invalid uuid", "")
 		return
 	}
 	// Reject re-registration of an account that already exists in storage
 	// (e.g. after a server restart clears the in-memory registry).
-	if existing, err := loadUser(c.hub.rdb, username); err == nil && existing.PasswordHash != "" {
-		c.send <- createResult(actionRegisterResult, false, "username already taken", "")
+	if existing, err := loadUser(c.hub.rdb, accountUUID); err == nil && existing.PasswordHash != "" {
+		c.send <- createResult(actionRegisterResult, false, "uuid already taken", "")
 		return
 	}
-	if err := c.hub.registerUser(username); err != nil {
+	if err := c.hub.registerUser(accountUUID); err != nil {
 		c.send <- createResult(actionRegisterResult, false, err.Error(), "")
 		return
 	}
 
 	hash, err := hashPassword(password)
 	if err != nil {
+		c.hub.unregisterUser(accountUUID)
 		c.send <- createResult(actionRegisterResult, false, "could not hash password", "")
 		return
 	}
-	user := &UserRecord{Username: username, PasswordHash: hash, Chips: initialChips, Avatar: "🙂"}
+	if avatar == "" {
+		avatar = "🙂"
+	}
+	user := &UserRecord{UUID: accountUUID, Username: username, PasswordHash: hash, Chips: initialChips, Avatar: avatar}
 	if err := saveUser(c.hub.rdb, user); err != nil {
+		c.hub.unregisterUser(accountUUID)
 		c.send <- createResult(actionRegisterResult, false, "could not save user", "")
 		return
 	}
+	if err := indexUsername(c.hub.rdb, username, accountUUID); err != nil {
+		slog.Default().Warn("Index username", "error", err)
+	}
 
 	c.username = username
-	c.send <- createResult(actionRegisterResult, true, "", username)
-	c.send <- createUserInfo(user, true)
+	c.accountUUID = accountUUID
+	c.send <- createResultWithUUID(actionRegisterResult, true, "", username, accountUUID)
+	c.send <- createUserInfo(c.hub.rdb, user, true)
 }
 
-func handleLogin(c *Client, username string, password string) {
-	user, err := loadUser(c.hub.rdb, username)
-	if err != nil || user.PasswordHash == "" || !verifyPassword(user.PasswordHash, password) {
+// handleLogin authenticates by account UUID first, then by username when the
+// username is unique across accounts.
+func handleLogin(c *Client, identifier string, password string) {
+	if identifier == "" || password == "" {
 		c.send <- createResult(actionLoginResult, false, "invalid username or password", "")
 		return
 	}
-	c.username = username
-	c.send <- createResult(actionLoginResult, true, "", username)
-	c.send <- createUserInfo(user, true)
+
+	var user *UserRecord
+	if candidate, err := loadUser(c.hub.rdb, identifier); err == nil && candidate.PasswordHash != "" {
+		user = candidate
+	} else {
+		candidate, err := loadUserByUsername(c.hub.rdb, identifier)
+		if err == ErrUsernameNotUnique {
+			c.send <- createResult(actionLoginResult, false, "username not unique", "")
+			return
+		}
+		if err != nil {
+			c.send <- createResult(actionLoginResult, false, "invalid username or password", "")
+			return
+		}
+		user = candidate
+	}
+
+	if user.PasswordHash == "" || !verifyPassword(user.PasswordHash, password) {
+		c.send <- createResult(actionLoginResult, false, "invalid username or password", "")
+		return
+	}
+	c.username = user.Username
+	c.accountUUID = user.UUID
+	c.send <- createResultWithUUID(actionLoginResult, true, "", user.Username, user.UUID)
+	c.send <- createUserInfo(c.hub.rdb, user, true)
 }
 
 // handleReconnectUser re-associates a returning client (identified by their
-// remembered username in localStorage) with their account. Passwords are only
-// required at initial login/registration.
-func handleReconnectUser(c *Client, username string) {
-	if username == "" {
+// remembered account UUID in localStorage) with their account. Passwords are
+// only required at initial login/registration.
+func handleReconnectUser(c *Client, accountUUID string) {
+	if accountUUID == "" {
 		return
 	}
-	c.username = username
-	user, err := loadUser(c.hub.rdb, username)
-	if err != nil {
+	user, err := loadUser(c.hub.rdb, accountUUID)
+	if err != nil || user.PasswordHash == "" {
 		return
 	}
-	c.send <- createUserInfo(user, true)
+	c.username = user.Username
+	c.accountUUID = user.UUID
+	c.send <- createUserInfo(c.hub.rdb, user, true)
 }
 
 func handleGetHistory(c *Client) {
-	records, err := loadHistory(c.hub.rdb, c.username)
+	records, err := loadHistory(c.hub.rdb, c.accountUUID)
 	if err != nil {
 		c.send <- createError("could not load history")
 		return
@@ -115,49 +154,55 @@ func handleGetHistory(c *Client) {
 	c.send <- createHistoryList(records)
 }
 
-func handleGetUser(c *Client, targetUsername string) {
-	self := targetUsername == "" || targetUsername == c.username
+func handleGetUser(c *Client, targetUUID string) {
+	self := targetUUID == "" || targetUUID == c.accountUUID
 	if !self {
-		// viewing someone else's profile
-		user, err := loadUser(c.hub.rdb, targetUsername)
-		if err != nil {
+		// viewing someone else's profile by account UUID
+		user, err := loadUser(c.hub.rdb, targetUUID)
+		if err != nil || user.PasswordHash == "" {
 			c.send <- createError("could not load user")
 			return
 		}
 		user.Chips = 0
-		c.send <- createUserInfo(user, false)
+		c.send <- createUserInfo(c.hub.rdb, user, false)
 		return
 	}
-	user, err := loadUser(c.hub.rdb, c.username)
+	user, err := loadUser(c.hub.rdb, c.accountUUID)
 	if err != nil {
 		c.send <- createError("could not load user")
 		return
 	}
-	c.send <- createUserInfo(user, true)
+	c.send <- createUserInfo(c.hub.rdb, user, true)
 }
 
-func handleAddFriend(c *Client, friendUsername string) {
-	if friendUsername == "" || friendUsername == c.username {
-		c.send <- createError("invalid username")
+func handleAddFriend(c *Client, friendUUID string) {
+	if friendUUID == "" || friendUUID == c.accountUUID {
+		c.send <- createError("invalid uuid")
 		return
 	}
-	user, err := loadUser(c.hub.rdb, c.username)
+	user, err := loadUser(c.hub.rdb, c.accountUUID)
 	if err != nil {
+		c.send <- createError("could not load user")
+		return
+	}
+	// The friend must be an existing account.
+	friend, err := loadUser(c.hub.rdb, friendUUID)
+	if err != nil || friend.PasswordHash == "" {
 		c.send <- createError("could not load user")
 		return
 	}
 	for _, f := range user.Friends {
-		if f == friendUsername {
+		if f == friendUUID {
 			c.send <- createError("already friends")
 			return
 		}
 	}
-	user.Friends = append(user.Friends, friendUsername)
+	user.Friends = append(user.Friends, friendUUID)
 	if err := saveUser(c.hub.rdb, user); err != nil {
 		c.send <- createError("could not save user")
 		return
 	}
-	c.send <- createUserInfo(user, true)
+	c.send <- createUserInfo(c.hub.rdb, user, true)
 }
 
 func handleSetAvatar(c *Client, avatar string) {
@@ -165,7 +210,7 @@ func handleSetAvatar(c *Client, avatar string) {
 		c.send <- createError("invalid avatar")
 		return
 	}
-	user, err := loadUser(c.hub.rdb, c.username)
+	user, err := loadUser(c.hub.rdb, c.accountUUID)
 	if err != nil {
 		c.send <- createError("could not load user")
 		return
@@ -177,7 +222,45 @@ func handleSetAvatar(c *Client, avatar string) {
 		c.send <- createError("could not save user")
 		return
 	}
-	c.send <- createUserInfo(user, true)
+	c.send <- createUserInfo(c.hub.rdb, user, true)
+}
+
+// handleChangeUsername updates the account's display name. Usernames are only
+// aliases, so no storage keys need to be migrated. It is rejected while the
+// client is at a table.
+func handleChangeUsername(c *Client, newUsername string) {
+	if c.accountUUID == "" {
+		c.send <- createError("not logged in")
+		return
+	}
+	if c.table != nil {
+		c.send <- createError("game already running")
+		return
+	}
+	if newUsername == "" || newUsername == c.username {
+		c.send <- createResult(actionChangeUsernameResult, false, "invalid username", c.username)
+		return
+	}
+
+	user, err := loadUser(c.hub.rdb, c.accountUUID)
+	if err != nil {
+		c.send <- createResult(actionChangeUsernameResult, false, "could not load user", c.username)
+		return
+	}
+	oldUsername := user.Username
+	user.Username = newUsername
+	if err := saveUser(c.hub.rdb, user); err != nil {
+		c.send <- createResult(actionChangeUsernameResult, false, "could not save user", oldUsername)
+		return
+	}
+	_ = unindexUsername(c.hub.rdb, oldUsername, c.accountUUID)
+	if err := indexUsername(c.hub.rdb, newUsername, c.accountUUID); err != nil {
+		slog.Default().Warn("Index username", "error", err)
+	}
+
+	c.username = newUsername
+	c.send <- createResultWithUUID(actionChangeUsernameResult, true, "", newUsername, c.accountUUID)
+	c.send <- createUserInfo(c.hub.rdb, user, true)
 }
 
 func handleAddChips(c *Client, amount uint) {
@@ -185,7 +268,7 @@ func handleAddChips(c *Client, amount uint) {
 		c.send <- createError("amount must be positive")
 		return
 	}
-	user, err := loadUser(c.hub.rdb, c.username)
+	user, err := loadUser(c.hub.rdb, c.accountUUID)
 	if err != nil {
 		c.send <- createError("could not load user")
 		return
@@ -195,7 +278,7 @@ func handleAddChips(c *Client, amount uint) {
 		c.send <- createError("could not save user")
 		return
 	}
-	c.send <- createUserInfo(user, true)
+	c.send <- createUserInfo(c.hub.rdb, user, true)
 }
 
 func handleListTables(c *Client) {
@@ -278,7 +361,7 @@ func handleLeaveTable(c *Client, tablename string) {
 				break
 			}
 		}
-		if _, err := flushPlayerSession(c.hub.rdb, pre.Username, c.table.name, pre.TotalBuyIn, pre.Stack, stats); err != nil {
+		if _, err := flushPlayerSession(c.hub.rdb, pre.AccountUUID, c.table.name, pre.TotalBuyIn, pre.Stack, stats); err != nil {
 			slog.Default().Warn("Flush player", "error", err)
 		}
 
@@ -335,9 +418,9 @@ func handleTakeSeat(c *Client, username string, seatID uint, buyIn uint) {
 		return
 	}
 
-	// Reject if this user is already seated at the table.
+	// Reject if this account is already seated at the table.
 	for i := range view.Players {
-		if view.Players[i].Username == username {
+		if view.Players[i].AccountUUID == c.accountUUID {
 			c.send <- createError("already seated")
 			return
 		}
@@ -356,7 +439,7 @@ func handleTakeSeat(c *Client, username string, seatID uint, buyIn uint) {
 	}
 
 	// Deduct the buy-in from the user's account balance before seating.
-	user, err := loadUser(c.hub.rdb, username)
+	user, err := loadUser(c.hub.rdb, c.accountUUID)
 	if err != nil {
 		c.send <- createError("could not load user")
 		return
@@ -374,6 +457,10 @@ func handleTakeSeat(c *Client, username string, seatID uint, buyIn uint) {
 	position := c.table.game.AddPlayer()
 	c.uuid = c.table.game.GenerateOmniView().Players[position].UUID
 	c.send <- createUpdatedPlayerUUID(c)
+	err = poker.SetAccountUUID(c.table.game, position, c.accountUUID)
+	if err != nil {
+		slog.Default().Warn("Set account uuid", "error", err)
+	}
 	err = poker.SetUsername(c.table.game, position, username)
 	if err != nil {
 		slog.Default().Warn("Set username", "error", err)
@@ -393,7 +480,7 @@ func handleTakeSeat(c *Client, username string, seatID uint, buyIn uint) {
 		slog.Default().Warn("Set seat id", "error", err)
 	}
 	c.table.broadcastGame()
-	c.send <- createUserInfo(user, true)
+	c.send <- createUserInfo(c.hub.rdb, user, true)
 }
 
 func handleRebuy(c *Client, amount uint) {
@@ -428,7 +515,7 @@ func handleRebuy(c *Client, amount uint) {
 		return
 	}
 
-	user, err := loadUser(c.hub.rdb, c.username)
+	user, err := loadUser(c.hub.rdb, c.accountUUID)
 	if err != nil {
 		c.send <- createError("could not load user")
 		return
@@ -450,7 +537,7 @@ func handleRebuy(c *Client, amount uint) {
 	// and must explicitly tap their avatar to get ready.
 	autoStartIfReady(c.table)
 	c.table.broadcastGame()
-	c.send <- createUserInfo(user, true)
+	c.send <- createUserInfo(c.hub.rdb, user, true)
 }
 
 func handleUndoRebuy(c *Client) {
@@ -490,7 +577,7 @@ func handleUndoRebuy(c *Client) {
 		return
 	}
 
-	user, err := loadUser(c.hub.rdb, c.username)
+	user, err := loadUser(c.hub.rdb, c.accountUUID)
 	if err != nil {
 		c.send <- createError("could not load user")
 		return
@@ -506,7 +593,7 @@ func handleUndoRebuy(c *Client) {
 	}
 
 	c.table.broadcastGame()
-	c.send <- createUserInfo(user, true)
+	c.send <- createUserInfo(c.hub.rdb, user, true)
 }
 
 func handleStartGame(c *Client) {
@@ -579,7 +666,7 @@ func handleQueueNext(c *Client) {
 		c.send <- createError("amount must be positive")
 		return
 	}
-	user, err := loadUser(c.hub.rdb, c.username)
+	user, err := loadUser(c.hub.rdb, c.accountUUID)
 	if err != nil {
 		c.send <- createError("could not load user")
 		return
@@ -825,11 +912,16 @@ func createNewMessage(username string, message string) []byte {
 }
 
 func createResult(action string, ok bool, message string, username string) []byte {
+	return createResultWithUUID(action, ok, message, username, "")
+}
+
+func createResultWithUUID(action string, ok bool, message string, username string, accountUUID string) []byte {
 	resp := result{
 		base{action},
 		ok,
 		message,
 		username,
+		accountUUID,
 	}
 	bytes, err := json.Marshal(resp)
 	if err != nil {
@@ -862,14 +954,30 @@ func createHistoryList(records []HistoryRecord) []byte {
 	return bytes
 }
 
-func createUserInfo(u *UserRecord, self bool) []byte {
+func createUserInfo(rdb *redis.Client, u *UserRecord, self bool) []byte {
+	friends := make([]friendInfo, 0)
+	if self {
+		for _, friendUUID := range u.Friends {
+			friend, err := loadUser(rdb, friendUUID)
+			if err != nil || friend.PasswordHash == "" {
+				continue
+			}
+			friends = append(friends, friendInfo{
+				UUID:        friend.UUID,
+				Username:    friend.Username,
+				Avatar:      friend.Avatar,
+				AvatarImage: friend.AvatarImage,
+			})
+		}
+	}
 	resp := userInfo{
 		base{actionUserInfo},
+		u.UUID,
 		u.Username,
 		u.Chips,
 		u.Avatar,
 		u.AvatarImage,
-		u.Friends,
+		friends,
 		u.Stats,
 		self,
 	}

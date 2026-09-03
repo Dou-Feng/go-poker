@@ -6,38 +6,39 @@ import (
 
 // inbound (client) actions
 const (
-	actionJoinTable    string = "join-table"
-	actionLeaveTable   string = "leave-table"
-	actionSendMessage  string = "send-message"
-	actionSendLog      string = "send-log"
-	actionNewPlayer    string = "new-player"
-	actionTakeSeat     string = "take-seat"
-	actionStartGame    string = "start-game"
-	actionDealGame     string = "deal-game"
-	actionResetGame    string = "reset-game"
-	actionPlayerCall   string = "player-call"
-	actionPlayerCheck  string = "player-check"
-	actionPlayerRaise  string = "player-raise"
-	actionPlayerFold   string = "player-fold"
-	actionRegisterUser string = "register-user"
-	actionListTables   string = "list-tables"
-	actionCreateTable  string = "create-table"
-	actionAddChips     string = "add-chips"
-	actionRebuy        string = "rebuy"
-	actionUndoBuyIn    string = "undo-buyin"
-	actionGetUser      string = "get-user"
-	actionLogin        string = "login"
-	actionAddFriend    string = "add-friend"
-	actionSetAvatar    string = "set-avatar"
-	actionReconnect    string = "reconnect-user"
-	actionGetHistory   string = "get-history"
-	actionToggleReady  string = "toggle-ready"
-	actionQueueNext    string = "queue-next"
-	actionMoveSeat     string = "move-seat"
-	actionVoteSettle   string = "vote-settle"
-	actionShowHand     string = "show-hand"
-	actionSpectate     string = "spectate"
-	actionPing         string = "ping"
+	actionJoinTable      string = "join-table"
+	actionLeaveTable     string = "leave-table"
+	actionSendMessage    string = "send-message"
+	actionSendLog        string = "send-log"
+	actionNewPlayer      string = "new-player"
+	actionTakeSeat       string = "take-seat"
+	actionStartGame      string = "start-game"
+	actionDealGame       string = "deal-game"
+	actionResetGame      string = "reset-game"
+	actionPlayerCall     string = "player-call"
+	actionPlayerCheck    string = "player-check"
+	actionPlayerRaise    string = "player-raise"
+	actionPlayerFold     string = "player-fold"
+	actionRegisterUser   string = "register-user"
+	actionListTables     string = "list-tables"
+	actionCreateTable    string = "create-table"
+	actionAddChips       string = "add-chips"
+	actionRebuy          string = "rebuy"
+	actionUndoBuyIn      string = "undo-buyin"
+	actionGetUser        string = "get-user"
+	actionLogin          string = "login"
+	actionAddFriend      string = "add-friend"
+	actionSetAvatar      string = "set-avatar"
+	actionReconnect      string = "reconnect-user"
+	actionGetHistory     string = "get-history"
+	actionToggleReady    string = "toggle-ready"
+	actionQueueNext      string = "queue-next"
+	actionMoveSeat       string = "move-seat"
+	actionVoteSettle     string = "vote-settle"
+	actionShowHand       string = "show-hand"
+	actionSpectate       string = "spectate"
+	actionPing           string = "ping"
+	actionChangeUsername string = "change-username"
 )
 
 type base struct {
@@ -112,18 +113,20 @@ type playerFold struct {
 type registerUser struct {
 	base            // actionRegisterUser
 	Username string `json:"username"`
+	UUID     string `json:"uuid"`
 	Password string `json:"password"`
+	Avatar   string `json:"avatar,omitempty"`
 }
 
 type login struct {
-	base            // actionLogin
-	Username string `json:"username"`
-	Password string `json:"password"`
+	base              // actionLogin
+	Identifier string `json:"identifier"`
+	Password   string `json:"password"`
 }
 
 type addFriend struct {
-	base            // actionAddFriend
-	Username string `json:"username"`
+	base        // actionAddFriend
+	UUID string `json:"uuid"`
 }
 
 type setAvatar struct {
@@ -132,8 +135,8 @@ type setAvatar struct {
 }
 
 type reconnectUser struct {
-	base            // actionReconnect
-	Username string `json:"username"`
+	base        // actionReconnect
+	UUID string `json:"uuid"`
 }
 
 type listTables struct {
@@ -167,8 +170,8 @@ type undoBuyIn struct {
 }
 
 type getUser struct {
-	base            // actionGetUser
-	Username string `json:"username,omitempty"`
+	base        // actionGetUser
+	UUID string `json:"uuid,omitempty"`
 }
 
 type getHistory struct {
@@ -201,21 +204,27 @@ type ping struct {
 	base // actionPing
 }
 
+type changeUsername struct {
+	base               // actionChangeUsername
+	NewUsername string `json:"newUsername"`
+}
+
 // outbound (server) actions
 const (
-	actionNewMessage       string = "new-message"
-	actionNewLog           string = "new-log"
-	actionUpdateGame       string = "update-game"
-	actionUpdatePlayerUUID string = "update-player-uuid"
-	actionRegisterResult   string = "register-result"
-	actionTableList        string = "table-list"
-	actionCreateResult     string = "create-result"
-	actionUserInfo         string = "user-info"
-	actionError            string = "error"
-	actionLoginResult      string = "login-result"
-	actionHistory          string = "history"
-	actionSettlement       string = "settlement"
-	actionPong             string = "pong"
+	actionNewMessage           string = "new-message"
+	actionNewLog               string = "new-log"
+	actionUpdateGame           string = "update-game"
+	actionUpdatePlayerUUID     string = "update-player-uuid"
+	actionRegisterResult       string = "register-result"
+	actionTableList            string = "table-list"
+	actionCreateResult         string = "create-result"
+	actionUserInfo             string = "user-info"
+	actionError                string = "error"
+	actionLoginResult          string = "login-result"
+	actionHistory              string = "history"
+	actionSettlement           string = "settlement"
+	actionChangeUsernameResult string = "change-username-result"
+	actionPong                 string = "pong"
 )
 
 type newMessage struct {
@@ -250,6 +259,7 @@ type result struct {
 	Ok       bool   `json:"ok"`
 	Message  string `json:"message"`
 	Username string `json:"username,omitempty"`
+	UUID     string `json:"uuid,omitempty"`
 }
 
 type tableInfo struct {
@@ -265,13 +275,21 @@ type tableList struct {
 	Tables []tableInfo `json:"tables"`
 }
 
+type friendInfo struct {
+	UUID        string `json:"uuid"`
+	Username    string `json:"username"`
+	Avatar      string `json:"avatar"`
+	AvatarImage bool   `json:"avatarImage"`
+}
+
 type userInfo struct {
 	base                          // actionUserInfo
+	UUID        string            `json:"uuid"`
 	Username    string            `json:"username"`
 	Chips       uint              `json:"chips"`
 	Avatar      string            `json:"avatar"`
 	AvatarImage bool              `json:"avatarImage"`
-	Friends     []string          `json:"friends"`
+	Friends     []friendInfo      `json:"friends"`
 	Stats       poker.PlayerStats `json:"stats"`
 	Self        bool              `json:"self"`
 }
@@ -283,6 +301,7 @@ type historyList struct {
 
 type settlementPlayer struct {
 	Username    string `json:"username"`
+	UUID        string `json:"uuid"`
 	Avatar      string `json:"avatar"`
 	AvatarImage bool   `json:"avatarImage"`
 	BuyIn       uint   `json:"buyIn"`

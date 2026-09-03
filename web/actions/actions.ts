@@ -94,29 +94,31 @@ export function newPlayer(socket: WebSocket, username: string) {
 export function registerUser(
   socket: WebSocket,
   username: string,
+  uuid: string,
   password: string,
   avatar: string
 ) {
   send(socket, {
     action: "register-user",
     username: username,
+    uuid: uuid,
     password: password,
     avatar: avatar,
   });
 }
 
-export function login(socket: WebSocket, username: string, password: string) {
+export function login(socket: WebSocket, identifier: string, password: string) {
   send(socket, {
     action: "login",
-    username: username,
+    identifier: identifier,
     password: password,
   });
 }
 
-export function addFriend(socket: WebSocket, username: string) {
+export function addFriend(socket: WebSocket, uuid: string) {
   send(socket, {
     action: "add-friend",
-    username: username,
+    uuid: uuid,
   });
 }
 
@@ -127,10 +129,17 @@ export function setAvatar(socket: WebSocket, avatar: string) {
   });
 }
 
-export function reconnectUser(socket: WebSocket, username: string) {
+export function reconnectUser(socket: WebSocket, uuid: string) {
   send(socket, {
     action: "reconnect-user",
-    username: username,
+    uuid: uuid,
+  });
+}
+
+export function changeUsername(socket: WebSocket, newUsername: string) {
+  send(socket, {
+    action: "change-username",
+    newUsername: newUsername,
   });
 }
 
@@ -182,10 +191,10 @@ export function undoBuyIn(socket: WebSocket) {
   });
 }
 
-export function getUser(socket: WebSocket, username?: string) {
+export function getUser(socket: WebSocket, uuid?: string) {
   send(socket, {
     action: "get-user",
-    ...(username ? { username } : {}),
+    ...(uuid ? { uuid } : {}),
   });
 }
 

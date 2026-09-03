@@ -138,7 +138,10 @@ export function SocketProvider(props: SocketProviderProps) {
             return;
           case "register-result":
             if (event.ok) {
-              saveUser(event.username);
+              if (event.uuid) {
+                saveUser(event.uuid);
+                dispatch({ type: "setUuid", payload: event.uuid });
+              }
               dispatch({ type: "setUsername", payload: event.username });
               dispatch({ type: "setAuthError", payload: null });
             } else {
@@ -150,13 +153,35 @@ export function SocketProvider(props: SocketProviderProps) {
             return;
           case "login-result":
             if (event.ok) {
-              saveUser(event.username);
+              if (event.uuid) {
+                saveUser(event.uuid);
+                dispatch({ type: "setUuid", payload: event.uuid });
+              }
               dispatch({ type: "setUsername", payload: event.username });
               dispatch({ type: "setAuthError", payload: null });
             } else {
               dispatch({
                 type: "setAuthError",
                 payload: event.message ?? "Invalid credentials",
+              });
+            }
+            return;
+          case "change-username-result":
+            if (event.ok) {
+              if (event.uuid) {
+                saveUser(event.uuid);
+                dispatch({ type: "setUuid", payload: event.uuid });
+              }
+              dispatch({ type: "setUsername", payload: event.username });
+              dispatch({ type: "setProfile", payload: null });
+              const existing = loadSession();
+              if (existing) {
+                saveSession({ ...existing, username: event.username });
+              }
+            } else {
+              dispatch({
+                type: "setAuthError",
+                payload: event.message ?? "could not save user",
               });
             }
             return;
@@ -188,6 +213,8 @@ export function SocketProvider(props: SocketProviderProps) {
               vpipByPos: [0, 0, 0, 0, 0, 0],
             };
             if (event.self) {
+              saveUser(event.uuid);
+              dispatch({ type: "setUuid", payload: event.uuid ?? null });
               dispatch({ type: "setChips", payload: event.chips ?? 0 });
               dispatch({ type: "setAvatar", payload: event.avatar ?? "🙂" });
               dispatch({
@@ -198,6 +225,7 @@ export function SocketProvider(props: SocketProviderProps) {
               dispatch({ type: "setStats", payload: stats });
             } else {
               const profile: Profile = {
+                uuid: event.uuid,
                 username: event.username,
                 avatar: event.avatar ?? "🙂",
                 avatarImage: !!event.avatarImage,

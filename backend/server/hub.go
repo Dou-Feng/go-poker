@@ -91,19 +91,29 @@ func (h *Hub) createTableIfAbsent(name string, password string) (*table, bool) {
 	return t, true
 }
 
-// registerUser reserves a username for the lifetime of the server. It returns
-// an error if the username is empty or already taken.
-func (h *Hub) registerUser(username string) error {
-	if username == "" {
-		return errors.New("username cannot be empty")
+// registerUser reserves an account uuid for the lifetime of the server. It
+// returns an error if the uuid is empty or already taken.
+func (h *Hub) registerUser(uuid string) error {
+	if uuid == "" {
+		return errors.New("uuid cannot be empty")
 	}
 	h.usersMu.Lock()
 	defer h.usersMu.Unlock()
-	if _, ok := h.users[username]; ok {
-		return errors.New("username already taken")
+	if _, ok := h.users[uuid]; ok {
+		return errors.New("uuid already taken")
 	}
-	h.users[username] = true
+	h.users[uuid] = true
 	return nil
+}
+
+// unregisterUser releases an account uuid reservation.
+func (h *Hub) unregisterUser(uuid string) {
+	if uuid == "" {
+		return
+	}
+	h.usersMu.Lock()
+	delete(h.users, uuid)
+	h.usersMu.Unlock()
 }
 
 // listTables returns a snapshot of all live tables.

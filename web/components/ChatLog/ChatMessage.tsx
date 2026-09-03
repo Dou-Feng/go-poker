@@ -1,20 +1,20 @@
 import { Message } from "../../interfaces";
 
 export default function ChatMessage({ name, message, timestamp }: Message) {
-    if (name == "system" && message.includes("has joined")) {
-        return (
-            <div className="flex flex-row">
-                <p className="text-neutral-500">[{timestamp}] &nbsp;</p>
-                <p className="italic text-neutral-400">{message}</p>
-            </div>
-        );
-    }
-
+  if (name == "system" && message.includes("has joined")) {
     return (
-        <div className="flex flex-row text-neutral-400">
-            <p className="text-neutral-500">[{timestamp}] &nbsp;</p>
-            <p className="font-semibold">{name}: &nbsp; </p>
-            <p>{message}</p>
-        </div>
+      <div className="flex flex-row">
+        <p className="text-neutral-500">[{timestamp}] &nbsp;</p>
+        <p className="italic text-neutral-400">{message}</p>
+      </div>
     );
+  }
+
+  return (
+    <div className="flex flex-row text-neutral-400">
+      <p className="text-neutral-500">[{timestamp}] &nbsp;</p>
+      <p className="font-semibold">{name}: &nbsp; </p>
+      <p>{message}</p>
+    </div>
+  );
 }

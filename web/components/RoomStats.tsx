@@ -64,6 +64,7 @@ export default function RoomStats() {
                     <div className="flex min-w-0 flex-row items-center gap-2">
                       <Avatar
                         username={p.username}
+                        uuid={p.accountUuid}
                         emoji={p.avatar || "🙂"}
                         hasImage={p.avatarImage}
                         size={28}

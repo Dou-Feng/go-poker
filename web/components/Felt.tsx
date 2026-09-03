@@ -2,12 +2,12 @@ import CommunityCards from "./CommunityCards";
 import Pot from "./Pot";
 
 export default function Felt() {
-    return (
-        <div className="-z-10 flex h-full w-full flex-col items-center justify-center rounded-full border border-8 border-teal-900 bg-emerald-700">
-            <Pot />
-            <div className="mt-4 mb-12 flex w-full items-center justify-center">
-                <CommunityCards />
-            </div>
-        </div>
-    );
+  return (
+    <div className="-z-10 flex h-full w-full flex-col items-center justify-center rounded-full border border-8 border-teal-900 bg-emerald-700">
+      <Pot />
+      <div className="mt-4 mb-12 flex w-full items-center justify-center">
+        <CommunityCards />
+      </div>
+    </div>
+  );
 }

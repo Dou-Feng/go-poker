@@ -45,6 +45,7 @@ export default function Settlement() {
               <div className="flex flex-row items-center gap-2">
                 <Avatar
                   username={p.username}
+                  uuid={p.uuid}
                   emoji={p.avatar || "🙂"}
                   hasImage={p.avatarImage}
                   size={28}

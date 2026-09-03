@@ -27,7 +27,7 @@ function chipPosition(id: number) {
     {
       // The chip (bet amount / dealer) sits on the side of the seat that
       // faces the table center.
-      "left-1/2 -translate-x-1/2 -top-6 flex-row": id === 1, // bottom
+      "left-1/2 -translate-x-1/2 -top-9 flex-row": id === 1, // bottom
       "right-1 -top-9 flex-row": id === 2, // bottom-left
       "right-1 top-full mt-1 flex-col": id === 3, // top-left
       "left-1/2 -translate-x-1/2 top-full mt-1 flex-row": id === 4, // top
@@ -82,12 +82,15 @@ export default function Seat({ player, id, visualId, reveal }: seatProps) {
       dispatch({
         type: "setProfile",
         payload: {
+          uuid: isMine ? appState.uuid ?? "" : player.accountUuid ?? "",
           username: player.username,
-          avatar: player.avatar || "🙂",
-          avatarImage: player.avatarImage,
-          chips: player.stack,
-          friends: [],
-          stats: player.stats,
+          avatar: isMine
+            ? appState.avatar || player.avatar || "🙂"
+            : player.avatar || "🙂",
+          avatarImage: isMine ? appState.avatarImage : player.avatarImage,
+          chips: isMine ? appState.chips ?? player.stack : player.stack,
+          friends: isMine ? appState.friends ?? [] : [],
+          stats: isMine ? appState.stats ?? player.stats : player.stats,
         },
       });
     };
@@ -102,18 +105,7 @@ export default function Seat({ player, id, visualId, reveal }: seatProps) {
         if (socket) {
           showHand(socket);
         }
-      } else if (isMine && !running) {
-        if (player.stack === 0) {
-          dispatch({
-            type: "setAuthError",
-            payload: "not enough chips to ready",
-          });
-          return;
-        }
-        if (socket) {
-          toggleReady(socket);
-        }
-      } else if (!isMine) {
+      } else {
         openStats();
       }
     };
@@ -136,8 +128,6 @@ export default function Seat({ player, id, visualId, reveal }: seatProps) {
             player.stack === 0 &&
             !player.revealed
               ? t("showCards")
-              : isMine
-              ? t("ready")
               : t("viewRoomStats")
           }
           style={{ cursor: "pointer" }}
@@ -159,6 +149,7 @@ export default function Seat({ player, id, visualId, reveal }: seatProps) {
               <div className="flex flex-1 items-center justify-center">
                 <Avatar
                   username={player.username}
+                  uuid={player.accountUuid}
                   emoji={player.avatar || "🙂"}
                   hasImage={player.avatarImage}
                   size={44}
@@ -169,6 +160,7 @@ export default function Seat({ player, id, visualId, reveal }: seatProps) {
             <div className="flex flex-1 flex-row items-center justify-center gap-2">
               <Avatar
                 username={player.username}
+                uuid={player.accountUuid}
                 emoji={player.avatar || "🙂"}
                 hasImage={player.avatarImage}
                 size={44}
@@ -220,6 +212,31 @@ export default function Seat({ player, id, visualId, reveal }: seatProps) {
               </div>
             </div>
           ))}
+        {!running && isMine && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              if (player.stack === 0) {
+                dispatch({
+                  type: "setAuthError",
+                  payload: "not enough chips to ready",
+                });
+                return;
+              }
+              if (socket) {
+                toggleReady(socket);
+              }
+            }}
+            className={classNames(
+              "mt-1 w-full rounded-sm py-1 text-xs font-bold sm:text-sm",
+              player.ready
+                ? "bg-zinc-700 text-neutral-200 hover:bg-zinc-600"
+                : "bg-emerald-600 text-white hover:bg-emerald-500"
+            )}
+          >
+            {player.ready ? t("cancelReady") : t("ready")}
+          </button>
+        )}
         <div className={chipPosition(visualId ?? id)}>
           {running && game.dealer == player.position && (
             <div className="mx-0.5 my-0.5 flex h-5 w-6 items-center justify-center text-sm sm:mx-1 sm:my-1 sm:h-7 sm:w-8 sm:text-xl">

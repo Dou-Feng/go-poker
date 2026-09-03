@@ -26,17 +26,17 @@ export default function Lobby() {
   const [newPassword, setNewPassword] = useState("");
   const [joinTarget, setJoinTarget] = useState<string | null>(null);
   const [joinPassword, setJoinPassword] = useState("");
-  const [friendName, setFriendName] = useState("");
+  const [friendUuid, setFriendUuid] = useState("");
   const [showHistory, setShowHistory] = useState(false);
   const [showRecharge, setShowRecharge] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
   const [showFriends, setShowFriends] = useState(false);
-  const [sb, setSb] = useState(1);
-  const [bb, setBb] = useState(2);
-  const [buyIn, setBuyIn] = useState(200);
-  const [maxBuy, setMaxBuy] = useState(600);
-  const [maxPlayers, setMaxPlayers] = useState(6);
-  const [handsLimit, setHandsLimit] = useState(20);
+  const [sb, setSb] = useState("1");
+  const [bb, setBb] = useState("2");
+  const [buyIn, setBuyIn] = useState("200");
+  const [maxBuy, setMaxBuy] = useState("600");
+  const [maxPlayers, setMaxPlayers] = useState("6");
+  const [handsLimit, setHandsLimit] = useState("20");
   const { t } = useTranslation();
 
   useEffect(() => {
@@ -77,6 +77,25 @@ export default function Lobby() {
     }
   };
 
+  const parseNumber = (
+    value: string,
+    fallback: number,
+    min?: number,
+    max?: number
+  ) => {
+    const n = Number(value);
+    if (value.trim() === "" || !Number.isFinite(n)) {
+      return fallback;
+    }
+    if (min !== undefined && n < min) {
+      return fallback;
+    }
+    if (max !== undefined && n > max) {
+      return fallback;
+    }
+    return n;
+  };
+
   const create = () => {
     if (!socket) {
       return;
@@ -93,14 +112,15 @@ export default function Lobby() {
       table: name,
       clientID: null,
     });
+    const buyInNum = parseNumber(buyIn, 200, 1);
     createTable(socket, name, {
       password: newPassword || undefined,
-      sb,
-      bb,
-      buyIn,
-      maxBuy,
-      maxPlayers,
-      handsLimit,
+      sb: parseNumber(sb, 1, 1),
+      bb: parseNumber(bb, 2, 2),
+      buyIn: buyInNum,
+      maxBuy: parseNumber(maxBuy, Math.max(600, buyInNum), buyInNum),
+      maxPlayers: parseNumber(maxPlayers, 6, 2, 8),
+      handsLimit: parseNumber(handsLimit, 20, 0),
     });
   };
 
@@ -114,6 +134,7 @@ export default function Lobby() {
     dispatch({
       type: "setProfile",
       payload: {
+        uuid: appState.uuid ?? "",
         username: appState.username ?? "",
         avatar: appState.avatar ?? "🙂",
         chips: appState.chips ?? 0,
@@ -135,10 +156,10 @@ export default function Lobby() {
   };
 
   const onAddFriend = () => {
-    if (socket && friendName != "") {
+    if (socket && friendUuid != "") {
       dispatch({ type: "setAuthError", payload: null });
-      addFriend(socket, friendName);
-      setFriendName("");
+      addFriend(socket, friendUuid);
+      setFriendUuid("");
     }
   };
 
@@ -149,6 +170,7 @@ export default function Lobby() {
           <button onClick={viewSelf} className="text-3xl" title={t("myStats")}>
             <Avatar
               username={appState.username ?? ""}
+              uuid={appState.uuid ?? ""}
               emoji={appState.avatar ?? "🙂"}
               hasImage={appState.avatarImage}
               size={32}
@@ -316,18 +338,18 @@ export default function Lobby() {
                     {t("blinds")}
                   </span>
                   <input
-                    type="number"
-                    min={1}
+                    type="text"
+                    inputMode="numeric"
                     value={sb}
-                    onChange={(e) => setSb(Math.max(1, Number(e.target.value)))}
+                    onChange={(e) => setSb(e.target.value)}
                     className="w-20 flex-1 rounded-sm bg-neutral-600 px-2 py-1 text-white focus:outline-none"
                   />
                   <span className="text-neutral-400">/</span>
                   <input
-                    type="number"
-                    min={2}
+                    type="text"
+                    inputMode="numeric"
                     value={bb}
-                    onChange={(e) => setBb(Math.max(2, Number(e.target.value)))}
+                    onChange={(e) => setBb(e.target.value)}
                     className="w-20 flex-1 rounded-sm bg-neutral-600 px-2 py-1 text-white focus:outline-none"
                   />
                 </div>
@@ -337,12 +359,10 @@ export default function Lobby() {
                     {t("buyIn")}
                   </span>
                   <input
-                    type="number"
-                    min={1}
+                    type="text"
+                    inputMode="numeric"
                     value={buyIn}
-                    onChange={(e) =>
-                      setBuyIn(Math.max(1, Number(e.target.value)))
-                    }
+                    onChange={(e) => setBuyIn(e.target.value)}
                     className="flex-1 rounded-sm bg-neutral-600 px-2 py-1 text-white focus:outline-none"
                   />
                 </div>
@@ -352,12 +372,10 @@ export default function Lobby() {
                     {t("maxBuy")}
                   </span>
                   <input
-                    type="number"
-                    min={buyIn}
+                    type="text"
+                    inputMode="numeric"
                     value={maxBuy}
-                    onChange={(e) =>
-                      setMaxBuy(Math.max(buyIn, Number(e.target.value)))
-                    }
+                    onChange={(e) => setMaxBuy(e.target.value)}
                     className="flex-1 rounded-sm bg-neutral-600 px-2 py-1 text-white focus:outline-none"
                   />
                 </div>
@@ -367,15 +385,10 @@ export default function Lobby() {
                     {t("maxPlayers")}
                   </span>
                   <input
-                    type="number"
-                    min={2}
-                    max={8}
+                    type="text"
+                    inputMode="numeric"
                     value={maxPlayers}
-                    onChange={(e) =>
-                      setMaxPlayers(
-                        Math.min(8, Math.max(2, Number(e.target.value)))
-                      )
-                    }
+                    onChange={(e) => setMaxPlayers(e.target.value)}
                     className="flex-1 rounded-sm bg-neutral-600 px-2 py-1 text-white focus:outline-none"
                   />
                 </div>
@@ -385,12 +398,10 @@ export default function Lobby() {
                     {t("hands")}
                   </span>
                   <input
-                    type="number"
-                    min={0}
+                    type="text"
+                    inputMode="numeric"
                     value={handsLimit}
-                    onChange={(e) =>
-                      setHandsLimit(Math.max(0, Number(e.target.value)))
-                    }
+                    onChange={(e) => setHandsLimit(e.target.value)}
                     className="flex-1 rounded-sm bg-neutral-600 px-2 py-1 text-white focus:outline-none"
                   />
                   <span className="shrink-0 text-neutral-500">
@@ -433,14 +444,14 @@ export default function Lobby() {
                   <input
                     className="flex-1 rounded-sm bg-neutral-700 py-2 pl-4 text-white focus:outline-none"
                     type="text"
-                    value={friendName}
-                    placeholder={t("friendName")}
-                    maxLength={20}
-                    onChange={(e) => setFriendName(e.target.value)}
+                    value={friendUuid}
+                    placeholder={t("friendUuid")}
+                    maxLength={32}
+                    onChange={(e) => setFriendUuid(e.target.value)}
                   />
                   <button
                     onClick={onAddFriend}
-                    disabled={friendName == ""}
+                    disabled={friendUuid == ""}
                     className="rounded-sm bg-neutral-600 px-4 py-2 text-white hover:bg-neutral-500 disabled:opacity-40"
                   >
                     {t("add")}
@@ -454,12 +465,21 @@ export default function Lobby() {
                 <div className="mt-2 flex flex-col gap-2">
                   {appState.friends.map((f) => (
                     <div
-                      key={f}
+                      key={f.uuid}
                       className="flex flex-row items-center justify-between rounded-sm bg-neutral-700 px-4 py-2"
                     >
-                      <p className="text-white">{f}</p>
+                      <div className="flex flex-row items-center gap-2">
+                        <Avatar
+                          username={f.username}
+                          uuid={f.uuid}
+                          emoji={f.avatar || "🙂"}
+                          hasImage={f.avatarImage}
+                          size={24}
+                        />
+                        <p className="text-white">{f.username}</p>
+                      </div>
                       <button
-                        onClick={() => socket && getUser(socket, f)}
+                        onClick={() => socket && getUser(socket, f.uuid)}
                         className="text-xs text-neutral-400 hover:text-neutral-200"
                       >
                         {t("viewStats")}

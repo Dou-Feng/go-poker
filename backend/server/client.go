@@ -26,12 +26,13 @@ var upgrader = websocket.Upgrader{
 
 // Client is a middleman between the websocket connection and the hub.
 type Client struct {
-	hub      *Hub
-	conn     *websocket.Conn // Websocket connection
-	send     chan []byte     // Buffered channel of outbound bytes
-	uuid     string          // UUID
-	username string
-	table    *table // Player's table
+	hub         *Hub
+	conn        *websocket.Conn // Websocket connection
+	send        chan []byte     // Buffered channel of outbound bytes
+	uuid        string          // per-session player UUID
+	accountUUID string          // account UUID
+	username    string          // display name
+	table       *table          // Player's table
 
 	// spectateReserved marks that the player wants to move to the spectator
 	// side once the current hand ends.
@@ -210,7 +211,7 @@ func (c *Client) processEvents(rawMessage []byte) error {
 		if err != nil {
 			return err
 		}
-		handleRegisterUser(c, user.Username, user.Password)
+		handleRegisterUser(c, user.Username, user.UUID, user.Password, user.Avatar)
 		return nil
 
 	case actionLogin:
@@ -219,7 +220,7 @@ func (c *Client) processEvents(rawMessage []byte) error {
 		if err != nil {
 			return err
 		}
-		handleLogin(c, login.Username, login.Password)
+		handleLogin(c, login.Identifier, login.Password)
 		return nil
 
 	case actionAddFriend:
@@ -228,7 +229,7 @@ func (c *Client) processEvents(rawMessage []byte) error {
 		if err != nil {
 			return err
 		}
-		handleAddFriend(c, friend.Username)
+		handleAddFriend(c, friend.UUID)
 		return nil
 
 	case actionSetAvatar:
@@ -246,7 +247,7 @@ func (c *Client) processEvents(rawMessage []byte) error {
 		if err != nil {
 			return err
 		}
-		handleReconnectUser(c, reconnect.Username)
+		handleReconnectUser(c, reconnect.UUID)
 		return nil
 
 	case actionListTables:
@@ -290,7 +291,7 @@ func (c *Client) processEvents(rawMessage []byte) error {
 		if err != nil {
 			return err
 		}
-		handleGetUser(c, user.Username)
+		handleGetUser(c, user.UUID)
 		return nil
 
 	case actionGetHistory:
@@ -366,6 +367,15 @@ func (c *Client) processEvents(rawMessage []byte) error {
 
 	case actionPlayerFold:
 		handleFold(c)
+		return nil
+
+	case actionChangeUsername:
+		var change changeUsername
+		err := json.Unmarshal(rawMessage, &change)
+		if err != nil {
+			return err
+		}
+		handleChangeUsername(c, change.NewUsername)
 		return nil
 
 	case actionPing:

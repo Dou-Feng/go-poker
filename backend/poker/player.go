@@ -35,6 +35,7 @@ type PlayerStats struct {
 type player struct {
 	Username     string      `json:"username"`
 	UUID         string      `json:"uuid"`
+	AccountUUID  string      `json:"accountUuid"`
 	Position     uint        `json:"position"`
 	SeatID       uint        `json:"seatID"`
 	Ready        bool        `json:"ready"`

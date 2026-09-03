@@ -20,8 +20,8 @@ const maxAvatarUpload = 10 << 20 // 10 MB
 // avatarSizes are the pre-rendered sizes we store, largest first.
 var avatarSizes = []int{1024, 512, 256, 128, 64}
 
-func avatarKey(username string) string {
-	return fmt.Sprintf("gopoker:avatar:%s", username)
+func avatarKey(uuid string) string {
+	return fmt.Sprintf("gopoker:avatar:%s", uuid)
 }
 
 type avatarSet struct {
@@ -62,9 +62,9 @@ func (s *Server) uploadAvatar(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	username := r.FormValue("username")
-	if username == "" {
-		http.Error(w, "missing username", http.StatusBadRequest)
+	uuid := r.FormValue("uuid")
+	if uuid == "" {
+		http.Error(w, "missing uuid", http.StatusBadRequest)
 		return
 	}
 
@@ -102,13 +102,13 @@ func (s *Server) uploadAvatar(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "marshal error", http.StatusInternalServerError)
 		return
 	}
-	if err := s.hub.rdb.Set(ctx, avatarKey(username), raw, 0).Err(); err != nil {
+	if err := s.hub.rdb.Set(ctx, avatarKey(uuid), raw, 0).Err(); err != nil {
 		http.Error(w, "store error", http.StatusInternalServerError)
 		return
 	}
 
 	// Mark the account as having a custom image avatar.
-	if user, err := loadUser(s.hub.rdb, username); err == nil {
+	if user, err := loadUser(s.hub.rdb, uuid); err == nil {
 		user.AvatarImage = true
 		if err := saveUser(s.hub.rdb, user); err != nil {
 			slog.Default().Warn("Save avatar flag", "error", err)
@@ -121,8 +121,8 @@ func (s *Server) uploadAvatar(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) getAvatar(w http.ResponseWriter, r *http.Request) {
-	username := r.URL.Query().Get("username")
-	if username == "" {
+	uuid := r.URL.Query().Get("uuid")
+	if uuid == "" {
 		http.NotFound(w, r)
 		return
 	}
@@ -131,7 +131,7 @@ func (s *Server) getAvatar(w http.ResponseWriter, r *http.Request) {
 		size = n
 	}
 
-	raw, err := s.hub.rdb.Get(ctx, avatarKey(username)).Result()
+	raw, err := s.hub.rdb.Get(ctx, avatarKey(uuid)).Result()
 	if err != nil {
 		http.NotFound(w, r)
 		return

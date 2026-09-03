@@ -9,6 +9,7 @@ import {
   Profile,
   HistoryRecord,
   Settlement,
+  Friend,
 } from "../interfaces";
 import { Language } from "../lib/translations";
 
@@ -16,6 +17,7 @@ const initialState: AppState = {
   messages: [],
   logs: [],
   username: null,
+  uuid: null,
   clientID: null,
   table: null,
   game: null,
@@ -40,6 +42,7 @@ type ACTIONTYPE =
   | { type: "addMessage"; payload: Message }
   | { type: "addLog"; payload: Log }
   | { type: "setUsername"; payload: string }
+  | { type: "setUuid"; payload: string | null }
   | { type: "updateGame"; payload: Game }
   | { type: "resetGame" }
   | { type: "leaveRoom" }
@@ -52,7 +55,7 @@ type ACTIONTYPE =
   | { type: "setAvatar"; payload: string }
   | { type: "setAvatarImage"; payload: boolean }
   | { type: "bumpAvatar" }
-  | { type: "setFriends"; payload: string[] }
+  | { type: "setFriends"; payload: Friend[] }
   | { type: "setStats"; payload: PlayerStats }
   | { type: "setProfile"; payload: Profile | null }
   | { type: "setHistory"; payload: HistoryRecord[] }
@@ -66,6 +69,8 @@ function reducer(state: AppState, action: ACTIONTYPE) {
       return { ...state, logs: [...state.logs, action.payload] };
     case "setUsername":
       return { ...state, username: action.payload };
+    case "setUuid":
+      return { ...state, uuid: action.payload };
     case "updateGame":
       return { ...state, game: action.payload };
     case "resetGame":

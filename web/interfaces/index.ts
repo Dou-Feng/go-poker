@@ -9,10 +9,18 @@ export type Log = {
   timestamp: string;
 };
 
+export type Friend = {
+  uuid: string;
+  username: string;
+  avatar: string;
+  avatarImage: boolean;
+};
+
 export type AppState = {
   messages: Message[];
   logs: Log[];
   username: string | null;
+  uuid: string | null;
   clientID: string | null;
   table: string | null;
   game: Game | null;
@@ -22,7 +30,7 @@ export type AppState = {
   avatar: string | null;
   avatarImage: boolean;
   avatarVersion: number;
-  friends: string[];
+  friends: Friend[];
   stats: PlayerStats | null;
   profile: Profile | null;
   history: HistoryRecord[];
@@ -51,11 +59,12 @@ export type PlayerStats = {
 };
 
 export type Profile = {
+  uuid?: string;
   username: string;
   avatar: string;
   avatarImage: boolean;
   chips: number;
-  friends: string[];
+  friends: Friend[];
   stats: PlayerStats;
   buyIn?: number;
   net?: number;
@@ -64,6 +73,7 @@ export type Profile = {
 export type HistoryRecord = {
   room: string;
   username: string;
+  uuid?: string;
   time: string;
   buyIn: number;
   net: number;
@@ -77,6 +87,7 @@ export type Card = string;
 export type Player = {
   username: string;
   uuid: string;
+  accountUuid: string;
   position: number;
   seatID: number;
   ready: boolean;
@@ -137,6 +148,7 @@ export type Pot = {
 
 export type SettlementPlayer = {
   username: string;
+  uuid: string;
   avatar: string;
   avatarImage: boolean;
   buyIn: number;

@@ -105,11 +105,6 @@ export default function Table() {
   const runoutDriver = game?.players.find((p) => !p.left);
   const isRunoutDriver =
     !!me && !!runoutDriver && me.position === runoutDriver.position;
-  const buyIn = game?.config.buyIn ?? 0;
-  const maxBuyIns =
-    buyIn > 0 ? Math.floor((game?.config.maxBuy ?? 0) / buyIn) : 0;
-  const usedBuyIns = buyIn > 0 ? Math.floor((me?.totalBuyIn ?? 0) / buyIn) : 0;
-  const remainingBuyIns = Math.max(0, maxBuyIns - usedBuyIns);
   const [revealedPlayers, setRevealedPlayers] = useState<Player[]>([]);
   const [winners, setWinners] = useState<WinnerResult[]>([]);
   const [forfeited, setForfeited] = useState(false);
@@ -278,13 +273,8 @@ export default function Table() {
               ) : (
                 <>
                   <p className="text-sm font-medium text-white sm:text-base">
-                    {t("clickAvatarToReady")}
+                    {t("clickReadyButton")}
                   </p>
-                  {maxBuyIns > 0 && (
-                    <p className="text-xs text-neutral-300">
-                      {t("buyInsLeft")}: {remainingBuyIns}
-                    </p>
-                  )}
                 </>
               )}
             </div>

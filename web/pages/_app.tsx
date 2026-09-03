@@ -6,13 +6,13 @@ import { AppStoreProvider } from "../providers/AppStore";
 import "../styles/index.css";
 
 function MyApp({ Component, pageProps }: AppProps) {
-    return (
-        <AppStoreProvider>
-            <SocketProvider>
-                <Component {...pageProps} />
-            </SocketProvider>
-        </AppStoreProvider>
-    );
+  return (
+    <AppStoreProvider>
+      <SocketProvider>
+        <Component {...pageProps} />
+      </SocketProvider>
+    </AppStoreProvider>
+  );
 }
 
 export default MyApp;

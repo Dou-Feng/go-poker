@@ -145,7 +145,7 @@ func (t *table) timeoutPlayer(playerUUID string) {
 	after := t.game.GenerateOmniView()
 	for j := range after.Players {
 		if after.Players[j].UUID == playerUUID {
-			if _, err := flushPlayerSession(t.rdb, after.Players[j].Username, t.name, after.Players[j].TotalBuyIn, after.Players[j].Stack, after.Players[j].Stats); err != nil {
+			if _, err := flushPlayerSession(t.rdb, after.Players[j].AccountUUID, t.name, after.Players[j].TotalBuyIn, after.Players[j].Stack, after.Players[j].Stats); err != nil {
 				slog.Default().Warn("Timeout flush", "error", err)
 			}
 			break
@@ -327,7 +327,7 @@ func (t *table) seatQueuedClient(c *Client) (bool, error) {
 		return false, errors.New("amount must be positive")
 	}
 
-	user, err := loadUser(t.rdb, c.username)
+	user, err := loadUser(t.rdb, c.accountUUID)
 	if err != nil {
 		return false, err
 	}
@@ -359,6 +359,9 @@ func (t *table) seatQueuedClient(c *Client) (bool, error) {
 	c.uuid = t.game.GenerateOmniView().Players[position].UUID
 	c.send <- createUpdatedPlayerUUID(c)
 
+	if err := poker.SetAccountUUID(t.game, position, c.accountUUID); err != nil {
+		slog.Default().Warn("Set account uuid", "error", err)
+	}
 	if err := poker.SetUsername(t.game, position, c.username); err != nil {
 		slog.Default().Warn("Set username", "error", err)
 	}
@@ -377,7 +380,7 @@ func (t *table) seatQueuedClient(c *Client) (bool, error) {
 		slog.Default().Warn("Set seat id", "error", err)
 	}
 
-	c.send <- createUserInfo(user, true)
+	c.send <- createUserInfo(t.rdb, user, true)
 	return true, nil
 }
 
@@ -452,6 +455,7 @@ func (t *table) settle() {
 	for _, p := range view.Players {
 		results = append(results, settlementPlayer{
 			Username:    p.Username,
+			UUID:        p.AccountUUID,
 			Avatar:      p.Avatar,
 			AvatarImage: p.AvatarImage,
 			BuyIn:       p.TotalBuyIn,
@@ -474,7 +478,7 @@ func (t *table) settle() {
 
 	// Record each player's session (history + lifetime stats + chips back).
 	for _, p := range view.Players {
-		if _, err := flushPlayerSession(t.rdb, p.Username, t.name, p.TotalBuyIn, p.Stack, p.Stats); err != nil {
+		if _, err := flushPlayerSession(t.rdb, p.AccountUUID, t.name, p.TotalBuyIn, p.Stack, p.Stats); err != nil {
 			slog.Default().Warn("Settle flush", "error", err)
 		}
 	}
@@ -580,7 +584,7 @@ func (t *table) applySpectate(c *Client) bool {
 	if err := poker.RemovePlayer(t.game, uint(pos)); err != nil {
 		slog.Default().Warn("Spectate remove", "error", err)
 	}
-	if _, err := flushPlayerSession(t.rdb, pre.Username, t.name, pre.TotalBuyIn, pre.Stack, stats); err != nil {
+	if _, err := flushPlayerSession(t.rdb, pre.AccountUUID, t.name, pre.TotalBuyIn, pre.Stack, stats); err != nil {
 		slog.Default().Warn("Spectate flush", "error", err)
 	}
 
@@ -648,7 +652,7 @@ func (t *table) autoSpectateBusted() {
 		}
 
 		p := view.Players[pos]
-		if _, err := flushPlayerSession(t.rdb, p.Username, t.name, p.TotalBuyIn, p.Stack, p.Stats); err != nil {
+		if _, err := flushPlayerSession(t.rdb, p.AccountUUID, t.name, p.TotalBuyIn, p.Stack, p.Stats); err != nil {
 			slog.Default().Warn("Auto spectate flush", "error", err)
 		}
 		t.clearClientUUID(p.UUID)
