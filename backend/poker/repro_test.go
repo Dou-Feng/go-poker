@@ -91,6 +91,11 @@ func TestSidePotShowdownAwards(t *testing.T) {
 
 	g.setStageAndBetting(River, true)
 	g.updateRoundInfo()
+	if g.getStage() == Showdown {
+		if err := SettleShowdown(g); err != nil {
+			t.Fatalf("settle showdown: %v", err)
+		}
+	}
 
 	if g.players[a].Stack != 150 {
 		t.Fatalf("a should win the 150 main pot, stack=%d", g.players[a].Stack)
@@ -183,24 +188,99 @@ func TestAllInRunoutToShowdown(t *testing.T) {
 		t.Fatalf("betting should be off after everyone is all-in")
 	}
 
-	// Drive the runout until the showdown resolves and the game returns to
-	// PreDeal. The flop is revealed all at once, then the turn and river.
+	// Drive the runout until the board is complete. The flop is revealed all
+	// at once, then the turn and river. Dealing the river enters the Showdown
+	// state (cards + hand types displayed); settleShowdown() advances to the
+	// next hand.
 	revealedCards := 0
-	for g.getStage() != PreDeal {
+	for g.getStage() != Showdown {
 		if err := RunoutNext(g); err != nil {
 			t.Fatalf("runout: %v", err)
 		}
-		if g.getStage() != PreDeal {
+		if g.getStage() != Showdown {
 			revealedCards++
 		}
 	}
 	if revealedCards != 3 {
 		t.Fatalf("expected 3 reveal steps (flop, turn, river), got %d", revealedCards)
 	}
+	if g.pots[0].WinningPlayerNums == nil {
+		t.Fatalf("pots should be decided when the showdown state is entered")
+	}
+
+	// Ending the showdown display advances the table to the next hand.
+	if err := SettleShowdown(g); err != nil {
+		t.Fatalf("settle showdown: %v", err)
+	}
+	if g.getStage() != NotReady {
+		t.Fatalf("stage after settle = %v, want NotReady", g.getStage())
+	}
 
 	total := g.players[a].Stack + g.players[b].Stack + g.players[c].Stack
 	if total != 2100 {
 		t.Fatalf("chips should be conserved (2100), got %d", total)
+	}
+}
+
+// A player who folds stays seated and readied for the next hand: only the
+// current hand is abandoned. This matters for heads-up — when A folds, B takes
+// the pot and the room should auto-start the next hand without A having to
+// click ready again.
+func TestFoldKeepsReadyForNextHand(t *testing.T) {
+	g := NewGame()
+	Configure(g, 1, 2, 100, 100, 2, 0)
+
+	a := g.AddPlayer()
+	b := g.AddPlayer()
+
+	for _, pn := range []uint{a, b} {
+		if err := BuyIn(g, pn, 100); err != nil {
+			t.Fatalf("buyin %d: %v", pn, err)
+		}
+		if err := ToggleReady(g, pn, 0); err != nil {
+			t.Fatalf("ready %d: %v", pn, err)
+		}
+	}
+	if err := Deal(g, a, 0); err != nil {
+		t.Fatalf("deal: %v", err)
+	}
+
+	// In heads-up the dealer (a) is SB and acts first preflop. A folds.
+	if err := Fold(g, a, 0); err != nil {
+		t.Fatalf("fold: %v", err)
+	}
+
+	view := g.GenerateOmniView()
+	if view.Stage != Showdown {
+		t.Fatalf("expected Showdown after heads-up fold, got stage %v", view.Stage)
+	}
+	// The folder stays seated, readied for the next hand.
+	if !view.Players[a].Ready {
+		t.Fatalf("folder a should still be ready for the next hand")
+	}
+	if view.Players[a].In {
+		t.Fatalf("folder a should be out of the current hand")
+	}
+	// B takes the pot.
+	if len(view.Pots) == 0 || len(view.Pots[0].WinningPlayerNums) != 1 || view.Pots[0].WinningPlayerNums[0] != 1 {
+		t.Fatalf("b should win the pot, got %+v", view.Pots)
+	}
+
+	// Settling back to the ready phase keeps both players ready so the room
+	// auto-starts the next hand.
+	if err := SettleShowdown(g); err != nil {
+		t.Fatalf("settle: %v", err)
+	}
+	if g.getStage() != NotReady {
+		t.Fatalf("expected NotReady after settle, got %v", g.getStage())
+	}
+	view = g.GenerateOmniView()
+	if !view.Players[a].Ready || !view.Players[b].Ready {
+		t.Fatalf("both players should remain ready, a=%v b=%v", view.Players[a].Ready, view.Players[b].Ready)
+	}
+	// A new hand can be dealt immediately without re-readying anyone.
+	if err := Deal(g, view.DealerNum, 0); err != nil {
+		t.Fatalf("dealing the next hand should work without re-ready: %v", err)
 	}
 }
 
@@ -275,12 +355,27 @@ func TestLeaveOnTurnHeadsUpSettlement(t *testing.T) {
 		t.Fatalf("leave: %v", err)
 	}
 
+	// The uncontested win must enter the Showdown state (stage 6) so the
+	// winner toast can play; the leaver is still seated (greyed) until the
+	// showdown display ends.
 	view := g.GenerateOmniView()
-	if len(view.Players) != 1 {
-		t.Fatalf("expected 1 player remaining, got %d", len(view.Players))
+	if view.Stage != Showdown {
+		t.Fatalf("expected Showdown after uncontested win, got stage %v", view.Stage)
+	}
+	if len(view.Players) != 2 {
+		t.Fatalf("expected both players seated during showdown, got %d", len(view.Players))
 	}
 	if len(view.Pots) == 0 || len(view.Pots[0].WinningPlayerNums) != 1 {
 		t.Fatalf("expected a pot with a single winner")
+	}
+
+	// Ending the showdown display drops the leaver and remaps positions.
+	if err := SettleShowdown(g); err != nil {
+		t.Fatalf("settle showdown: %v", err)
+	}
+	view = g.GenerateOmniView()
+	if len(view.Players) != 1 {
+		t.Fatalf("expected 1 player remaining, got %d", len(view.Players))
 	}
 	// After dropping a, b moves to position 0; the pot must reference it.
 	if view.Pots[0].WinningPlayerNums[0] != 0 {
@@ -322,7 +417,6 @@ func TestAllInLeaveForfeitsPot(t *testing.T) {
 	g.players[b].TotalBet = 100
 	g.players[a].Called = true
 	g.players[b].Called = true
-	g.running = true
 	g.setStageAndBetting(River, true)
 
 	// b leaves while all-in: they stay in the hand and reveal, not folded.
@@ -337,6 +431,11 @@ func TestAllInLeaveForfeitsPot(t *testing.T) {
 	}
 
 	g.updateRoundInfo()
+	if g.getStage() == Showdown {
+		if err := SettleShowdown(g); err != nil {
+			t.Fatalf("settle showdown: %v", err)
+		}
+	}
 
 	view := g.GenerateOmniView()
 	// b (aces) beats a (kings): the pot is forfeited, nobody is awarded.
@@ -382,7 +481,6 @@ func TestAllInLeaveOpponentWins(t *testing.T) {
 	g.players[b].TotalBet = 100
 	g.players[a].Called = true
 	g.players[b].Called = true
-	g.running = true
 	g.setStageAndBetting(River, true)
 
 	if err := LeaveHand(g, b); err != nil {
@@ -390,6 +488,11 @@ func TestAllInLeaveOpponentWins(t *testing.T) {
 	}
 
 	g.updateRoundInfo()
+	if g.getStage() == Showdown {
+		if err := SettleShowdown(g); err != nil {
+			t.Fatalf("settle showdown: %v", err)
+		}
+	}
 
 	view := g.GenerateOmniView()
 	if len(view.Pots) == 0 || len(view.Pots[0].WinningPlayerNums) != 1 || view.Pots[0].WinningPlayerNums[0] != 0 {
@@ -422,7 +525,6 @@ func TestAllInLeaveOpponentFoldsForfeits(t *testing.T) {
 	g.players[a].TotalBet = 2
 	g.players[b].TotalBet = 100
 	g.actionNum = a
-	g.running = true
 	g.setStageAndBetting(PreFlop, true)
 
 	if err := LeaveHand(g, b); err != nil {
@@ -432,14 +534,27 @@ func TestAllInLeaveOpponentFoldsForfeits(t *testing.T) {
 		t.Fatalf("a fold: %v", err)
 	}
 
+	// The forfeit (nobody collects) must still enter the Showdown state so
+	// the "chips forfeited" notice can display before the hand is settled.
 	view := g.GenerateOmniView()
-	// a folded, and b (the all-in leaver) cannot collect: the pot vanishes.
+	if view.Stage != Showdown {
+		t.Fatalf("expected Showdown after forfeit, got stage %v", view.Stage)
+	}
+	if len(view.Players) != 2 {
+		t.Fatalf("expected both players seated during showdown, got %d", len(view.Players))
+	}
 	if len(view.Pots) == 0 || view.Pots[0].Amt != 102 {
 		t.Fatalf("expected a 102-chip pot, got %+v", view.Pots)
 	}
 	if len(view.Pots[0].WinningPlayerNums) != 0 {
 		t.Fatalf("pot should have no winners (forfeit), got %v", view.Pots[0].WinningPlayerNums)
 	}
+
+	// Ending the showdown display drops the departed all-in player.
+	if err := SettleShowdown(g); err != nil {
+		t.Fatalf("settle showdown: %v", err)
+	}
+	view = g.GenerateOmniView()
 	if len(view.Players) != 1 {
 		t.Fatalf("expected 1 player remaining, got %d", len(view.Players))
 	}
@@ -467,20 +582,29 @@ func TestHeadsUpLeaveFacingAllInOpponentFolds(t *testing.T) {
 	g.players[a].TotalBet = 100
 	g.players[b].TotalBet = 2
 	g.actionNum = b
-	g.running = true
 	g.setStageAndBetting(PreFlop, true)
 
 	if err := LeaveHand(g, b); err != nil {
 		t.Fatalf("leave: %v", err)
 	}
 
+	// b folded on their turn; a wins by concession. The table enters the
+	// Showdown state so the winner toast can play before the leaver is
+	// dropped when the display ends.
 	view := g.GenerateOmniView()
-	// b folded on their turn and was dropped; a wins the pot by concession.
-	if len(view.Players) != 1 {
-		t.Fatalf("expected 1 player remaining, got %d", len(view.Players))
+	if view.Stage != Showdown {
+		t.Fatalf("expected Showdown after concession, got stage %v", view.Stage)
 	}
 	if len(view.Pots) == 0 || len(view.Pots[0].WinningPlayerNums) != 1 || view.Pots[0].WinningPlayerNums[0] != 0 {
 		t.Fatalf("a should win by concession, got %+v", view.Pots)
+	}
+
+	if err := SettleShowdown(g); err != nil {
+		t.Fatalf("settle showdown: %v", err)
+	}
+	view = g.GenerateOmniView()
+	if len(view.Players) != 1 {
+		t.Fatalf("expected 1 player remaining, got %d", len(view.Players))
 	}
 	if view.Players[0].Stack != 102 {
 		t.Fatalf("a should win 102 chips, got %d", view.Players[0].Stack)
@@ -515,7 +639,6 @@ func TestThreePlayerAllInLeaveForfeits(t *testing.T) {
 		g.players[pn].TotalBet = 100
 		g.players[pn].Called = true
 	}
-	g.running = true
 	g.setStageAndBetting(River, true)
 
 	if err := LeaveHand(g, b); err != nil {
@@ -526,6 +649,11 @@ func TestThreePlayerAllInLeaveForfeits(t *testing.T) {
 	}
 
 	g.updateRoundInfo()
+	if g.getStage() == Showdown {
+		if err := SettleShowdown(g); err != nil {
+			t.Fatalf("settle showdown: %v", err)
+		}
+	}
 
 	view := g.GenerateOmniView()
 	if len(view.Pots) == 0 || view.Pots[0].Amt != 300 {
@@ -572,7 +700,6 @@ func TestThreePlayerAllInLeaveOpponentWins(t *testing.T) {
 		g.players[pn].TotalBet = 100
 		g.players[pn].Called = true
 	}
-	g.running = true
 	g.setStageAndBetting(River, true)
 
 	if err := LeaveHand(g, b); err != nil {
@@ -580,6 +707,11 @@ func TestThreePlayerAllInLeaveOpponentWins(t *testing.T) {
 	}
 
 	g.updateRoundInfo()
+	if g.getStage() == Showdown {
+		if err := SettleShowdown(g); err != nil {
+			t.Fatalf("settle showdown: %v", err)
+		}
+	}
 
 	view := g.GenerateOmniView()
 	if len(view.Pots) == 0 || len(view.Pots[0].WinningPlayerNums) != 1 || view.Pots[0].WinningPlayerNums[0] != 0 {
@@ -676,7 +808,6 @@ func TestThreePlayerTwoLeaveOneAllIn(t *testing.T) {
 	g.players[c].TotalBet = 2
 	g.players[a].Called = true
 	g.players[b].Called = true
-	g.running = true
 	g.setStageAndBetting(River, true)
 
 	if err := LeaveHand(g, b); err != nil {
@@ -690,6 +821,11 @@ func TestThreePlayerTwoLeaveOneAllIn(t *testing.T) {
 	}
 
 	g.updateRoundInfo()
+	if g.getStage() == Showdown {
+		if err := SettleShowdown(g); err != nil {
+			t.Fatalf("settle showdown: %v", err)
+		}
+	}
 
 	view := g.GenerateOmniView()
 	// a (aces) beats b (kings) and wins the 202-chip pot (b's 100 + c's 2).
@@ -732,7 +868,6 @@ func TestThreePlayerTwoLeaveBothAllInForfeits(t *testing.T) {
 		g.players[pn].TotalBet = 100
 		g.players[pn].Called = true
 	}
-	g.running = true
 	g.setStageAndBetting(River, true)
 
 	if err := LeaveHand(g, b); err != nil {
@@ -746,6 +881,11 @@ func TestThreePlayerTwoLeaveBothAllInForfeits(t *testing.T) {
 	}
 
 	g.updateRoundInfo()
+	if g.getStage() == Showdown {
+		if err := SettleShowdown(g); err != nil {
+			t.Fatalf("settle showdown: %v", err)
+		}
+	}
 
 	view := g.GenerateOmniView()
 	if len(view.Pots) == 0 || view.Pots[0].Amt != 300 {
@@ -790,7 +930,6 @@ func TestThreePlayerTwoLeaveBothAllInRemainingWins(t *testing.T) {
 		g.players[pn].TotalBet = 100
 		g.players[pn].Called = true
 	}
-	g.running = true
 	g.setStageAndBetting(River, true)
 
 	if err := LeaveHand(g, b); err != nil {
@@ -801,6 +940,11 @@ func TestThreePlayerTwoLeaveBothAllInRemainingWins(t *testing.T) {
 	}
 
 	g.updateRoundInfo()
+	if g.getStage() == Showdown {
+		if err := SettleShowdown(g); err != nil {
+			t.Fatalf("settle showdown: %v", err)
+		}
+	}
 
 	view := g.GenerateOmniView()
 	if len(view.Pots) == 0 || len(view.Pots[0].WinningPlayerNums) != 1 || view.Pots[0].WinningPlayerNums[0] != 0 {
@@ -836,7 +980,6 @@ func TestAllInLeaveRunoutCompletes(t *testing.T) {
 	g.players[a].TotalBet = 100
 	g.players[b].TotalBet = 2
 	g.actionNum = b
-	g.running = true
 	g.setStageAndBetting(PreFlop, true)
 
 	// a leaves while all-in: stays in and reveals.
@@ -856,18 +999,22 @@ func TestAllInLeaveRunoutCompletes(t *testing.T) {
 	}
 
 	// Drive the runout: the flop is dealt all at once, then the turn and river
-	// are revealed one at a time. It must resolve without hanging.
+	// are revealed one at a time. Dealing the river enters the Showdown state;
+	// settleShowdown() resolves the display window and drops the leaver.
 	revealed := 0
-	for g.getStage() != PreDeal {
+	for g.getStage() != Showdown {
 		if err := RunoutNext(g); err != nil {
 			t.Fatalf("runout: %v", err)
 		}
-		if g.getStage() != PreDeal {
+		if g.getStage() != Showdown {
 			revealed++
 		}
 	}
 	if revealed != 3 {
 		t.Fatalf("expected 3 reveal steps (flop, turn, river), got %d", revealed)
+	}
+	if err := SettleShowdown(g); err != nil {
+		t.Fatalf("settle showdown: %v", err)
 	}
 
 	// The leaver is dropped once the hand resolves; only b remains.
@@ -920,18 +1067,22 @@ func TestFlopAllInRunoutRevealsTurnAndRiver(t *testing.T) {
 		t.Fatalf("betting should be off after both players are all-in")
 	}
 
-	// Drive the runout: exactly two more cards (turn + river) must be dealt.
+	// Drive the runout: exactly two more cards (turn + river) must be dealt,
+	// landing the table in the Showdown state.
 	revealed := 0
-	for g.getStage() != PreDeal {
+	for g.getStage() != Showdown {
 		if err := RunoutNext(g); err != nil {
 			t.Fatalf("runout: %v", err)
 		}
-		if g.getStage() != PreDeal {
+		if g.getStage() != Showdown {
 			revealed++
 		}
 	}
 	if revealed != 2 {
 		t.Fatalf("expected turn + river (2 cards), got %d", revealed)
+	}
+	if err := SettleShowdown(g); err != nil {
+		t.Fatalf("settle showdown: %v", err)
 	}
 
 	// Chips must be conserved: 200 total, the winner gets it all.
@@ -990,13 +1141,14 @@ func TestShortAllInFlopRevealsTurnAndRiver(t *testing.T) {
 		t.Fatalf("betting should be off after both are all-in")
 	}
 
-	// Drive the runout: exactly two more cards (turn + river) must be dealt.
+	// Drive the runout: exactly two more cards (turn + river) must be dealt,
+	// landing the table in the Showdown state.
 	revealed := 0
-	for g.getStage() != PreDeal {
+	for g.getStage() != Showdown {
 		if err := RunoutNext(g); err != nil {
 			t.Fatalf("runout: %v", err)
 		}
-		if g.getStage() != PreDeal {
+		if g.getStage() != Showdown {
 			revealed++
 		}
 	}

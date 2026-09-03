@@ -284,7 +284,7 @@ func (t *table) seatWaitingPlayers() {
 	}
 
 	view := t.game.GenerateOmniView()
-	if view.Stage != poker.PreDeal {
+	if view.Stage != poker.NotReady {
 		return
 	}
 
@@ -409,7 +409,7 @@ func (t *table) maybeSettleAfterHand() bool {
 		return false
 	}
 	view := t.game.GenerateOmniView()
-	if view.Stage != poker.PreDeal {
+	if view.Stage != poker.NotReady {
 		t.settleMu.Unlock()
 		return false
 	}
@@ -569,7 +569,7 @@ func (t *table) toggleSpectate(c *Client) {
 	c.spectateReserved = !c.spectateReserved
 
 	view := t.game.GenerateOmniView()
-	if c.spectateReserved && view.Stage == poker.PreDeal {
+	if c.spectateReserved && view.Stage == poker.NotReady {
 		t.applySpectate(c)
 	}
 	t.broadcastGame()
@@ -627,7 +627,7 @@ func (t *table) applySpectate(c *Client) bool {
 func (t *table) applySpectateReservations() {
 	for {
 		view := t.game.GenerateOmniView()
-		if view.Stage != poker.PreDeal {
+		if view.Stage != poker.NotReady {
 			return
 		}
 
@@ -655,7 +655,7 @@ func (t *table) applySpectateReservations() {
 func (t *table) autoSpectateBusted() {
 	for {
 		view := t.game.GenerateOmniView()
-		if view.Running || view.Stage != poker.PreDeal {
+		if view.Running || view.Stage != poker.NotReady {
 			return
 		}
 		pos := -1

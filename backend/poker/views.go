@@ -45,7 +45,7 @@ func (g *Game) copyToView() *GameView {
 	//make sure that it is. An example: copying a slice of structs, where the struct
 	//has a field that is a slice: this doesn't work by default. Write a helper function.
 	view := &GameView{
-		Running:           g.running,
+		Running:           g.getRunning(),
 		DealerNum:         g.dealerNum,
 		ActionNum:         g.actionNum,
 		UTGNum:            g.utgNum,
@@ -66,6 +66,10 @@ func (g *Game) copyToView() *GameView {
 		BiggestPotWinners: append([]uint{}, g.biggestPotWinners...),
 	}
 
+	// Showdown annotation: the hand name is stamped onto players at
+	// showdown time (see updateRoundInfo) and persists on the player until
+	// the next hand deals, so clients can display it during their showdown
+	// window.
 	return view
 }
 
@@ -88,7 +92,6 @@ func (g *Game) FillFromView(gv *GameView) {
 	g.mtx.Lock()
 	defer g.mtx.Unlock()
 
-	g.running = gv.Running
 	g.dealerNum = gv.DealerNum
 	g.actionNum = gv.ActionNum
 	g.utgNum = gv.UTGNum
@@ -148,7 +151,7 @@ func (g *Game) GeneratePlayerView(pn uint) *GameView {
 		}
 	}
 
-	if g.getStage() == PreDeal && inCount > 1 {
+	if g.getStage() == NotReady && inCount > 1 {
 
 		showCards(g.calledNum)
 		_, scoreToBeat := eval.BestFiveOfSeven(

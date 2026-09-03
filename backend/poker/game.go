@@ -17,31 +17,36 @@ const minPlayers = 2
 type gameFlags uint8
 
 /*
-xxxxBSSS
+xB...SSS
 --------
-xxxxxxxx
+x  - unused
+B  - Betting
+	1 : Yes, still betting
+	0 : No, can advance
+SSS - Status (see GameStage)
 
-SSS - Status
-	000 : Nothing
-	001 : PreDeal
-	010 : PreFlop
-	011 : Flop
-	100 : Turn
-	101 : River
-
-B - Betting
-	1 :Yes, still betting
-	0: No, can advance
+Betting is only meaningful in the betting states (PreFlop..River).
 */
 
+// GameStage is the table state machine (change.md「状态」章节):
+//
+//	NotReady  — waiting for players to ready up; rebuy/move/spectate allowed
+//	PreFlop   — hole cards dealt, betting round in progress
+//	Flop      — three community cards, betting round in progress
+//	Turn      — fourth community card, betting round in progress
+//	River     — fifth community card, betting round in progress
+//	Showdown  — hand resolved: reveal cards + hand types + winner toast
+//	Terminal  — session finished (hand limit / early settle vote): scoreboard
 type GameStage uint8
 
 const (
-	PreDeal GameStage = iota + 1
+	NotReady GameStage = iota + 1
 	PreFlop
 	Flop
 	Turn
 	River
+	Showdown
+	Terminal
 )
 
 type Pot struct {
@@ -68,7 +73,6 @@ type GameConfig struct {
 type Game struct {
 	mtx sync.Mutex
 
-	running           bool
 	dealerNum         uint
 	actionNum         uint
 	utgNum            uint
@@ -116,6 +120,13 @@ func (g *Game) setBetting(b bool) {
 func (g *Game) setStageAndBetting(s GameStage, b bool) {
 	g.setStage(s)
 	g.setBetting(b)
+}
+
+// getRunning reports whether the table is inside a hand (PreFlop..River) or
+// its showdown window — i.e. everything except NotReady and Terminal.
+func (g *Game) getRunning() bool {
+	s := g.getStage()
+	return s >= PreFlop && s <= Showdown
 }
 
 func (g *Game) getPlayer(pn uint) *player {
@@ -266,7 +277,7 @@ func (g *Game) dropPlayer(pn uint) {
 }
 
 // RemovePlayer removes a player from the game entirely, freeing their seat.
-// It is only safe to call when no hand is in progress (stage PreDeal).
+// It is only safe to call when no hand is in progress (stage NotReady).
 func RemovePlayer(g *Game, pn uint) error {
 	g.mtx.Lock()
 	defer g.mtx.Unlock()
@@ -275,7 +286,7 @@ func RemovePlayer(g *Game, pn uint) error {
 		return ErrOutOfBounds
 	}
 	g.dropPlayer(pn)
-	if g.getStage() == PreDeal {
+	if g.getStage() == NotReady {
 		g.updateBlindNums()
 	}
 	return nil
@@ -296,16 +307,13 @@ func ResetToReadyPhase(g *Game) {
 		}
 	}
 
-	g.running = false
 	g.pots = []Pot{}
 	g.communityCards = make([]Card, 5)
 	g.deck = DefaultDeck
-	g.setStageAndBetting(PreDeal, false)
+	g.setStageAndBetting(NotReady, false)
 
 	for i := range g.players {
-		g.players[i].Ready = false
-		g.players[i].In = false
-		g.players[i].Called = false
+		g.players[i].setState(PlayerNotReady)
 		g.players[i].Bet = 0
 		g.players[i].TotalBet = 0
 		g.players[i].Cards = [2]Card{0, 0}
@@ -318,25 +326,22 @@ func ResetToReadyPhase(g *Game) {
 	}
 }
 
-// Pause puts the game into the ready phase without clearing player stacks or
-// the hand counter: everyone becomes not-ready and the running flag is
-// cleared, so the table waits for players to ready up again.
+// Pause puts the game into the not-ready phase without clearing player stacks
+// or the hand counter: everyone becomes not-ready, so the table waits for
+// players to ready up again.
 func Pause(g *Game) {
 	g.mtx.Lock()
 	defer g.mtx.Unlock()
 
 	for i := range g.players {
-		g.players[i].Ready = false
-		g.players[i].In = false
-		g.players[i].Called = false
+		g.players[i].setState(PlayerNotReady)
 		g.players[i].Bet = 0
 		g.players[i].TotalBet = 0
 		g.players[i].Cards = [2]Card{0, 0}
 		g.players[i].Revealed = false
 	}
 	g.pots = []Pot{}
-	g.running = false
-	g.setStageAndBetting(PreDeal, false)
+	g.setStageAndBetting(NotReady, false)
 }
 
 func (g *Game) resetForNextHand() {
@@ -352,7 +357,7 @@ func (g *Game) resetForNextHand() {
 	}
 
 	if len(g.players) == 0 {
-		g.setStageAndBetting(PreDeal, false)
+		g.setStageAndBetting(NotReady, false)
 		return
 	}
 
@@ -381,16 +386,14 @@ func (g *Game) resetForNextHand() {
 		// regroup. Everyone becomes not-ready, but the hand counter is
 		// preserved so a fixed-length session still ends on schedule.
 		for i := range g.players {
-			g.players[i].Ready = false
-			g.players[i].In = false
+			g.players[i].setState(PlayerNotReady)
 			g.players[i].Called = false
 			g.players[i].Bet = 0
 			g.players[i].TotalBet = 0
 			g.players[i].Cards = [2]Card{0, 0}
 			g.players[i].Revealed = false
 		}
-		g.running = false
-		g.setStageAndBetting(PreDeal, false)
+		g.setStageAndBetting(NotReady, false)
 		return
 	}
 
@@ -412,7 +415,7 @@ func (g *Game) resetForNextHand() {
 		seen++
 	}
 
-	g.setStageAndBetting(PreDeal, false)
+	g.setStageAndBetting(NotReady, false)
 }
 
 // recordBiggestPot tracks the largest single pot of the session along with its
@@ -432,7 +435,7 @@ func (g *Game) updateRoundInfo() {
 	// are resolved at showdown (their winnings are forfeited below).
 	for i := range g.players {
 		if g.players[i].In && g.players[i].Left && !g.players[i].allIn() {
-			g.players[i].In = false
+			g.players[i].setState(PlayerNotReady)
 			g.players[i].Stats.Folds++
 		}
 	}
@@ -508,16 +511,21 @@ func (g *Game) updateRoundInfo() {
 		}
 
 		// A departed all-in player who is the last one standing forfeits the
-		// pot: nobody is awarded the chips.
+		// pot: nobody is awarded the chips. The table still enters the
+		// Showdown state so the forfeit is displayed (the chips vanish), then
+		// the client advances to the next state.
 		if g.players[inPlayerNums[0]].Left {
 			for i := range g.pots {
 				g.pots[i].WinningPlayerNums = []uint{}
 			}
-			g.resetForNextHand()
+			g.setStageAndBetting(Showdown, false)
 			return
 		}
 
-		// But this is special because cards do not need to be shown
+		// Uncontested win: award the pot to the last player standing. No
+		// showdown comparison is needed, so no cards are revealed — showing
+		// is left to the winner (ShowHand). The table still enters the
+		// Showdown state so the winner toast plays, then the client advances.
 		var won uint = 0
 		for _, p := range g.players {
 			won += p.TotalBet
@@ -529,7 +537,7 @@ func (g *Game) updateRoundInfo() {
 		}
 		g.recordBiggestPot(won, inPlayerNums)
 
-		g.resetForNextHand()
+		g.setStageAndBetting(Showdown, false)
 
 		return
 	}
@@ -567,60 +575,13 @@ func (g *Game) updateRoundInfo() {
 
 	//If there are two or more players in, and everybody has called or is all in, then end the hand f we've just finished river betting
 	if g.getStage() == River {
-
-		for i := range g.pots {
-			g.pots[i].WinningScore = 8000
-
-			for _, num := range g.pots[i].EligiblePlayerNums {
-
-				hand, score := BestFiveOfSeven(
-					g.players[num].Cards[0],
-					g.players[num].Cards[1],
-					g.communityCards[0],
-					g.communityCards[1],
-					g.communityCards[2],
-					g.communityCards[3],
-					g.communityCards[4],
-				)
-				// lower is better for the score
-				if score < g.pots[i].WinningScore {
-					g.pots[i].WinningScore = score
-					g.pots[i].WinningPlayerNums = []uint{num}
-					g.pots[i].WinningHand = hand
-				} else if score == g.pots[i].WinningScore {
-					g.pots[i].WinningPlayerNums = append(g.pots[i].WinningPlayerNums, num)
-				}
-			}
-
-			// Drop winners who left while all-in: their share is forfeited
-			// (the chips vanish) as a penalty for leaving. If every winner
-			// forfeited, the whole pot disappears.
-			totalWinners := uint(len(g.pots[i].WinningPlayerNums))
-			legit := []uint{}
-			for _, num := range g.pots[i].WinningPlayerNums {
-				if !g.players[num].Left {
-					legit = append(legit, num)
-				}
-			}
-			g.pots[i].WinningPlayerNums = legit
-
-			if totalWinners > 0 {
-				share := g.pots[i].Amt / totalWinners
-				for _, num := range legit {
-					g.players[num].Stack += share
-					//TODO: leave the remainder in the middle! (fractional money will disappear currently)
-					g.players[num].Stats.HandsWon++
-					if share > g.players[num].Stats.MaxPotWon {
-						g.players[num].Stats.MaxPotWon = share
-					}
-				}
-			}
-			if len(legit) > 0 {
-				g.recordBiggestPot(g.pots[i].Amt, legit)
-			}
-		}
-
-		g.resetForNextHand()
+		// Resolve the pots and enter the Showdown state: cards, hand types
+		// and the winner toast stay on screen here. The client advances the
+		// table to the next state with a deal request once its display
+		// window (hand types → 1s → toast 4s) has elapsed.
+		g.resolveShowdown()
+		g.setStageAndBetting(Showdown, false)
+		return
 
 		// otherwise, just set betting to false so the dealer can deal the next part of the hand
 	} else if len(inPlayerNums) == len(allInPlayerNums) {
@@ -633,13 +594,91 @@ func (g *Game) updateRoundInfo() {
 	}
 }
 
+// resolveShowdown evaluates every pot on the board, awards the chips and
+// stamps each in-hand player's best hand name. Chips have moved and stats are
+// updated after this, but the table reset (resetForNextHand) happens when the
+// showdown display ends and the next hand is dealt.
+func (g *Game) resolveShowdown() {
+	for i := range g.pots {
+		g.pots[i].WinningScore = 8000
+
+		for _, num := range g.pots[i].EligiblePlayerNums {
+
+			hand, score := BestFiveOfSeven(
+				g.players[num].Cards[0],
+				g.players[num].Cards[1],
+				g.communityCards[0],
+				g.communityCards[1],
+				g.communityCards[2],
+				g.communityCards[3],
+				g.communityCards[4],
+			)
+			// lower is better for the score
+			if score < g.pots[i].WinningScore {
+				g.pots[i].WinningScore = score
+				g.pots[i].WinningPlayerNums = []uint{num}
+				g.pots[i].WinningHand = hand
+			} else if score == g.pots[i].WinningScore {
+				g.pots[i].WinningPlayerNums = append(g.pots[i].WinningPlayerNums, num)
+			}
+		}
+
+		// Drop winners who left while all-in: their share is forfeited
+		// (the chips vanish) as a penalty for leaving. If every winner
+		// forfeited, the whole pot disappears.
+		totalWinners := uint(len(g.pots[i].WinningPlayerNums))
+		legit := []uint{}
+		for _, num := range g.pots[i].WinningPlayerNums {
+			if !g.players[num].Left {
+				legit = append(legit, num)
+			}
+		}
+		g.pots[i].WinningPlayerNums = legit
+
+		if totalWinners > 0 {
+			share := g.pots[i].Amt / totalWinners
+			for _, num := range legit {
+				g.players[num].Stack += share
+				//TODO: leave the remainder in the middle! (fractional money will disappear currently)
+				g.players[num].Stats.HandsWon++
+				if share > g.players[num].Stats.MaxPotWon {
+					g.players[num].Stats.MaxPotWon = share
+				}
+			}
+		}
+		if len(legit) > 0 {
+			g.recordBiggestPot(g.pots[i].Amt, legit)
+		}
+	}
+
+	// Stamp each in-hand player with the name of their best five-card hand:
+	// clients display it next to the seat during the showdown window.
+	for i := range g.players {
+		if g.players[i].In {
+			g.players[i].BestHand = BestHandName(g, uint(i))
+		}
+	}
+}
+
+// SettleShowdown closes the showdown window: reset the table for the next
+// hand (state 6 → 0; the client auto-starts or re-readies from there).
+func SettleShowdown(g *Game) error {
+	g.mtx.Lock()
+	defer g.mtx.Unlock()
+	if g.getStage() != Showdown {
+		return ErrIllegalAction
+	}
+	g.resetForNextHand()
+	return nil
+}
+
 //Exported functions related to game management (not "Actions")
 
 // NewGame is a factory method that returns a pointer to an initialized game.
 // This freshly created game will have the following default values:
 //
 //	Players: []
-//	GameStage: PreDeal
+//	GameStage: NotReady
 //	Betting: False
 //	Config: {
 //		BigBlind:	25
@@ -649,7 +688,7 @@ func (g *Game) updateRoundInfo() {
 func NewGame() *Game {
 	newGame := Game{}
 
-	newGame.setStageAndBetting(PreDeal, false)
+	newGame.setStageAndBetting(NotReady, false)
 	newGame.deck = DefaultDeck
 	newGame.config = GameConfig{
 		BigBlind:   20,
@@ -676,17 +715,18 @@ func Configure(g *Game, sb uint, bb uint, buyIn uint, maxBuy uint, maxPlayers ui
 }
 
 // Start checks that all players (except those who have left) are ready, then
-// sets running to true and deals the first hand
+// deals the first hand (moving the table from NotReady into PreFlop).
 func (g *Game) Start() error {
+	if g.getStage() != NotReady {
+		return ErrStartGame
+	}
 	for _, p := range g.players {
 		if !p.Left && !p.Ready {
 			return ErrStartGame
 		}
 	}
-	g.running = true
 	err := Deal(g, g.dealerNum, 0)
 	if err != nil {
-		g.running = false
 		return err
 	}
 	return nil
@@ -694,13 +734,12 @@ func (g *Game) Start() error {
 
 // Reset resets the game to a blank game
 func (g *Game) Reset() {
-	g.running = false
 	g.players = []player{}
 	g.departedPlayers = []player{}
 	g.pots = []Pot{}
 	g.communityCards = make([]Card, 5)
 	g.deck = DefaultDeck
-	g.setStageAndBetting(PreDeal, false)
+	g.setStageAndBetting(NotReady, false)
 	g.handsPlayed = 0
 	g.biggestPotAmt = 0
 	g.biggestPotWinners = nil
@@ -709,16 +748,12 @@ func (g *Game) Reset() {
 // RunoutNext reveals the next board card(s) when every remaining player is
 // all-in. The flop is dealt as three cards at once (flipped together), then
 // the turn and river are revealed one at a time so the client can animate
-// each flip. Once the river has been dealt it resolves the showdown and resets
-// for the next hand.
+// each flip. Dealing the river completes the board but does NOT resolve the
+// hand: the table displays the full board for the showdown, and the next
+// deal-game request settles it (revealed >= 5 branch).
 func RunoutNext(g *Game) error {
 	g.mtx.Lock()
 	defer g.mtx.Unlock()
-
-	if g.getStage() == River {
-		g.updateRoundInfo()
-		return nil
-	}
 
 	revealed := 0
 	for _, c := range g.communityCards {

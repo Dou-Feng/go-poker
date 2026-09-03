@@ -367,7 +367,7 @@ func handleLeaveTable(c *Client, tablename string) {
 
 		// Remove the player from the room once no hand is active. If they
 		// folded mid-hand they are dropped when the hand ends.
-		if stillSeated >= 0 && after.Stage == poker.PreDeal {
+		if stillSeated >= 0 && after.Stage == poker.NotReady {
 			if err := poker.RemovePlayer(c.table.game, uint(stillSeated)); err != nil {
 				slog.Default().Warn("Remove player", "error", err)
 			}
@@ -379,7 +379,7 @@ func handleLeaveTable(c *Client, tablename string) {
 	remaining := c.table.game.GenerateOmniView()
 	if len(remaining.Players) == 0 {
 		c.table.game.Reset()
-	} else if remaining.Stage == poker.PreDeal {
+	} else if remaining.Stage == poker.NotReady {
 		// A player left between hands: put the room back into the ready phase
 		// so the next hand waits for everyone to ready up.
 		poker.Pause(c.table.game)
@@ -749,6 +749,34 @@ func handleDealGame(c *Client) {
 	}
 	view := c.table.game.GenerateOmniView()
 
+	// The client's showdown display (hand types → toast) has finished: close
+	// the showdown, reset the table, and deal the next hand.
+	if view.Stage == poker.Showdown {
+		if err := poker.SettleShowdown(c.table.game); err != nil {
+			slog.Default().Warn("Settle showdown", "error", err)
+		}
+		// Apply any queued spectate moves before deciding how to continue.
+		c.table.applySpectateReservations()
+
+		// Honour an early-settle vote or a reached hand limit first: the
+		// session ends instead of automatically dealing another hand.
+		if c.table.maybeSettleAfterHand() {
+			return
+		}
+		if c.table.maybeSettle() {
+			return
+		}
+
+		// Everyone is still ready: auto-start the next hand. Otherwise
+		// broadcast the ready phase and wait for players to re-ready.
+		if autoStartIfReady(c.table) {
+			c.table.broadcastGame()
+			return
+		}
+		c.table.broadcastGame()
+		return
+	}
+
 	// All-in runout: reveal the board one card at a time and resolve at the
 	// river. Betting is off and the board is incomplete in this state.
 	if !view.Betting && view.Stage >= poker.PreFlop && view.Stage <= poker.River {
@@ -782,7 +810,13 @@ func handleDealGame(c *Client) {
 
 func handleCall(c *Client) {
 	view := c.table.game.GenerateOmniView()
+	if len(view.Players) == 0 {
+		return
+	}
 	pn := view.ActionNum
+	if pn >= uint(len(view.Players)) {
+		return
+	}
 	currentPlayer := view.Players[pn]
 
 	// compute amount needed to call
@@ -809,6 +843,9 @@ func handleCall(c *Client) {
 func handleRaise(c *Client, raise uint) {
 	view := c.table.game.GenerateOmniView()
 	pn := view.ActionNum
+	if pn >= uint(len(view.Players)) {
+		return
+	}
 	err := poker.Bet(c.table.game, pn, raise)
 	if err != nil {
 		slog.Default().Warn("Handle raise", "error", err)
@@ -820,6 +857,9 @@ func handleRaise(c *Client, raise uint) {
 func handleCheck(c *Client) {
 	view := c.table.game.GenerateOmniView()
 	pn := view.ActionNum
+	if pn >= uint(len(view.Players)) {
+		return
+	}
 	err := poker.Bet(c.table.game, pn, 0)
 	if err != nil {
 		slog.Default().Warn("Handle check", "error", err)
@@ -830,6 +870,9 @@ func handleCheck(c *Client) {
 func handleFold(c *Client) {
 	view := c.table.game.GenerateOmniView()
 	pn := view.ActionNum
+	if pn >= uint(len(view.Players)) {
+		return
+	}
 	err := poker.Fold(c.table.game, pn, 0)
 	if err != nil {
 		slog.Default().Warn("Handle fold", "error", err)

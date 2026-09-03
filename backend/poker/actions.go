@@ -311,7 +311,7 @@ func deal(g *Game, pn uint, data uint) error {
 	//TODO: if all or all but one are all-in and its not the end, don't set betting to true on the next deal
 
 	switch stage {
-	case PreDeal:
+	case NotReady:
 
 		// Zero all the community cards from last round
 		for i := range g.communityCards {
@@ -333,6 +333,7 @@ func deal(g *Game, pn uint, data uint) error {
 				g.players[i].Cards[0] = g.deck.Pop()
 				g.players[i].Cards[1] = g.deck.Pop()
 				g.players[i].In = true
+				g.players[i].State = PlayerPlaying
 				g.players[i].Stats.HandsPlayed++
 			} else {
 				g.players[i].Cards[0] = 0
@@ -341,6 +342,7 @@ func deal(g *Game, pn uint, data uint) error {
 
 			g.players[i].Called = false
 			g.players[i].Revealed = false
+			g.players[i].BestHand = ""
 		}
 
 		g.players[g.sbNum].putInChips(g.config.SmallBlind)
@@ -374,6 +376,9 @@ func deal(g *Game, pn uint, data uint) error {
 		return errInternalBadGameStage
 	}
 
+	// The next stage in the table state machine. Starting from NotReady this
+	// lands on PreFlop; Flop/Turn advance one street each. In the new enum
+	// the betting stages are contiguous, so +1 is the next street.
 	g.setStageAndBetting(stage+1, true)
 
 	return nil
@@ -403,7 +408,11 @@ func fold(g *Game, pn uint, data uint) error {
 		return ErrIllegalAction
 	}
 
-	p.In = false
+	// A fold exits the current hand (In=false) but the player stays seated
+	// and readied for the next one (Ready=true). The Ready flag must survive
+	// the fold so heads-up and multiway hands auto-start the next hand
+	// without everyone having to click ready again.
+	p.setState(PlayerReady)
 	p.Stats.Folds++
 
 	g.updateRoundInfo()
@@ -451,30 +460,29 @@ func LeaveHand(g *Game, pn uint) error {
 func leaveHand(g *Game, pn uint) error {
 	p := g.getPlayer(pn)
 
+	// A departing all-in player shows down instead of folding: their cards are
+	// revealed and they remain in the hand, so the hand runs to a showdown. If
+	// they would have won, their winnings are forfeited in updateRoundInfo.
+	allIn := p.allIn()
+	if allIn {
+		p.Revealed = true
+	}
+
 	// Unready the player. Mid-hand the ready flag is cleared directly so their
 	// hole cards remain until they fold; otherwise toggleReady fixes up the
 	// dealer and blinds.
-	if p.Ready {
-		if p.In {
-			p.Ready = false
-		} else if err := toggleReady(g, pn, 0); err != nil {
+	if p.Ready && !p.In {
+		if err := toggleReady(g, pn, 0); err != nil {
 			return err
 		}
 	}
 
 	p.Left = true
 
-	// A departing all-in player shows down instead of folding: their cards are
-	// revealed and they remain in the hand, so the hand runs to a showdown. If
-	// they would have won, their winnings are forfeited in updateRoundInfo.
-	if p.allIn() {
-		p.Revealed = true
-		return nil
-	}
-
-	// If it is already their turn, fold them now so the hand doesn't hang.
-	if g.actionNum == pn && p.In {
-		p.In = false
+	// If it is already their turn (and they are not all-in), fold them now so
+	// the hand doesn't hang.
+	if !allIn && g.actionNum == pn && p.In {
+		p.setState(PlayerNotReady)
 		p.Stats.Folds++
 		g.updateRoundInfo()
 	}
@@ -490,7 +498,7 @@ func SitOut(g *Game, pn uint, data uint) error {
 
 	p := g.getPlayer(pn)
 	if p.In {
-		p.In = false
+		p.setState(PlayerNotReady)
 		p.Stats.Folds++
 		g.updateRoundInfo()
 	}
@@ -516,14 +524,14 @@ func toggleReady(g *Game, pn uint, data uint) error {
 	}
 
 	if p.Ready {
-		p.Ready = false
+		p.setState(PlayerNotReady)
 		p.Cards[0] = 0
 		p.Cards[1] = 0
 	} else {
 		if p.Stack == 0 {
 			return ErrIllegalAction
 		}
-		p.Ready = true
+		p.setState(PlayerReady)
 	}
 
 	if pn == g.dealerNum {
@@ -535,7 +543,7 @@ func toggleReady(g *Game, pn uint, data uint) error {
 		}
 	}
 
-	if g.getStage() == PreDeal {
+	if g.getStage() == NotReady {
 		g.updateBlindNums()
 	}
 

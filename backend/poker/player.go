@@ -32,12 +32,37 @@ type PlayerStats struct {
 	VPIPByPos   [PosLabelCount]uint `json:"vpipByPos"`
 }
 
+// PlayerState is the player state machine (change.md「玩家状态」章节):
+//
+//	NotReady   — seated but not readied: rebuy / move seat / spectate allowed
+//	Ready      — readied up; waiting for the table to start (auto when all ready)
+//	Playing    — in the current hand, can act when it is their turn
+//	AllIn      — in the current hand but committed all chips: turns are skipped,
+//	             may voluntarily show their cards, still contest the pot
+//	Spectating — watching from the spectator side; may queue for the next hand
+//	Offline    — disconnected: auto-fold on turn and removed before the next
+//	             hand unless all-in (then showdown with forfeit penalty)
+//
+// Note: Ready/In below are retained as fast-path flags derived from State —
+// Ready mirrors State==Ready, In mirrors State in {Playing, AllIn}.
+type PlayerState uint8
+
+const (
+	PlayerNotReady PlayerState = iota + 1
+	PlayerReady
+	PlayerPlaying
+	PlayerAllIn
+	PlayerSpectating
+	PlayerOffline
+)
+
 type player struct {
 	Username     string      `json:"username"`
 	UUID         string      `json:"uuid"`
 	AccountUUID  string      `json:"accountUuid"`
 	Position     uint        `json:"position"`
 	SeatID       uint        `json:"seatID"`
+	State        PlayerState `json:"state"`
 	Ready        bool        `json:"ready"`
 	In           bool        `json:"in"`
 	Called       bool        `json:"called"`
@@ -52,6 +77,16 @@ type player struct {
 	Avatar       string      `json:"avatar"`
 	AvatarImage  bool        `json:"avatarImage"`
 	Revealed     bool        `json:"revealed"`
+	// BestHand is populated on showdown for revealed/all-in players: the
+	// name of their best five-card hand (e.g. "full house").
+	BestHand string `json:"bestHand,omitempty"`
+}
+
+// setState assigns a state and keeps the derived fast-path flags in sync.
+func (p *player) setState(s PlayerState) {
+	p.State = s
+	p.Ready = s == PlayerReady
+	p.In = s == PlayerPlaying || s == PlayerAllIn
 }
 
 func (p *player) allIn() bool {
@@ -62,8 +97,7 @@ func (p *player) initialize() {
 	*p = player{}
 
 	p.UUID = uuid.New().String()
-	p.Ready = false
-	p.In = false
+	p.setState(PlayerNotReady)
 	p.Called = false
 
 }

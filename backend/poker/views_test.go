@@ -73,7 +73,7 @@ func TestGame_GenerateOmniView(t *testing.T) {
 					67115551,
 					134224677,
 				},
-				Stage:             PreDeal,
+				Stage:             NotReady,
 				Betting:           true,
 				Config:            GameConfig{},
 				Players:           []player{},
