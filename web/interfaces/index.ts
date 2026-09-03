@@ -103,6 +103,7 @@ export type Player = {
   avatar: string;
   avatarImage: boolean;
   revealed: boolean;
+  bestHand: string;
 };
 
 export type Game = {

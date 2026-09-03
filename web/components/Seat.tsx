@@ -5,6 +5,7 @@ import Card from "./Card";
 import Chip from "./Chip";
 import classNames from "classnames";
 import { useTranslation } from "../hooks/useTranslation";
+import { TranslationKey } from "../lib/translations";
 import { useSocket } from "../hooks/useSocket";
 import {
   toggleReady,
@@ -21,6 +22,28 @@ type seatProps = {
   visualId?: number;
   reveal: boolean;
 };
+
+// Localized name for a showdown hand category ("full house" etc).
+const HAND_KEYS: Record<string, TranslationKey> = {
+  "royal flush": "hand_royal_flush",
+  "straight flush": "hand_straight_flush",
+  "four of a kind": "hand_four_of_a_kind",
+  "full house": "hand_full_house",
+  flush: "hand_flush",
+  straight: "hand_straight",
+  "three of a kind": "hand_three_of_a_kind",
+  "two pair": "hand_two_pair",
+  "one pair": "hand_one_pair",
+  "high card": "hand_high_card",
+};
+
+function useHandLabel() {
+  const { t } = useTranslation();
+  return (hand: string) => {
+    const key = HAND_KEYS[hand];
+    return key ? t(key) : hand;
+  };
+}
 
 function chipPosition(id: number) {
   return classNames(
@@ -69,6 +92,7 @@ export default function Seat({ player, id, visualId, reveal }: seatProps) {
   const { appState, dispatch } = useContext(AppContext);
   const socket = useSocket();
   const { t } = useTranslation();
+  const handLabel = useHandLabel();
 
   const game = appState.game;
   const running = game?.running ?? false;
@@ -249,6 +273,21 @@ export default function Seat({ player, id, visualId, reveal }: seatProps) {
               className="animate-chip-pop flex h-6 w-9 items-center justify-center rounded-3xl bg-amber-300 text-sm font-semibold text-zinc-900 sm:h-8 sm:w-12 sm:text-xl"
             >
               {player.bet}
+            </p>
+          )}
+          {/* Best hand at showdown: shown on the table-facing side of the
+              seat (same spot as chips), only for players whose cards are
+              actually revealed (participated in the showdown). */}
+          {running && player.bestHand && (reveal || player.revealed) && (
+            <p
+              className={classNames(
+                "animate-fade-in max-w-28 sm:max-w-36 truncate rounded-3xl bg-zinc-900/90 px-2 text-xs font-semibold text-amber-300 sm:text-sm",
+                // Match the chip's side of the seat so it never overlaps
+                // the hole cards.
+                (visualId ?? id) === 3 ? "flex-col items-start" : "flex-row"
+              )}
+            >
+              {handLabel(player.bestHand)}
             </p>
           )}
         </div>

@@ -5,7 +5,20 @@ import { AppContext } from "../providers/AppStore";
 import { sendLog, dealGame, queueNext } from "../actions/actions";
 import { useSocket } from "../hooks/useSocket";
 import { useTranslation } from "../hooks/useTranslation";
+import { playSfx } from "../lib/sfx";
 import { useContext, useState, useEffect, useRef } from "react";
+
+// The backend's GameStage enum values. 1..5 are NotReady, PreFlop..River;
+// 6 is the Showdown window where the settled hand (winner/forfeit) is shown.
+const Stage = {
+  NotReady: 1,
+  PreFlop: 2,
+  Flop: 3,
+  Turn: 4,
+  River: 5,
+  Showdown: 6,
+  Terminal: 7,
+} as const;
 
 type WinnerResult = { player: Player; amount: number };
 
@@ -64,7 +77,7 @@ function handleWinner(game: GameType | null, socket: WebSocket | null) {
   if (!game || !socket) {
     return;
   }
-  if (game.stage === 1 && game.pots.length !== 0) {
+  if (game.stage === Stage.Showdown && game.pots.length !== 0) {
     for (const result of getWinners(game)) {
       sendLog(socket, result.player.username + " wins " + result.amount);
     }
@@ -105,12 +118,14 @@ export default function Table() {
   const runoutDriver = game?.players.find((p) => !p.left);
   const isRunoutDriver =
     !!me && !!runoutDriver && me.position === runoutDriver.position;
-  const [revealedPlayers, setRevealedPlayers] = useState<Player[]>([]);
+  const [revealedPositions, setRevealedPositions] = useState<number[]>([]);
   const [winners, setWinners] = useState<WinnerResult[]>([]);
   const [forfeited, setForfeited] = useState(false);
   const shownHandRef = useRef<string>("");
   const dismissTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const mountedRef = useRef(true);
+  const lastStageRef = useRef<number>(-1);
 
   const maxPlayers = game?.config.maxPlayers ?? 6;
 
@@ -136,7 +151,10 @@ export default function Table() {
 
   useEffect(() => {
     // Reveal the board one card at a time during an all-in runout: betting is
-    // off while the board is still incomplete.
+    // off while the board is still incomplete. Each request reveals the next
+    // street (flop → turn → river); the request after the river is complete
+    // resolves the hand and enters the Showdown state (stage 6), at which
+    // point `inRunout` becomes false and dealing stops automatically.
     if (!game || !socket || !isRunoutDriver) {
       return;
     }
@@ -164,18 +182,13 @@ export default function Table() {
       return;
     }
     if (game.pots.length === 0) {
-      // A new hand is in progress: clear the settlement result and timer.
+      // The pots are only cleared when the next hand is dealt: from now on
+      // the next hand is running. Reset the shown hand so it can be shown
+      // again for the new hand's showdown.
       shownHandRef.current = "";
-      setRevealedPlayers([]);
-      setWinners([]);
-      setForfeited(false);
-      if (dismissTimerRef.current) {
-        clearTimeout(dismissTimerRef.current);
-        dismissTimerRef.current = null;
-      }
       return;
     }
-    if (game.stage !== 1) {
+    if (game.stage !== Stage.Showdown) {
       return;
     }
     const results = getWinners(game);
@@ -191,9 +204,9 @@ export default function Table() {
       return;
     }
     shownHandRef.current = sig;
-    setRevealedPlayers(getRevealedPlayers(game));
-    setWinners(results);
+    setRevealedPositions(getRevealedPlayers(game).map((p) => p.position));
     setForfeited(!!forfeitPot);
+    playSfx(forfeitPot ? "error" : "win");
     if (forfeitPot) {
       if (socket) {
         sendLog(socket, "chips forfeited");
@@ -204,12 +217,21 @@ export default function Table() {
     if (dismissTimerRef.current) {
       clearTimeout(dismissTimerRef.current);
     }
+    // Showdown sequencing: the hand-type labels appear with the card reveal
+    // first; the winner toast pops 1s later and stays 4s.
+    toastTimerRef.current = setTimeout(() => {
+      toastTimerRef.current = null;
+      if (!mountedRef.current) {
+        return;
+      }
+      setWinners(results);
+    }, 1000);
     dismissTimerRef.current = setTimeout(() => {
       dismissTimerRef.current = null;
       if (!mountedRef.current) {
         return;
       }
-      setRevealedPlayers([]);
+      setRevealedPositions([]);
       setWinners([]);
       setForfeited(false);
       if (socket && isRunoutDriver) {
@@ -217,6 +239,20 @@ export default function Table() {
       }
     }, 5000);
   }, [game?.stage, game?.pots?.length]);
+
+  // Deal sound: a new hand starts when the stage leaves NotReady into the
+  // first betting street (PreFlop).
+  useEffect(() => {
+    const stage = game?.stage ?? -1;
+    if (
+      game?.running &&
+      stage !== Stage.NotReady &&
+      lastStageRef.current === Stage.NotReady
+    ) {
+      playSfx("deal");
+    }
+    lastStageRef.current = stage;
+  }, [game?.running, game?.stage]);
 
   // Track mounted state so a pending dismissal timer can no-op after unmount.
   useEffect(() => {
@@ -293,7 +329,9 @@ export default function Table() {
                 player={player}
                 id={i + 1}
                 visualId={visualIndex + 1}
-                reveal={player ? revealedPlayers.includes(player) : false}
+                reveal={
+                  player ? revealedPositions.includes(player.position) : false
+                }
               />
             </div>
           );

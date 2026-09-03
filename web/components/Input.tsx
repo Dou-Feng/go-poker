@@ -9,6 +9,7 @@ import {
 } from "../actions/actions";
 import { useSocket } from "../hooks/useSocket";
 import { useTranslation } from "../hooks/useTranslation";
+import { playSfx } from "../lib/sfx";
 import InputButton from "./InputButton";
 import RaiseInput from "./RaiseInput";
 
@@ -20,6 +21,7 @@ export default function Input() {
 
   const handleFold = (user: string | null) => {
     if (socket) {
+      playSfx("fold");
       let foldMessage = user + " folds";
       sendLog(socket, foldMessage);
       playerFold(socket);
@@ -50,9 +52,11 @@ export default function Input() {
       return;
     }
     if (canCheck) {
+      playSfx("click");
       sendLog(socket, user + " checks");
       playerCheck(socket);
     } else {
+      playSfx("call");
       sendLog(socket, user + " calls " + callAmount);
       playerCall(socket);
     }
@@ -62,6 +66,7 @@ export default function Input() {
     if (!socket) {
       return;
     }
+    playSfx("allin");
     sendLog(socket, user + " is all in");
     playerRaise(socket, player.stack);
   };

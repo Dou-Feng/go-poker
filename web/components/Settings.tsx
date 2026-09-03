@@ -1,10 +1,12 @@
 import { useState } from "react";
 import { FiSettings } from "react-icons/fi";
 import { useTranslation } from "../hooks/useTranslation";
+import { getSfxVolume, setSfxVolume, playSfx } from "../lib/sfx";
 
 export default function Settings() {
   const { language, setLanguage, t } = useTranslation();
   const [open, setOpen] = useState(false);
+  const [volume, setVolume] = useState(() => Math.round(getSfxVolume() * 100));
 
   const optionButton = (active: boolean) =>
     `rounded-sm px-3 py-1 text-sm ${
@@ -12,6 +14,11 @@ export default function Settings() {
         ? "bg-cyan-900 text-white"
         : "bg-neutral-700 text-neutral-300 hover:bg-neutral-600"
     }`;
+
+  const applyVolume = (v: number) => {
+    setVolume(v);
+    setSfxVolume(v / 100);
+  };
 
   return (
     <div className="relative">
@@ -52,6 +59,35 @@ export default function Settings() {
                   className={optionButton(language === "zh")}
                 >
                   中文
+                </button>
+              </div>
+            </div>
+
+            <div className="mt-4 flex flex-col gap-2">
+              <div className="flex flex-row items-center justify-between">
+                <p className="text-xs text-neutral-400">{t("sfx")}</p>
+                <p className="font-mono text-xs text-neutral-500">{volume}%</p>
+              </div>
+              <div className="flex flex-row items-center gap-2">
+                <input
+                  type="range"
+                  min={0}
+                  max={100}
+                  step={5}
+                  value={volume}
+                  onChange={(e) => applyVolume(Number(e.target.value))}
+                  onPointerUp={() => playSfx("click")}
+                  onKeyUp={() => playSfx("click")}
+                  className="h-1.5 w-full cursor-pointer appearance-none rounded-full bg-neutral-600 accent-cyan-700"
+                />
+                <button
+                  onClick={() => {
+                    applyVolume(volume === 0 ? 50 : 0);
+                  }}
+                  title={t("sfx")}
+                  className="rounded-sm border border-neutral-600 px-2 py-0.5 text-xs text-neutral-400 hover:text-neutral-200"
+                >
+                  {volume === 0 ? "🔇" : "🔊"}
                 </button>
               </div>
             </div>

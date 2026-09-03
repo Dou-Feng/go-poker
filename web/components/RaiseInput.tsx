@@ -3,6 +3,7 @@ import { AppContext } from "../providers/AppStore";
 import { playerRaise, sendLog } from "../actions/actions";
 import { useSocket } from "../hooks/useSocket";
 import { useTranslation } from "../hooks/useTranslation";
+import { playSfx } from "../lib/sfx";
 import InputButton from "./InputButton";
 import Chip from "./Chip";
 import { Slider } from "@mantine/core";
@@ -64,6 +65,7 @@ export default function RaiseInput({ showRaise, setShowRaise }: raiseProps) {
 
   const handleRaise = (user: string | null, amount: number) => {
     if (socket) {
+      playSfx(isAllIn ? "allin" : "raise");
       const raiseMessage = isAllIn
         ? user + " is all in"
         : user + " bets " + amount;
