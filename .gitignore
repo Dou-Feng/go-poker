@@ -64,3 +64,5 @@ jspm_packages
 
 # Go build artifacts (air hot-reload output)
 backend/tmp/
+
+data/
