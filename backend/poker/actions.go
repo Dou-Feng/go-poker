@@ -136,21 +136,20 @@ func BuyIn(g *Game, pn uint, data uint) error {
 func buyIn(g *Game, pn uint, data uint) error {
 	p := g.getPlayer(pn)
 
-	//Can't buy in while playing
-	if p.In {
-		return ErrIllegalAction
-	}
-
 	//Can't buy more than the maximum buy, if it's configured
 	if g.config.MaxBuy != 0 && p.TotalBuyIn+data > g.config.MaxBuy {
 		return ErrIllegalAction
 	}
 
-	//Otherwise, add it to the stack
-	p.Stack = p.Stack + data
+	if p.In {
+		// Rebuy during a hand: chips are held until the hand ends.
+		p.PendingBuyIn += data
+	} else {
+		p.Stack += data
+	}
 
 	//And add it to your total
-	p.TotalBuyIn = p.TotalBuyIn + data
+	p.TotalBuyIn += data
 
 	return nil
 }
@@ -297,7 +296,7 @@ func deal(g *Game, pn uint, data uint) error {
 	}
 
 	g.betsThisStreet = 0
-	g.minRaise = g.config.BigBlind
+	g.minRaise = g.config.SmallBlind
 
 	//TODO: if all or all but one are all-in and its not the end, don't set betting to true on the next deal
 

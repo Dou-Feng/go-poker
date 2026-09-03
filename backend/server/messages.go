@@ -147,7 +147,7 @@ type createTable struct {
 	SB         uint   `json:"sb"`
 	BB         uint   `json:"bb"`
 	BuyIn      uint   `json:"buyIn"`
-	MaxBuyIns  uint   `json:"maxBuyIns"`
+	MaxBuy     uint   `json:"maxBuy"`
 	MaxPlayers uint   `json:"maxPlayers"`
 	HandsLimit uint   `json:"handsLimit"`
 }

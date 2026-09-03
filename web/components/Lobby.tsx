@@ -34,7 +34,7 @@ export default function Lobby() {
   const [sb, setSb] = useState(1);
   const [bb, setBb] = useState(2);
   const [buyIn, setBuyIn] = useState(200);
-  const [maxBuyIns, setMaxBuyIns] = useState(3);
+  const [maxBuy, setMaxBuy] = useState(600);
   const [maxPlayers, setMaxPlayers] = useState(6);
   const [handsLimit, setHandsLimit] = useState(20);
   const { t } = useTranslation();
@@ -98,7 +98,7 @@ export default function Lobby() {
       sb,
       bb,
       buyIn,
-      maxBuyIns,
+      maxBuy,
       maxPlayers,
       handsLimit,
     });
@@ -349,14 +349,14 @@ export default function Lobby() {
 
                 <div className="flex flex-row items-center gap-2 rounded-sm bg-neutral-700 px-3 py-2 text-xs">
                   <span className="w-16 shrink-0 text-neutral-400">
-                    {t("buyIns")}
+                    {t("maxBuy")}
                   </span>
                   <input
                     type="number"
-                    min={1}
-                    value={maxBuyIns}
+                    min={buyIn}
+                    value={maxBuy}
                     onChange={(e) =>
-                      setMaxBuyIns(Math.max(1, Number(e.target.value)))
+                      setMaxBuy(Math.max(buyIn, Number(e.target.value)))
                     }
                     className="flex-1 rounded-sm bg-neutral-600 px-2 py-1 text-white focus:outline-none"
                   />

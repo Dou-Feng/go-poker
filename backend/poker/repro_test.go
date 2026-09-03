@@ -184,7 +184,7 @@ func TestAllInRunoutToShowdown(t *testing.T) {
 	}
 
 	// Drive the runout until the showdown resolves and the game returns to
-	// PreDeal. Cards must be revealed one at a time.
+	// PreDeal. The flop is revealed all at once, then the turn and river.
 	revealedCards := 0
 	for g.getStage() != PreDeal {
 		if err := RunoutNext(g); err != nil {
@@ -194,8 +194,8 @@ func TestAllInRunoutToShowdown(t *testing.T) {
 			revealedCards++
 		}
 	}
-	if revealedCards != 5 {
-		t.Fatalf("expected 5 cards revealed one at a time, got %d", revealedCards)
+	if revealedCards != 3 {
+		t.Fatalf("expected 3 reveal steps (flop, turn, river), got %d", revealedCards)
 	}
 
 	total := g.players[a].Stack + g.players[b].Stack + g.players[c].Stack
@@ -855,8 +855,8 @@ func TestAllInLeaveRunoutCompletes(t *testing.T) {
 		t.Fatalf("betting should be off after the call")
 	}
 
-	// Drive the runout one card at a time; it must reveal exactly five cards
-	// and resolve without hanging.
+	// Drive the runout: the flop is dealt all at once, then the turn and river
+	// are revealed one at a time. It must resolve without hanging.
 	revealed := 0
 	for g.getStage() != PreDeal {
 		if err := RunoutNext(g); err != nil {
@@ -866,8 +866,8 @@ func TestAllInLeaveRunoutCompletes(t *testing.T) {
 			revealed++
 		}
 	}
-	if revealed != 5 {
-		t.Fatalf("expected 5 cards revealed, got %d", revealed)
+	if revealed != 3 {
+		t.Fatalf("expected 3 reveal steps (flop, turn, river), got %d", revealed)
 	}
 
 	// The leaver is dropped once the hand resolves; only b remains.

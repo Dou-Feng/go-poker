@@ -393,7 +393,6 @@ func (t *table) broadcastGame() {
 		return
 	}
 	t.autoSpectateBusted()
-	t.applySpectateReservations()
 	t.broadcast <- createUpdatedGameBytes(t)
 }
 
@@ -591,6 +590,11 @@ func (t *table) applySpectate(c *Client) bool {
 
 	if len(t.game.GenerateOmniView().Players) == 0 {
 		t.game.Reset()
+	} else {
+		// A seated player moved to the spectator side between hands: put the
+		// room back into the ready phase (clearing the previous hand's result)
+		// so the remaining players can ready up again.
+		poker.Pause(t.game)
 	}
 	return true
 }

@@ -77,6 +77,7 @@ func TestGame_GenerateOmniView(t *testing.T) {
 				Betting:           true,
 				Config:            GameConfig{},
 				Players:           []player{},
+				DepartedPlayers:   []player{},
 				Deck:              DefaultDeck,
 				Pots:              []Pot{},
 				MinRaise:          25,

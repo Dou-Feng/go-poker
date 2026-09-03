@@ -1,9 +1,10 @@
-import { useState, useContext, useCallback } from "react";
+import { useState, useContext } from "react";
 import { AppContext } from "../providers/AppStore";
 import { playerRaise, sendLog } from "../actions/actions";
 import { useSocket } from "../hooks/useSocket";
 import { useTranslation } from "../hooks/useTranslation";
 import InputButton from "./InputButton";
+import Chip from "./Chip";
 import { Slider } from "@mantine/core";
 import classNames from "classnames";
 
@@ -13,13 +14,13 @@ type raiseProps = {
 };
 function button() {
   return classNames(
-    "mx-0.5 my-1 rounded-xl border border-2 border-zinc-600 px-3 py-2 text-base text-neutral-200 hover:bg-zinc-600 font-normal sm:px-4 sm:py-2 sm:text-lg"
+    "mx-0.5 my-1 rounded-xl border border-2 border-zinc-600 bg-zinc-800 px-3 py-2 text-base text-neutral-200 hover:bg-zinc-600 font-normal sm:px-4 sm:py-2 sm:text-lg"
   );
 }
 
 export default function RaiseInput({ showRaise, setShowRaise }: raiseProps) {
   const socket = useSocket();
-  const { appState, dispatch } = useContext(AppContext);
+  const { appState } = useContext(AppContext);
   const { t } = useTranslation();
 
   if (!appState.game) {
@@ -39,18 +40,10 @@ export default function RaiseInput({ showRaise, setShowRaise }: raiseProps) {
       ? appState.game.pots[0].amount
       : bigBlind + smallBlind;
 
-  // a pot sized bet is equal to 3 times the previous largest bet + pot before previous bet
-  const potBet = 3 * maxBet + currentPot - maxBet;
-
-  function potPortion(pot: number, fraction: number) {
-    // returns rounded fraction of the pot
-    return Math.ceil(pot * fraction);
-  }
-
-  function betValidator(bet: number, minRaise: number, stack: number) {
+  function betValidator(bet: number, min: number, stack: number) {
     // bet can never be smaller than min raise and can never be bigger than player stack + committed chips
-    if (bet < minRaise) {
-      return minRaise;
+    if (bet < min) {
+      return min;
     } else if (bet > stack) {
       return stack;
     } else {
@@ -58,26 +51,22 @@ export default function RaiseInput({ showRaise, setShowRaise }: raiseProps) {
     }
   }
 
-  const half =
-    appState.game.pots.length != 0 ? potPortion(potBet, 0.5) : minRaise;
-  const threeQuarter =
-    appState.game.pots.length != 0
-      ? potPortion(potBet, 0.75)
-      : Math.ceil(bigBlind * 2.5);
-
-  const full = appState.game.pots.length != 0 ? potBet : bigBlind * 3;
-  const allIn = currentStack + currentBet;
+  // Quick amounts are a pot-sized raise relative to the current pot.
+  const potBet = currentPot + 2 * (maxBet - currentBet);
+  const half = Math.ceil(potBet / 2);
+  const threeQuarter = Math.ceil((potBet * 3) / 4);
+  const full = potBet;
+  const allInTotal = currentStack + currentBet;
 
   const [inputValue, setInputValue] = useState(minRaise);
 
-  const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const bet = parseInt(e.target.value);
-    setInputValue(bet);
-  }, []);
+  const isAllIn = inputValue >= allInTotal;
 
   const handleRaise = (user: string | null, amount: number) => {
     if (socket) {
-      let raiseMessage = user + " bets " + amount;
+      const raiseMessage = isAllIn
+        ? user + " is all in"
+        : user + " bets " + amount;
       sendLog(socket, raiseMessage);
       playerRaise(socket, amount);
     }
@@ -85,23 +74,17 @@ export default function RaiseInput({ showRaise, setShowRaise }: raiseProps) {
   };
 
   return (
-    <div className="pointer-events-auto flex w-full flex-row flex-wrap items-center justify-center gap-1 p-2 sm:p-6">
-      <input
-        autoFocus
-        className="mx-1 w-16 rounded-sm border border-2 border-zinc-600 bg-zinc-800 p-2 text-xl font-normal text-neutral-200 focus:outline-none sm:w-24 sm:text-2xl"
-        id="input"
-        type="text"
-        value={inputValue ? inputValue : ""}
-        onChange={handleChange}
-      />
-      <div className="mx-1 flex flex-col items-center justify-center rounded-sm border border-2 border-zinc-600 px-2">
+    <div className="pointer-events-auto flex w-full flex-row flex-wrap items-center justify-center gap-1 rounded-2xl bg-zinc-900/80 p-2 shadow-lg sm:p-6">
+      <div className="mx-1 flex flex-col items-center justify-center rounded-sm border border-2 border-zinc-600 bg-zinc-900/90 px-2">
+        <div className="my-1 flex items-center justify-center gap-1.5 text-xl font-semibold text-amber-300 sm:text-2xl">
+          <Chip className="h-5 w-5 sm:h-6 sm:w-6" />
+          <span className="font-mono leading-none">{inputValue}</span>
+        </div>
         <div className="flex flex-row flex-wrap items-center justify-center">
           <button
             className={button()}
             onClick={() =>
-              setInputValue(
-                betValidator(minRaise, minRaise, currentStack + currentBet)
-              )
+              setInputValue(betValidator(minRaise, minRaise, allInTotal))
             }
           >
             {t("min")}
@@ -109,9 +92,7 @@ export default function RaiseInput({ showRaise, setShowRaise }: raiseProps) {
           <button
             className={button()}
             onClick={() =>
-              setInputValue(
-                betValidator(half, minRaise, currentStack + currentBet)
-              )
+              setInputValue(betValidator(half, minRaise, allInTotal))
             }
           >
             {t("halfPot")}
@@ -119,9 +100,7 @@ export default function RaiseInput({ showRaise, setShowRaise }: raiseProps) {
           <button
             className={button()}
             onClick={() =>
-              setInputValue(
-                betValidator(threeQuarter, minRaise, currentStack + currentBet)
-              )
+              setInputValue(betValidator(threeQuarter, minRaise, allInTotal))
             }
           >
             {t("threeQuarterPot")}
@@ -129,22 +108,10 @@ export default function RaiseInput({ showRaise, setShowRaise }: raiseProps) {
           <button
             className={button()}
             onClick={() =>
-              setInputValue(
-                betValidator(full, minRaise, currentStack + currentBet)
-              )
+              setInputValue(betValidator(full, minRaise, allInTotal))
             }
           >
             {t("pot")}
-          </button>
-          <button
-            className={button()}
-            onClick={() =>
-              setInputValue(
-                betValidator(allIn, minRaise, currentStack + currentBet)
-              )
-            }
-          >
-            {t("allIn")}
           </button>
         </div>
         <div className="w-40 pb-2 sm:w-72">
@@ -152,7 +119,7 @@ export default function RaiseInput({ showRaise, setShowRaise }: raiseProps) {
             value={inputValue}
             onChange={setInputValue}
             min={minRaise}
-            max={currentStack + currentBet}
+            max={allInTotal}
             step={1}
             color="gray"
             showLabelOnHover={false}
@@ -163,10 +130,8 @@ export default function RaiseInput({ showRaise, setShowRaise }: raiseProps) {
       </div>
       <InputButton
         action={() => handleRaise(appState.username, inputValue - currentBet)}
-        title={t("bet")}
-        disabled={
-          inputValue < minRaise || inputValue > currentStack + currentBet
-        }
+        title={isAllIn ? t("allIn") : t("bet")}
+        disabled={inputValue < minRaise || inputValue > allInTotal}
       />
       <InputButton
         action={() => setShowRaise(!showRaise)}

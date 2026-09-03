@@ -115,6 +115,7 @@ export function SocketProvider(props: SocketProviderProps) {
               betting: event.game.betting,
               config: event.game.config,
               players: event.game.players,
+              departedPlayers: event.game.departedPlayers ?? [],
               pots: event.game.pots,
               minRaise: event.game.minRaise,
               readyCount: event.game.readyCount,

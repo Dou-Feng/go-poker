@@ -145,7 +145,7 @@ export type CreateTableOptions = {
   sb?: number;
   bb?: number;
   buyIn?: number;
-  maxBuyIns?: number;
+  maxBuy?: number;
   maxPlayers?: number;
   handsLimit?: number;
 };

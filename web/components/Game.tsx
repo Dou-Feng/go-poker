@@ -1,13 +1,15 @@
 import { useContext, useState, useEffect } from "react";
 import ChatLog from "./ChatLog";
+import Chip from "./Chip";
+import EyeIcon from "./EyeIcon";
 import GameInfo from "./GameInfo";
-import Start from "./Start";
 import Input from "./Input";
 import Table from "./Table";
 import Wallet from "./Wallet";
 import Settlement from "./Settlement";
 import Settings from "./Settings";
 import RoomStats from "./RoomStats";
+import Rebuy from "./Rebuy";
 import { AppContext } from "../providers/AppStore";
 import { useSocket } from "../hooks/useSocket";
 import { useTranslation } from "../hooks/useTranslation";
@@ -79,6 +81,7 @@ export default function Game() {
           </p>
         </div>
       )}
+      <Rebuy />
       {me && game && (
         <button
           onClick={() => {
@@ -88,16 +91,25 @@ export default function Game() {
             setReservedSpectate(!reservedSpectate);
             spectate(socket);
           }}
-          className={`absolute bottom-44 right-2 z-30 rounded-sm border px-3 py-1.5 text-sm font-semibold sm:bottom-48 ${
+          className={`absolute bottom-52 right-2 z-30 inline-flex flex-row items-center gap-1.5 rounded-sm border px-3 py-1.5 text-sm font-semibold sm:bottom-56 ${
             reservedSpectate
               ? "border-amber-500 bg-amber-600 text-white hover:bg-amber-500"
               : "border-neutral-500 text-neutral-300 hover:bg-neutral-700"
           }`}
         >
-          {reservedSpectate ? "✓ " : ""}
+          {reservedSpectate ? (
+            <span className="flex h-4 w-4 items-center justify-center leading-none">
+              ✓
+            </span>
+          ) : (
+            <EyeIcon className="h-4 w-4" />
+          )}
           {t("spectate")}
         </button>
       )}
+      <div className="absolute bottom-40 right-2 z-30 sm:bottom-44">
+        <RoomStats />
+      </div>
       <div className="absolute inset-x-0 bottom-0 z-10 flex flex-col sm:block">
         <div className="w-full sm:pointer-events-none sm:absolute sm:inset-x-0 sm:bottom-0 sm:z-20">
           <Input />
@@ -126,18 +138,29 @@ export default function Game() {
           </button>
         )}
       </div>
-      <div className="absolute top-0 right-0 z-10 flex flex-row items-start gap-1 p-2 sm:hidden">
-        <RoomStats />
+      <div className="absolute top-0 right-0 z-10 flex flex-col items-end gap-1 p-2 sm:hidden">
         <Wallet />
+        {me && game && (
+          <div className="inline-flex w-20 flex-row items-center justify-between rounded-md bg-zinc-800/90 px-2.5 py-1 text-sm text-amber-300">
+            <Chip className="h-4 w-4" />
+            <span className="font-mono font-semibold leading-none">
+              {me.stack}
+            </span>
+          </div>
+        )}
       </div>
       <div className="absolute top-0 right-0 z-10 hidden flex-col items-end gap-2 p-2 sm:flex">
         <GameInfo />
         <Wallet />
-        <RoomStats />
+        {me && game && (
+          <div className="inline-flex w-20 flex-row items-center justify-between rounded-md bg-zinc-800/90 px-2.5 py-1 text-sm text-amber-300 shadow">
+            <Chip className="h-4 w-4" />
+            <span className="font-mono font-semibold leading-none">
+              {me.stack}
+            </span>
+          </div>
+        )}
         <Settings />
-      </div>
-      <div className="absolute bottom-0 right-0 z-30">
-        <Start />
       </div>
       <Settlement />
     </div>

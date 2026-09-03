@@ -2,6 +2,7 @@ import { useContext } from "react";
 import { AppContext } from "../providers/AppStore";
 import { Game, Player } from "../interfaces/index";
 import Card from "./Card";
+import Chip from "./Chip";
 import classNames from "classnames";
 import { useTranslation } from "../hooks/useTranslation";
 import { useSocket } from "../hooks/useSocket";
@@ -9,8 +10,6 @@ import {
   toggleReady,
   takeSeat,
   sendLog,
-  rebuy,
-  undoBuyIn,
   moveSeat,
   showHand,
 } from "../actions/actions";
@@ -19,18 +18,21 @@ import Avatar from "./Avatar";
 type seatProps = {
   player: Player | null;
   id: number;
+  visualId?: number;
   reveal: boolean;
 };
 
 function chipPosition(id: number) {
   return classNames(
     {
-      "right-[60%] top-[-45%] flex-row": id === 1,
-      "right-[30%] top-[-40%] flex-row": id === 2,
-      "right-[-20%] top-[20%] flex-col": id === 3,
-      "right-[30%] bottom-[-40%] flex-row": id === 4,
-      "right-[60%] bottom-[-40%] flex-row": id === 5,
-      "left-[-23%] top-[15%] flex-col": id === 6,
+      // The chip (bet amount / dealer) sits on the side of the seat that
+      // faces the table center.
+      "left-1/2 -translate-x-1/2 -top-6 flex-row": id === 1, // bottom
+      "right-1 -top-9 flex-row": id === 2, // bottom-left
+      "right-1 top-full mt-1 flex-col": id === 3, // top-left
+      "left-1/2 -translate-x-1/2 top-full mt-1 flex-row": id === 4, // top
+      "left-1 top-full mt-1 flex-row": id === 5, // top-right
+      "left-1 -top-9 flex-row": id === 6, // bottom-right
     },
     "absolute flex items-center justify-start z-10"
   );
@@ -59,11 +61,11 @@ function active(player: Player, game: Game) {
       "bg-zinc-900 text-neutral-100 ": !winner && !game.betting,
     },
 
-    "rounded-xl m-1 sm:m-4 h-16 w-32 sm:h-20 sm:w-56 flex flex-row justify-start items-center z-2"
+    "rounded-xl flex flex-row justify-start items-center z-2"
   );
 }
 
-export default function Seat({ player, id, reveal }: seatProps) {
+export default function Seat({ player, id, visualId, reveal }: seatProps) {
   const { appState, dispatch } = useContext(AppContext);
   const socket = useSocket();
   const { t } = useTranslation();
@@ -76,9 +78,6 @@ export default function Seat({ player, id, reveal }: seatProps) {
     const isMine = player.uuid === appState.clientID;
     const hidden = running && !isMine;
     const left = player.left;
-    const buyIn = game.config.buyIn ?? 200;
-    const atMax =
-      game.config.maxBuy > 0 && player.totalBuyIn + buyIn > game.config.maxBuy;
     const openStats = () => {
       dispatch({
         type: "setProfile",
@@ -123,6 +122,9 @@ export default function Seat({ player, id, reveal }: seatProps) {
         <div
           className={classNames(
             active(player, game),
+            isMine || !running
+              ? "m-1 h-16 w-32 sm:m-4 sm:h-20 sm:w-56"
+              : "m-0.5 h-16 w-32 sm:m-2 sm:h-20 sm:w-44",
             left && "opacity-40 grayscale",
             "relative"
           )}
@@ -176,36 +178,10 @@ export default function Seat({ player, id, reveal }: seatProps) {
                   {player.username}
                 </p>
                 <div className="flex flex-row items-center gap-1">
+                  <Chip className="h-4 w-4 sm:h-5 sm:w-5" />
                   <p className="font-mono text-base font-semibold text-amber-300 sm:text-lg">
                     {player.stack}
                   </p>
-                  {isMine && !player.ready && !atMax && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (socket) {
-                          rebuy(socket, buyIn);
-                        }
-                      }}
-                      className="rounded-sm bg-emerald-800 px-1.5 py-0.5 text-xs font-medium text-white hover:bg-emerald-700"
-                    >
-                      +{buyIn}
-                    </button>
-                  )}
-                  {isMine && !player.ready && player.totalBuyIn > 0 && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (socket) {
-                          undoBuyIn(socket);
-                        }
-                      }}
-                      title={t("undo")}
-                      className="rounded-sm bg-neutral-600 px-1.5 py-0.5 text-xs font-medium text-white hover:bg-neutral-500"
-                    >
-                      ↩
-                    </button>
-                  )}
                 </div>
               </div>
             </div>
@@ -236,15 +212,18 @@ export default function Seat({ player, id, reveal }: seatProps) {
               <p className="truncate pr-1 text-base font-medium text-white sm:text-lg">
                 {player.username}
               </p>
-              <p className="font-mono text-base font-semibold text-amber-300 sm:text-lg">
-                {player.stack}
-              </p>
+              <div className="flex flex-row items-center gap-1">
+                <Chip className="h-4 w-4 sm:h-5 sm:w-5" />
+                <p className="font-mono text-base font-semibold text-amber-300 sm:text-lg">
+                  {player.stack}
+                </p>
+              </div>
             </div>
           ))}
-        <div className={chipPosition(id)}>
+        <div className={chipPosition(visualId ?? id)}>
           {running && game.dealer == player.position && (
-            <div className="mx-1 my-1 flex h-5 w-6 items-center justify-center rounded-[50%] bg-white text-sm font-bold text-purple-800 sm:mx-3 sm:my-3 sm:h-7 sm:w-8 sm:text-xl">
-              D
+            <div className="mx-0.5 my-0.5 flex h-5 w-6 items-center justify-center text-sm sm:mx-1 sm:my-1 sm:h-7 sm:w-8 sm:text-xl">
+              🔔
             </div>
           )}
           {player.bet !== 0 && (

@@ -202,7 +202,7 @@ func handleListTables(c *Client) {
 	c.send <- createTableList(c.hub.listTables())
 }
 
-func handleCreateTable(c *Client, tablename string, password string, sb uint, bb uint, buyIn uint, maxBuyIns uint, maxPlayers uint, handsLimit uint) {
+func handleCreateTable(c *Client, tablename string, password string, sb uint, bb uint, buyIn uint, maxBuy uint, maxPlayers uint, handsLimit uint) {
 	table, created := c.hub.createTableIfAbsent(tablename, password)
 	if !created {
 		c.send <- createResult(actionCreateResult, false, "room already exists", "")
@@ -218,13 +218,13 @@ func handleCreateTable(c *Client, tablename string, password string, sb uint, bb
 	if buyIn == 0 {
 		buyIn = 200
 	}
-	if maxBuyIns == 0 {
-		maxBuyIns = 2
+	if maxBuy == 0 {
+		maxBuy = buyIn * 2
 	}
 	if maxPlayers == 0 {
 		maxPlayers = 6
 	}
-	poker.Configure(table.game, sb, bb, buyIn, buyIn*maxBuyIns, maxPlayers, handsLimit)
+	poker.Configure(table.game, sb, bb, buyIn, maxBuy, maxPlayers, handsLimit)
 
 	c.table = table
 	table.register <- c
@@ -402,14 +402,12 @@ func handleRebuy(c *Client, amount uint) {
 		return
 	}
 
-	view := c.table.game.GenerateOmniView()
-
-	// Use the room's fixed buy-in amount when one is configured.
-	amount = view.Config.BuyIn
 	if amount == 0 {
 		c.send <- createError("amount must be positive")
 		return
 	}
+
+	view := c.table.game.GenerateOmniView()
 
 	position := -1
 	for i := range view.Players {
@@ -420,10 +418,6 @@ func handleRebuy(c *Client, amount uint) {
 	}
 	if position < 0 {
 		c.send <- createError("you are not seated")
-		return
-	}
-	if view.Players[position].In {
-		c.send <- createError("cannot rebuy during a hand")
 		return
 	}
 
@@ -674,6 +668,18 @@ func handleDealGame(c *Client) {
 		if err := poker.RunoutNext(c.table.game); err != nil {
 			slog.Default().Warn("Runout next", "error", err)
 		}
+		c.table.broadcastGame()
+		return
+	}
+
+	// Apply pending spectate reservations before dealing the next hand. This
+	// lets the previous hand's settlement animation play out first.
+	c.table.applySpectateReservations()
+
+	// If the room paused (e.g. a player just moved to spectate) or no longer
+	// has enough players, broadcast the paused state instead of dealing.
+	view = c.table.game.GenerateOmniView()
+	if !view.Running || len(view.Players) < 2 {
 		c.table.broadcastGame()
 		return
 	}

@@ -11,11 +11,18 @@ export default function WalletButton({ onOpen }: WalletButtonProps) {
   return (
     <button
       onClick={onOpen}
-      className="inline-flex flex-row items-center gap-1.5 rounded-md bg-zinc-800/90 px-2.5 py-1 text-sm font-medium text-white shadow hover:bg-zinc-700"
+      className="inline-flex w-20 flex-row items-center justify-between rounded-md bg-zinc-800/90 px-2.5 py-1 text-sm font-medium text-amber-300 shadow hover:bg-zinc-700"
     >
-      <span aria-hidden>💰</span>
-      <span>{appState.chips ?? 0}</span>
-      <span className="font-semibold text-emerald-400">+</span>
+      <img
+        src="/wallet.svg"
+        alt=""
+        draggable={false}
+        aria-hidden
+        className="h-4 w-4"
+      />
+      <span className="font-mono font-semibold leading-none">
+        {appState.chips ?? 0}
+      </span>
     </button>
   );
 }

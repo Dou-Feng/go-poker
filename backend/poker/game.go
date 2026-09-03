@@ -78,6 +78,7 @@ type Game struct {
 	flags             gameFlags
 	config            GameConfig
 	players           []player
+	departedPlayers   []player
 	deck              Deck
 	pots              []Pot
 	minRaise          uint
@@ -219,6 +220,12 @@ func (g *Game) canOpen(pn uint) bool {
 // dropPlayer removes the player at index pn from the game and remaps the
 // position bookkeeping. It assumes the game mutex is held.
 func (g *Game) dropPlayer(pn uint) {
+	// Snapshot the departing player for the room scoreboard. Cards are
+	// cleared so departed players never leak their hole cards.
+	snap := g.players[pn]
+	snap.Cards = [2]Card{0, 0}
+	g.departedPlayers = append(g.departedPlayers, snap)
+
 	shift := func(n *uint) {
 		if *n > pn {
 			*n--
@@ -327,6 +334,7 @@ func Pause(g *Game) {
 		g.players[i].Cards = [2]Card{0, 0}
 		g.players[i].Revealed = false
 	}
+	g.pots = []Pot{}
 	g.running = false
 	g.setStageAndBetting(PreDeal, false)
 }
@@ -349,6 +357,14 @@ func (g *Game) resetForNextHand() {
 	}
 
 	g.handsPlayed++
+
+	// Apply rebuys queued during the previous hand.
+	for i := range g.players {
+		if g.players[i].PendingBuyIn > 0 {
+			g.players[i].Stack += g.players[i].PendingBuyIn
+			g.players[i].PendingBuyIn = 0
+		}
+	}
 
 	paused := hadLeft
 	if !paused {
@@ -680,6 +696,7 @@ func (g *Game) Start() error {
 func (g *Game) Reset() {
 	g.running = false
 	g.players = []player{}
+	g.departedPlayers = []player{}
 	g.pots = []Pot{}
 	g.communityCards = make([]Card, 5)
 	g.deck = DefaultDeck
@@ -689,10 +706,11 @@ func (g *Game) Reset() {
 	g.biggestPotWinners = nil
 }
 
-// RunoutNext reveals the next board card when every remaining player is
-// all-in. It reveals one card at a time (the flop cards individually, then the
-// turn and river) so the client can animate each flip. Once the river has been
-// dealt it resolves the showdown and resets for the next hand.
+// RunoutNext reveals the next board card(s) when every remaining player is
+// all-in. The flop is dealt as three cards at once (flipped together), then
+// the turn and river are revealed one at a time so the client can animate
+// each flip. Once the river has been dealt it resolves the showdown and resets
+// for the next hand.
 func RunoutNext(g *Game) error {
 	g.mtx.Lock()
 	defer g.mtx.Unlock()
@@ -713,14 +731,20 @@ func RunoutNext(g *Game) error {
 		return nil
 	}
 
-	g.communityCards[revealed] = g.deck.Pop()
-	switch revealed {
-	case 0, 1, 2:
+	if revealed == 0 {
+		// Deal the whole flop at once so the three cards flip together.
+		g.communityCards[0] = g.deck.Pop()
+		g.communityCards[1] = g.deck.Pop()
+		g.communityCards[2] = g.deck.Pop()
 		g.setStage(Flop)
-	case 3:
-		g.setStage(Turn)
-	case 4:
-		g.setStage(River)
+	} else {
+		g.communityCards[revealed] = g.deck.Pop()
+		switch revealed {
+		case 3:
+			g.setStage(Turn)
+		case 4:
+			g.setStage(River)
+		}
 	}
 	g.setBetting(false)
 	return nil

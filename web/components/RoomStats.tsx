@@ -9,16 +9,20 @@ export default function RoomStats() {
   const { t } = useTranslation();
   const [show, setShow] = useState(false);
 
-  const players = appState.game?.players ?? [];
+  const players = [
+    ...(appState.game?.players ?? []),
+    ...(appState.game?.departedPlayers ?? []),
+  ];
 
   return (
     <>
       <button
         onClick={() => setShow(true)}
         title={t("roomStats")}
-        className="rounded-sm border border-neutral-600 px-2 py-1 text-xs text-neutral-400 hover:text-neutral-200"
+        className="inline-flex flex-row items-center gap-1.5 rounded-sm border border-neutral-500 px-3 py-1.5 text-sm font-semibold text-neutral-300 hover:bg-neutral-700"
       >
         <FiBarChart2 size="1rem" />
+        {t("roomStats")}
       </button>
 
       {show && (

@@ -33,23 +33,24 @@ type PlayerStats struct {
 }
 
 type player struct {
-	Username    string      `json:"username"`
-	UUID        string      `json:"uuid"`
-	Position    uint        `json:"position"`
-	SeatID      uint        `json:"seatID"`
-	Ready       bool        `json:"ready"`
-	In          bool        `json:"in"`
-	Called      bool        `json:"called"`
-	Left        bool        `json:"left"`
-	TotalBuyIn  uint        `json:"totalBuyIn"`
-	Stack       uint        `json:"stack"`
-	Bet         uint        `json:"bet"`
-	TotalBet    uint        `json:"totalBet"`
-	Cards       [2]Card     `json:"cards"`
-	Stats       PlayerStats `json:"stats"`
-	Avatar      string      `json:"avatar"`
-	AvatarImage bool        `json:"avatarImage"`
-	Revealed    bool        `json:"revealed"`
+	Username     string      `json:"username"`
+	UUID         string      `json:"uuid"`
+	Position     uint        `json:"position"`
+	SeatID       uint        `json:"seatID"`
+	Ready        bool        `json:"ready"`
+	In           bool        `json:"in"`
+	Called       bool        `json:"called"`
+	Left         bool        `json:"left"`
+	TotalBuyIn   uint        `json:"totalBuyIn"`
+	PendingBuyIn uint        `json:"-"`
+	Stack        uint        `json:"stack"`
+	Bet          uint        `json:"bet"`
+	TotalBet     uint        `json:"totalBet"`
+	Cards        [2]Card     `json:"cards"`
+	Stats        PlayerStats `json:"stats"`
+	Avatar       string      `json:"avatar"`
+	AvatarImage  bool        `json:"avatarImage"`
+	Revealed     bool        `json:"revealed"`
 }
 
 func (p *player) allIn() bool {

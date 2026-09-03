@@ -14,8 +14,8 @@ function seatPosition(
   total: number
 ): { left: string; top: string } {
   const angle = Math.PI / 2 + index * ((2 * Math.PI) / total);
-  const rx = 36;
-  const ry = 40;
+  const rx = 34;
+  const ry = 37;
   return {
     left: `${50 + rx * Math.cos(angle)}%`,
     top: `${50 + ry * Math.sin(angle)}%`,
@@ -118,6 +118,13 @@ export default function Table() {
   const mountedRef = useRef(true);
 
   const maxPlayers = game?.config.maxPlayers ?? 6;
+
+  // Once the game is running, rotate the table so the current player's seat
+  // sits at the bottom (map-style rotation), while preserving every other
+  // player's relative position. Before the game starts, seats keep their
+  // absolute positions for seat selection.
+  const seatRotation =
+    game?.running && me ? (me.seatID - 1 + maxPlayers) % maxPlayers : 0;
 
   // Number of revealed board cards: each flip changes this even though the
   // flop cards all share the same stage.
@@ -284,7 +291,8 @@ export default function Table() {
           </div>
         )}
         {seats.map((player, i) => {
-          const pos = seatPosition(i, maxPlayers);
+          const visualIndex = (i - seatRotation + maxPlayers) % maxPlayers;
+          const pos = seatPosition(visualIndex, maxPlayers);
           return (
             <div
               key={i}
@@ -294,6 +302,7 @@ export default function Table() {
               <Seat
                 player={player}
                 id={i + 1}
+                visualId={visualIndex + 1}
                 reveal={player ? revealedPlayers.includes(player) : false}
               />
             </div>

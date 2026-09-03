@@ -106,6 +106,7 @@ export type Game = {
   betting: boolean;
   config: Config;
   players: Player[];
+  departedPlayers: Player[];
   pots: Pot[];
   minRaise: number;
   readyCount: number;
