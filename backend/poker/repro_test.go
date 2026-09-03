@@ -876,3 +876,131 @@ func TestAllInLeaveRunoutCompletes(t *testing.T) {
 		t.Fatalf("expected 1 player remaining, got %d", len(view.Players))
 	}
 }
+
+// A flop all-in that is called must still reveal the turn and river one at a
+// time before settling, instead of skipping straight to the next hand.
+func TestFlopAllInRunoutRevealsTurnAndRiver(t *testing.T) {
+	g := NewGame()
+	Configure(g, 1, 2, 100, 100, 2, 0)
+
+	a := g.AddPlayer()
+	b := g.AddPlayer()
+
+	for _, pn := range []uint{a, b} {
+		if err := BuyIn(g, pn, 100); err != nil {
+			t.Fatalf("buyin %d: %v", pn, err)
+		}
+		if err := ToggleReady(g, pn, 0); err != nil {
+			t.Fatalf("ready %d: %v", pn, err)
+		}
+	}
+	if err := Deal(g, a, 0); err != nil {
+		t.Fatalf("deal: %v", err)
+	}
+
+	// Preflop: a (dealer/SB) calls, b (BB) checks.
+	if err := Bet(g, a, 1); err != nil {
+		t.Fatalf("a call: %v", err)
+	}
+	if err := Bet(g, b, 0); err != nil {
+		t.Fatalf("b check: %v", err)
+	}
+
+	// The flop has been dealt; b (first to act post-flop) shoves and a calls all-in.
+	if g.getStage() != Flop {
+		t.Fatalf("expected flop, got stage %d", g.getStage())
+	}
+	if err := Bet(g, b, 98); err != nil {
+		t.Fatalf("b all-in: %v", err)
+	}
+	if err := Bet(g, a, 98); err != nil {
+		t.Fatalf("a call: %v", err)
+	}
+	if g.getBetting() {
+		t.Fatalf("betting should be off after both players are all-in")
+	}
+
+	// Drive the runout: exactly two more cards (turn + river) must be dealt.
+	revealed := 0
+	for g.getStage() != PreDeal {
+		if err := RunoutNext(g); err != nil {
+			t.Fatalf("runout: %v", err)
+		}
+		if g.getStage() != PreDeal {
+			revealed++
+		}
+	}
+	if revealed != 2 {
+		t.Fatalf("expected turn + river (2 cards), got %d", revealed)
+	}
+
+	// Chips must be conserved: 200 total, the winner gets it all.
+	view := g.GenerateOmniView()
+	total := uint(0)
+	for _, p := range view.Players {
+		total += p.Stack
+	}
+	if total != 200 {
+		t.Fatalf("chips should be conserved (200), got %d", total)
+	}
+}
+
+// A short stack that goes all-in on the flop and is called must still reveal
+// the turn and river before settling.
+func TestShortAllInFlopRevealsTurnAndRiver(t *testing.T) {
+	g := NewGame()
+	Configure(g, 1, 2, 100, 100, 2, 0)
+
+	a := g.AddPlayer()
+	b := g.AddPlayer()
+
+	for _, pn := range []uint{a, b} {
+		if err := BuyIn(g, pn, 100); err != nil {
+			t.Fatalf("buyin %d: %v", pn, err)
+		}
+		if err := ToggleReady(g, pn, 0); err != nil {
+			t.Fatalf("ready %d: %v", pn, err)
+		}
+	}
+	if err := Deal(g, a, 0); err != nil {
+		t.Fatalf("deal: %v", err)
+	}
+
+	// Preflop: a (dealer/SB) calls, b (BB) checks.
+	if err := Bet(g, a, 1); err != nil {
+		t.Fatalf("a call: %v", err)
+	}
+	if err := Bet(g, b, 0); err != nil {
+		t.Fatalf("b check: %v", err)
+	}
+
+	// The flop is dealt. Make a a short stack, then b shoves and a calls
+	// all-in for less.
+	if g.getStage() != Flop {
+		t.Fatalf("expected flop, got stage %d", g.getStage())
+	}
+	g.players[a].Stack = 50
+	if err := Bet(g, b, 98); err != nil {
+		t.Fatalf("b all-in: %v", err)
+	}
+	if err := Bet(g, a, 50); err != nil {
+		t.Fatalf("a call all-in: %v", err)
+	}
+	if g.getBetting() {
+		t.Fatalf("betting should be off after both are all-in")
+	}
+
+	// Drive the runout: exactly two more cards (turn + river) must be dealt.
+	revealed := 0
+	for g.getStage() != PreDeal {
+		if err := RunoutNext(g); err != nil {
+			t.Fatalf("runout: %v", err)
+		}
+		if g.getStage() != PreDeal {
+			revealed++
+		}
+	}
+	if revealed != 2 {
+		t.Fatalf("expected turn + river (2 cards), got %d", revealed)
+	}
+}

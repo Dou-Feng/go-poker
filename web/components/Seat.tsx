@@ -104,6 +104,13 @@ export default function Seat({ player, id, reveal }: seatProps) {
           showHand(socket);
         }
       } else if (isMine && !running) {
+        if (player.stack === 0) {
+          dispatch({
+            type: "setAuthError",
+            payload: "not enough chips to ready",
+          });
+          return;
+        }
         if (socket) {
           toggleReady(socket);
         }

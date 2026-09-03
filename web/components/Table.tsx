@@ -98,6 +98,13 @@ export default function Table() {
   const game = appState.game;
   const me = game?.players.find((p) => p.uuid === appState.clientID);
   const queued = !me && !!game?.waiting.includes(appState.username ?? "");
+  // Only one client drives the all-in runout (and the post-settlement deal).
+  // Otherwise every seated/spectating client sends deal-game in the same
+  // interval, flipping the turn + river + settlement almost at once and
+  // making the river appear to be skipped.
+  const runoutDriver = game?.players.find((p) => !p.left);
+  const isRunoutDriver =
+    !!me && !!runoutDriver && me.position === runoutDriver.position;
   const buyIn = game?.config.buyIn ?? 0;
   const maxBuyIns =
     buyIn > 0 ? Math.floor((game?.config.maxBuy ?? 0) / buyIn) : 0;
@@ -107,6 +114,8 @@ export default function Table() {
   const [winners, setWinners] = useState<WinnerResult[]>([]);
   const [forfeited, setForfeited] = useState(false);
   const shownHandRef = useRef<string>("");
+  const dismissTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const mountedRef = useRef(true);
 
   const maxPlayers = game?.config.maxPlayers ?? 6;
 
@@ -126,7 +135,7 @@ export default function Table() {
   useEffect(() => {
     // Reveal the board one card at a time during an all-in runout: betting is
     // off while the board is still incomplete.
-    if (!game || !socket) {
+    if (!game || !socket || !isRunoutDriver) {
       return;
     }
     const inRunout =
@@ -138,7 +147,14 @@ export default function Table() {
       dealGame(socket);
     }, 900);
     return () => clearTimeout(timer);
-  }, [game?.running, game?.betting, game?.stage, boardCount, socket]);
+  }, [
+    game?.running,
+    game?.betting,
+    game?.stage,
+    boardCount,
+    isRunoutDriver,
+    socket,
+  ]);
 
   useEffect(() => {
     // this effect triggers when betting is over
@@ -146,8 +162,15 @@ export default function Table() {
       return;
     }
     if (game.pots.length === 0) {
-      // A new hand is in progress: reset the result marker.
+      // A new hand is in progress: clear the settlement result and timer.
       shownHandRef.current = "";
+      setRevealedPlayers([]);
+      setWinners([]);
+      setForfeited(false);
+      if (dismissTimerRef.current) {
+        clearTimeout(dismissTimerRef.current);
+        dismissTimerRef.current = null;
+      }
       return;
     }
     if (game.stage !== 1) {
@@ -162,7 +185,7 @@ export default function Table() {
       ? "forfeit:" + forfeitPot.amount
       : results.map((r) => r.player.position + ":" + r.amount).join(",");
     if (shownHandRef.current === sig) {
-      // Already shown for this settled hand (e.g. a failed deal).
+      // Already showing this settled hand: leave the dismissal timer running.
       return;
     }
     shownHandRef.current = sig;
@@ -176,18 +199,30 @@ export default function Table() {
     } else {
       handleWinner(game, socket);
     }
-    const timer = setTimeout(() => {
+    if (dismissTimerRef.current) {
+      clearTimeout(dismissTimerRef.current);
+    }
+    dismissTimerRef.current = setTimeout(() => {
+      dismissTimerRef.current = null;
+      if (!mountedRef.current) {
+        return;
+      }
       setRevealedPlayers([]);
       setWinners([]);
       setForfeited(false);
-      if (socket) {
+      if (socket && isRunoutDriver) {
         dealGame(socket);
       }
     }, 5000);
-    return () => {
-      clearTimeout(timer);
-    };
   }, [game?.stage, game?.pots?.length]);
+
+  // Track mounted state so a pending dismissal timer can no-op after unmount.
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
 
   return (
     <div className="relative flex h-full w-full items-start justify-center">

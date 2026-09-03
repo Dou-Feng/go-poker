@@ -663,6 +663,9 @@ func handleResetGame(c *Client) {
 }
 
 func handleDealGame(c *Client) {
+	if c.table == nil {
+		return
+	}
 	view := c.table.game.GenerateOmniView()
 
 	// All-in runout: reveal the board one card at a time and resolve at the
