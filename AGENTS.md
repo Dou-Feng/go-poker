@@ -7,7 +7,7 @@ Real-time multiplayer poker: Go backend (`backend/`) + Next.js frontend (`web/`)
 Two independent apps; the Go server serves the built Next.js static export.
 
 - **`backend/poker/`** — pure game-logic library. No network/persistence deps (only a card-eval lib and `uuid`). Contains the mutable `Game` state machine, player model, betting actions, and JSON view generation.
-- **`backend/server/`** — transport layer: `chi` HTTP router, `gorilla/websocket` at `/ws`, Redis pub/sub, and wire-message marshalling. Imports `poker`; `poker` never imports `server`. Redis is also used as a key/value store for user accounts (`store.go`: `gopoker:user:<name>` holds chips + lifetime stats).
+- **`backend/server/`** — transport layer: `chi` HTTP router, `gorilla/websocket` at `/ws`, Redis pub/sub, and wire-message marshalling. Imports `poker`; `poker` never imports `server`. Redis is also used as a key/value store for user accounts (`store.go`: users are keyed by UUID — `gopoker:user:<uuid>` holds chips + lifetime stats, `gopoker:username:<name>` maps username → UUID alias). `events.go` holds server→client event names.
 - **`backend/cmd/go-poker/main.go`** — thin bootstrap: loads `.env`, constructs and runs the server.
 - **`web/`** — Next.js (pages router) client. State lives in `providers/AppStore.tsx` (React Context + `useReducer`); `providers/WebSocket.tsx` owns the single socket connection.
 - **Client flow** is a three-screen state machine in `pages/index.tsx`: `Register` (unique username) → `Lobby` (list/join/create rooms) → `Game`. Session/user data is persisted in `web/lib/session.ts` (`gopoker-user`, `gopoker-session`) so a reload reconnects to the prior room; `Register.tsx` and `Lobby.tsx` are the new screens.
@@ -41,15 +41,16 @@ make start     # run backend and frontend together
 - Components read global state via `useContext(AppContext)` and mutate it only through `dispatch`; local UI state is `useState`.
 - Styling: Tailwind CSS + the `classnames` helper; `@mantine/core` is used only for the `Slider` in `RaiseInput`.
 - Client/server wire protocol: JSON messages discriminated by an `action` field (client `actions/actions.ts`; server `messages.go`). Types in `web/interfaces/index.ts` mirror the `poker` view structs 1:1 — keep them in sync when changing backend JSON tags.
+- UI text is bilingual (Chinese/English): `web/lib/language.ts` resolves the locale (browser language, then IP geolocation) and must stay synchronous to avoid SSR/client hydration mismatches; strings are translated via the dictionaries it serves. `LanguageToggle.tsx` switches at runtime.
+- Chat is split into chat vs. hand-history log tabs under `web/components/ChatLog/`.
 
 ## Pitfalls
 
 - **Broadcasts round-trip through Redis.** `table.run` publishes to a Redis channel and the same process re-subscribes before pushing to clients. Redis is therefore required even for local single-server runs; the server fails hard if `REDIS_URL` is unreachable.
 - **`GenerateOmniView()` leaks every hole card.** The server currently broadcasts it to all clients (`createUpdatedGame`); use `GeneratePlayerView(pn)` for per-player censored views if you touch this.
 - **Locking is inconsistent:** `AddPlayer()`, `Start()`, and `Reset()` mutate shared state without taking `g.mtx`, unlike other exported actions. Take the lock if you modify these.
-- **`SetSeatID` panics** on `data == 0` instead of returning an error.
-- **Known client/server mismatch:** client `Config` expects `maxBuyIn`, but backend `GameConfig` emits `json:"maxBuy"` — the buy-in input always falls back to its `2000` default.
-- **Client uses the native `WebSocket` API**, not socket.io (the `socket.io*` deps are unused). The connection lives in `providers/WebSocket.tsx`, where `onmessage` is assigned in the render body and cleanup closes a stale `null` closure — dev mode opens duplicate connections under React StrictMode.
+- **SetSeatID panics** on `data == 0` instead of returning an error.
+- Client uses the native `WebSocket` API, not socket.io (the `socket.io*` deps are unused). The connection lives in `providers/WebSocket.tsx`, where `onmessage` is assigned in the render body and cleanup closes a stale `null` closure — dev mode opens duplicate connections under React StrictMode.
 - **Reducer throws on unknown actions** (`AppStore.tsx` default case) — the client crashes on an unrecognized server event.
 - **The game screen is a fixed-size desktop layout** (`Game.tsx` overlays + fixed `w-56`/`w-96`/`w-64` widths). On mobile the action bar (`Input`/`RaiseInput`), seats, and chat panel overflow off-screen; keep new UI responsive with `sm:`-prefixed Tailwind classes and keep primary buttons inside a full-width bottom bar.
 - Dead/unused code to be aware of: `web/components/TableOld.tsx`, `web/hooks/useEffectCallback.ts`, and `Hub.broadcast` in `backend/server/hub.go`.
@@ -58,3 +59,4 @@ make start     # run backend and frontend together
 
 - [backend/poker/README.md](backend/poker/README.md) — licensing note: this package is a fork of the Riverboat library.
 - [README.md](README.md) — setup, Docker Compose, and demo link.
+- `change.md` — running feature-request checklist (in Chinese) driving recent work; check it before scoping feature changes.

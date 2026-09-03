@@ -40,6 +40,7 @@ export default function Profile() {
   const [showPicker, setShowPicker] = useState(false);
   const [showChangeUsername, setShowChangeUsername] = useState(false);
   const [newUsername, setNewUsername] = useState("");
+  const [copied, setCopied] = useState(false);
   const profile: ProfileType | null = appState.profile;
   const stats: PlayerStats | null = profile ? profile.stats : null;
 
@@ -105,6 +106,22 @@ export default function Profile() {
                 <p className="text-sm text-neutral-500">
                   {t("chips")}: {profile.chips}
                 </p>
+              )}
+              {profile.uuid && (
+                <button
+                  onClick={() => {
+                    navigator.clipboard?.writeText(profile.uuid ?? "");
+                    setCopied(true);
+                    window.setTimeout(() => setCopied(false), 1200);
+                  }}
+                  className="flex flex-row items-center gap-1 font-mono text-xs text-neutral-500 hover:text-neutral-300"
+                  title={profile.uuid}
+                >
+                  <span className="max-w-[180px] truncate">
+                    {t("uuid")}: {profile.uuid}
+                  </span>
+                  <span>{copied ? "✓" : "⧉"}</span>
+                </button>
               )}
             </div>
           </div>
