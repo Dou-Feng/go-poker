@@ -65,4 +65,9 @@ jspm_packages
 # Go build artifacts (air hot-reload output)
 backend/tmp/
 
+# Local toolchain install (Go SDK, GOPATH, build/module caches) — see .tools/goenv.sh
+.tools/
+
 data/
+
+.claude/
