@@ -14,7 +14,11 @@ import (
 const gameAdminName string = "system"
 
 func handleJoinTable(c *Client, tablename string, password string, playerUUID string, reconnect bool) {
-	if reconnect {
+	// A join carrying a per-session player uuid is always a session replay:
+	// the lobby never sends one. Treat it as a reconnect even when the client
+	// did not set the flag, so a phone still running an older frontend bundle
+	// cannot resurrect a recycled room.
+	if reconnect || playerUUID != "" {
 		handleReconnectTable(c, tablename, password, playerUUID)
 		return
 	}
@@ -26,12 +30,6 @@ func handleJoinTable(c *Client, tablename string, password string, playerUUID st
 	}
 	c.table = table
 	table.register <- c
-
-	// A deliberate join that still carries a player id (e.g. the lobby
-	// re-joining the same room) restores the seat when it is still there.
-	if playerUUID != "" && reconnectPlayer(c, playerUUID) {
-		return
-	}
 
 	if c.username != "" {
 		table.broadcast <- createNewMessage(gameAdminName, fmt.Sprintf("%s has joined", c.username))

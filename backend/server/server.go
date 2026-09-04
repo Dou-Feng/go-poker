@@ -136,6 +136,11 @@ func (s *Server) mountStatic() {
 			if mimeType := mime.TypeByExtension(ext); mimeType != "" {
 				w.Header().Set("Content-Type", mimeType)
 			}
+			// HTML must be revalidated on every load so a redeploy is picked
+			// up on refresh; the hashed assets it references can be cached.
+			if ext == ".html" {
+				w.Header().Set("Cache-Control", "no-cache")
+			}
 			http.ServeFile(w, r, path)
 			return
 		}
@@ -143,6 +148,7 @@ func (s *Server) mountStatic() {
 		// If file not found, serve index.html for client-side routing
 		indexPath := filepath.Join(staticDir, "index.html")
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.Header().Set("Cache-Control", "no-cache")
 		http.ServeFile(w, r, indexPath)
 	}))
 }
