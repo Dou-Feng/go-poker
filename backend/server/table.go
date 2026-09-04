@@ -23,6 +23,11 @@ const emptyTableTTL = 2 * time.Minute
 // are flushed (stack returned to wallet, stats recorded) before the room dies.
 const offlineTimeout = 60 * time.Second
 
+// flushFunc persists one player's finished table session (see
+// flushPlayerSession). It is a field on the table so tests can observe
+// evictions without a Redis instance.
+type flushFunc func(accountUUID string, room string, totalBuyIn uint, stack uint, stats poker.PlayerStats) (uint, error)
+
 // table is a single table or game of poker
 type table struct {
 	name            string
@@ -40,6 +45,8 @@ type table struct {
 	emptyTimer      *time.Timer
 	offlineTimers   map[string]*time.Timer
 	offlineMu       sync.Mutex
+	offlineAfter    time.Duration // grace period before an offline player is evicted
+	flush           flushFunc     // nil means flushPlayerSession against t.rdb
 	waiting         map[*Client]bool
 	waitingMu       sync.Mutex
 	settleVotes     map[string]bool
@@ -64,9 +71,19 @@ func newTable(name string, redisClient *redis.Client, hub *Hub) *table {
 		game:          game,
 		stop:          make(chan struct{}),
 		offlineTimers: make(map[string]*time.Timer),
+		offlineAfter:  offlineTimeout,
 		waiting:       make(map[*Client]bool),
 		settleVotes:   make(map[string]bool),
 	}
+}
+
+// flushSession persists a player's session through the injected flushFunc,
+// falling back to Redis.
+func (t *table) flushSession(accountUUID string, totalBuyIn uint, stack uint, stats poker.PlayerStats) (uint, error) {
+	if t.flush != nil {
+		return t.flush(accountUUID, t.name, totalBuyIn, stack, stats)
+	}
+	return flushPlayerSession(t.rdb, accountUUID, t.name, totalBuyIn, stack, stats)
 }
 
 func (t *table) run() {
@@ -106,7 +123,7 @@ func (t *table) markPlayerOffline(playerUUID string) {
 	if _, ok := t.offlineTimers[playerUUID]; ok {
 		return
 	}
-	t.offlineTimers[playerUUID] = time.AfterFunc(offlineTimeout, func() {
+	t.offlineTimers[playerUUID] = time.AfterFunc(t.offlineAfter, func() {
 		t.offlineMu.Lock()
 		delete(t.offlineTimers, playerUUID)
 		t.offlineMu.Unlock()
@@ -124,43 +141,95 @@ func (t *table) markPlayerOnline(playerUUID string) {
 	t.offlineMu.Unlock()
 }
 
-// timeoutPlayer folds a disconnected player out of the current hand, removes
-// them from the room, and persists their session stats and remaining stack.
+// timeoutPlayer evicts a player whose connection has been gone for longer
+// than the offline grace period. It behaves exactly like the player pressing
+// "leave" (see evictPlayer): between hands they are removed at once; during a
+// hand they are folded when the action reaches them (an all-in player stays
+// in for the showdown) and dropped when the hand ends, so the pot in play is
+// never destroyed. Their remaining stack is returned to their wallet.
 func (t *table) timeoutPlayer(playerUUID string) {
-	view := t.game.GenerateOmniView()
-	position := -1
-	for i := range view.Players {
-		if view.Players[i].UUID == playerUUID {
-			position = i
-			break
-		}
-	}
-	if position < 0 {
+	username, ok := t.evictPlayer(playerUUID)
+	if !ok {
 		return
 	}
-
-	if err := poker.SitOut(t.game, uint(position), 0); err != nil {
-		slog.Default().Warn("Timeout sit out", "error", err)
+	if username != "" {
+		t.broadcast <- createNewLog(fmt.Sprintf("%s timed out and left the table", username))
 	}
+	t.broadcastGame()
+}
 
-	// Settle the timed-out player's session with the post-fold state.
-	after := t.game.GenerateOmniView()
-	for j := range after.Players {
-		if after.Players[j].UUID == playerUUID {
-			if _, err := flushPlayerSession(t.rdb, after.Players[j].AccountUUID, t.name, after.Players[j].TotalBuyIn, after.Players[j].Stack, after.Players[j].Stats); err != nil {
-				slog.Default().Warn("Timeout flush", "error", err)
-			}
+// evictPlayer removes the seated player identified by their per-session uuid
+// from the game, settling their session (stats merged, remaining stack back
+// to the wallet, history entry) at that moment. It is the single leave path
+// shared by an explicit "leave", the offline timeout, and any future kick.
+//
+// Between hands (stage NotReady) the player is removed immediately and the
+// remaining players are put back into the ready phase. During a hand the
+// player is marked as left: they fold when the action reaches them (or right
+// away if it is their turn), an all-in player is shown down instead, and the
+// seat is released when the hand ends (resetForNextHand). The player's
+// username is returned along with whether they were seated at all.
+func (t *table) evictPlayer(playerUUID string) (string, bool) {
+	view := t.game.GenerateOmniView()
+	pos := -1
+	for i := range view.Players {
+		if view.Players[i].UUID == playerUUID {
+			pos = i
 			break
 		}
 	}
+	if pos < 0 {
+		return "", false
+	}
 
-	// Kick the player out and put the room back into the ready phase: every
-	// remaining player becomes not-ready, the game returns to the initial
-	// state, and stacks are preserved so players can rebuy without losing
-	// their chips.
-	poker.ResetToReadyPhase(t.game)
+	// Snapshot the player before folding so the session can be settled even
+	// when the fold immediately ends the hand and drops the player.
+	pre := view.Players[pos]
 
-	t.broadcastGame()
+	// Mark the player as left; they fold on their turn (or immediately if
+	// it is already their turn).
+	if err := poker.LeaveHand(t.game, uint(pos)); err != nil {
+		slog.Default().Warn("Leave hand", "error", err)
+	}
+
+	// Settle the session with the stack as it stood when they left. The fold
+	// is counted here even if it happens later, when the action reaches the
+	// departed player. An all-in player who leaves is shown down instead of
+	// folded, so no fold is counted for them.
+	stats := pre.Stats
+	if pre.In && pre.Stack > 0 {
+		stats.Folds++
+	}
+	if _, err := t.flushSession(pre.AccountUUID, pre.TotalBuyIn, pre.Stack, stats); err != nil {
+		slog.Default().Warn("Flush player", "error", err)
+	}
+
+	// Remove the player from the room once no hand is active. If they
+	// folded mid-hand they are dropped when the hand ends.
+	after := t.game.GenerateOmniView()
+	if after.Stage == poker.NotReady {
+		for j := range after.Players {
+			if after.Players[j].UUID == playerUUID {
+				if err := poker.RemovePlayer(t.game, uint(j)); err != nil {
+					slog.Default().Warn("Remove player", "error", err)
+				}
+				break
+			}
+		}
+	}
+
+	// If the room is now empty, reset the game so a re-entering player sees
+	// a fresh table instead of a stale running flag. If a player left between
+	// hands, put the room back into the ready phase so the next hand waits
+	// for everyone to ready up.
+	remaining := t.game.GenerateOmniView()
+	if len(remaining.Players) == 0 {
+		t.game.Reset()
+	} else if remaining.Stage == poker.NotReady {
+		poker.Pause(t.game)
+	}
+
+	return pre.Username, true
 }
 
 func (t *table) registerClient(client *Client) {
@@ -499,7 +568,7 @@ func (t *table) settle() {
 
 	// Record each player's session (history + lifetime stats + chips back).
 	for _, p := range view.Players {
-		if _, err := flushPlayerSession(t.rdb, p.AccountUUID, t.name, p.TotalBuyIn, p.Stack, p.Stats); err != nil {
+		if _, err := t.flushSession(p.AccountUUID, p.TotalBuyIn, p.Stack, p.Stats); err != nil {
 			slog.Default().Warn("Settle flush", "error", err)
 		}
 	}
@@ -605,7 +674,7 @@ func (t *table) applySpectate(c *Client) bool {
 	if err := poker.RemovePlayer(t.game, uint(pos)); err != nil {
 		slog.Default().Warn("Spectate remove", "error", err)
 	}
-	if _, err := flushPlayerSession(t.rdb, pre.AccountUUID, t.name, pre.TotalBuyIn, pre.Stack, stats); err != nil {
+	if _, err := t.flushSession(pre.AccountUUID, pre.TotalBuyIn, pre.Stack, stats); err != nil {
 		slog.Default().Warn("Spectate flush", "error", err)
 	}
 
@@ -673,7 +742,7 @@ func (t *table) autoSpectateBusted() {
 		}
 
 		p := view.Players[pos]
-		if _, err := flushPlayerSession(t.rdb, p.AccountUUID, t.name, p.TotalBuyIn, p.Stack, p.Stats); err != nil {
+		if _, err := t.flushSession(p.AccountUUID, p.TotalBuyIn, p.Stack, p.Stats); err != nil {
 			slog.Default().Warn("Auto spectate flush", "error", err)
 		}
 		t.clearClientUUID(p.UUID)

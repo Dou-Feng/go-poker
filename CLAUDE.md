@@ -10,8 +10,9 @@ Backend (Go 1.24, module `github.com/evanofslack/go-poker`, run from `backend/`)
 
 ```bash
 go run ./cmd/go-poker            # needs REDIS_URL; godotenv reads .env from the *working directory*, so export it or copy the root .env into backend/
-go test ./...                    # all tests live in backend/poker (white-box, same package)
+go test ./...                    # poker: engine tests; server: table eviction/reconnect tests (no Redis needed)
 go test ./poker -run 'TestAllInCallForLessThanFullAmount' -v   # single test
+go test ./server -run 'TestOfflineTimeout' -v                  # offline-eviction suite
 go vet ./...
 ```
 
@@ -59,7 +60,7 @@ Port gotcha: in hot mode the ports are swapped relative to `make start` (backend
 - Each `table` runs its own goroutine (`table.run`) with register/unregister/broadcast channels. **Every broadcast is published to a Redis channel named after the table and re-consumed by the same process** before being fanned out to clients, which is why Redis is required locally.
 - `Client.processEvents` (`client.go`) is the single dispatch switch over the `action` field; handlers live in `events.go`, request/response struct shapes in `messages.go`. Add a new message by touching all three plus `web/actions/actions.ts` and `web/providers/WebSocket.tsx`.
 - **Client-driven advancement**: the server never uses timers to advance a hand. The frontend (`web/components/Table.tsx`) elects one "runout driver" (first non-left player) whose browser sends `deal-game` after the showdown/runout animation delays. If that client is gone, the table stalls until another `deal-game` arrives.
-- Table lifecycle: a table is destroyed 2 min after its last client disconnects (`emptyTableTTL`); a disconnected player is folded and removed after 60 s (`offlineTimeout`) via `timeoutPlayer` → `ResetToReadyPhase`. Reconnects within that window restore the seat by per-session player UUID (`join-table` with `playerUUID`). A `join-table` flagged `reconnect: true` (what the browser replays from localStorage) never creates a room; if the room or seat is gone the server answers `session-expired` and the client clears its session and returns to the lobby.
+- Table lifecycle: a table is destroyed 2 min after its last client disconnects (`emptyTableTTL`); a disconnected player is evicted after 60 s (`offlineTimeout`) via `timeoutPlayer` → `table.evictPlayer`, the same path the leave button uses (fold on turn, seat released at hand end, stack back to wallet). `table.flush` and `table.offlineAfter` are injection points for tests (`server/table_test.go`). Reconnects within that window restore the seat by per-session player UUID (`join-table` with `playerUUID`). A `join-table` flagged `reconnect: true` (what the browser replays from localStorage) never creates a room; if the room or seat is gone the server answers `session-expired` and the client clears its session and returns to the lobby.
 - Session accounting: `flushPlayerSession` (`store.go`) is the one place chips return to the wallet, lifetime stats are merged, and a history entry is appended. It is called on leave, spectate, offline timeout, bust, and settlement. Settlement (hand limit or majority `vote-settle`) emits a `settlement` message then `Reset()`s the game.
 - **Two UUIDs per client**: `accountUUID` (persistent login identity, chosen by the user at registration, ≥5 alphanumerics) vs `uuid` (per-seat/session id regenerated on each seat). Frontend `appState.clientID` is the latter.
 

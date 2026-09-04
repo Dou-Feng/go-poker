@@ -395,66 +395,9 @@ func handleLeaveTable(c *Client, tablename string) {
 		return
 	}
 
-	// Snapshot the player before folding so the session can be settled even
-	// when the fold immediately ends the hand and drops the player.
-	view := c.table.game.GenerateOmniView()
-	pos := -1
-	for i := range view.Players {
-		if view.Players[i].UUID == c.uuid {
-			pos = i
-			break
-		}
-	}
-
-	if pos >= 0 {
-		pre := view.Players[pos]
-
-		// Mark the player as left; they fold on their turn (or immediately if
-		// it is already their turn).
-		if err := poker.LeaveHand(c.table.game, uint(pos)); err != nil {
-			slog.Default().Warn("Leave table", "error", err)
-		}
-
-		// Settle the session: merge stats, return the remaining stack to the
-		// wallet, and append a history entry. The fold is counted here even if
-		// it happens later, when the action reaches the departed player. An
-		// all-in player who leaves is shown down instead of folded, so no fold
-		// is counted for them.
-		stats := pre.Stats
-		if pre.In && pre.Stack > 0 {
-			stats.Folds++
-		}
-		after := c.table.game.GenerateOmniView()
-		stillSeated := -1
-		for j := range after.Players {
-			if after.Players[j].UUID == c.uuid {
-				stillSeated = j
-				break
-			}
-		}
-		if _, err := flushPlayerSession(c.hub.rdb, pre.AccountUUID, c.table.name, pre.TotalBuyIn, pre.Stack, stats); err != nil {
-			slog.Default().Warn("Flush player", "error", err)
-		}
-
-		// Remove the player from the room once no hand is active. If they
-		// folded mid-hand they are dropped when the hand ends.
-		if stillSeated >= 0 && after.Stage == poker.NotReady {
-			if err := poker.RemovePlayer(c.table.game, uint(stillSeated)); err != nil {
-				slog.Default().Warn("Remove player", "error", err)
-			}
-		}
-	}
-
-	// If the room is now empty, reset the game so a re-entering player sees
-	// a fresh table instead of a stale running flag.
-	remaining := c.table.game.GenerateOmniView()
-	if len(remaining.Players) == 0 {
-		c.table.game.Reset()
-	} else if remaining.Stage == poker.NotReady {
-		// A player left between hands: put the room back into the ready phase
-		// so the next hand waits for everyone to ready up.
-		poker.Pause(c.table.game)
-	}
+	// Settle and remove the seated player (fold on turn during a hand, drop
+	// at once between hands). A spectator has no seat and nothing to settle.
+	c.table.evictPlayer(c.uuid)
 
 	// Detach the client from the departed player so re-joining is treated as
 	// a fresh spectator rather than re-seating them.

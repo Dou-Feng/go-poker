@@ -156,6 +156,8 @@
 
 - [x] bug：空局状态下收到 player-call 导致服务端 panic 全进程崩溃 —— handleCall/Raise/Check/Fold 增加空玩家/越界保护
 
+- [x] 离线踢人加固 + UT：`timeoutPlayer` 改为复用与「离开」按钮相同的 `evictPlayer` 路径（牌局中轮到时弃牌、all-in 留局比牌、牌局结束时释放座位；局间立即移除并让其余人回到未准备）。原实现在牌局中调用 `ResetToReadyPhase`，会把所有人的下注清零但不退回筹码，底池凭空消失。新增 `backend/server/table_test.go`（无需 Redis）：局间超时踢出、牌局中非轮到者超时、单挑轮到者超时、all-in 者超时、宽限期内重连取消踢出、被踢后 session 重放返回 `session-expired`。
+
 - [x] bug 修复：房间在无任何在线连接超过 2 分钟后回收（`emptyTableTTL`），离线玩家 60 秒未重连即弃牌并请出房间（`offlineTimeout`）。根因是页面重载时按本地 session 重新 `join-table`，服务端对不存在的房间会「按需新建」一个空房间，且旧座位 uuid 匹配不到任何人时不回任何消息，前端因此停在一个没有牌局状态、无法坐下的房间里。现在 session 重放的 join 带 `reconnect` 标记：房间不存在 / 座位已被释放 / 房间有密码但 session 未带密码 → 服务端回 `session-expired`，前端清除本地 session、弹出提示并回到大厅；座位仍在则原样恢复。
 
 
