@@ -1,4 +1,4 @@
-import { useContext } from "react";
+import { useContext, useEffect, useState } from "react";
 import { AppContext } from "../providers/AppStore";
 import { Game, Player } from "../interfaces/index";
 import Card from "./Card";
@@ -43,6 +43,73 @@ function useHandLabel() {
     const key = HAND_KEYS[hand];
     return key ? t(key) : hand;
   };
+}
+
+// How long the bets of a street that has just been swept stay on screen.
+const SWEPT_BET_MS = 900;
+
+type BetSnapshot = { uuid: string; bet: number; totalBet: number };
+type SweptBet = { uuid: string; amount: number; until: number };
+
+// Returns the bet amount to draw for a player. Normally this is `bet`, the
+// chips committed this street. When a call (or all-in) closes a street the
+// server deals the next street in the same update, so every `bet` is already
+// 0 by the time the client sees it and the caller's chip would never appear.
+// Detect that sweep through the per-hand `totalBet` and keep the closed
+// street's bets visible for a moment so the commitment is shown (and the
+// caller's chip pops in like any other bet).
+function useDisplayedBet(player: Player | null): number {
+  const [prev, setPrev] = useState<BetSnapshot | null>(null);
+  const [swept, setSwept] = useState<SweptBet | null>(null);
+
+  // Derive the swept bet during render (React's "adjust state on prop
+  // change" pattern) so the bettor's own chip keeps its element across the
+  // sweep instead of unmounting and popping in again.
+  if (
+    player &&
+    (!prev ||
+      prev.uuid !== player.uuid ||
+      prev.bet !== player.bet ||
+      prev.totalBet !== player.totalBet)
+  ) {
+    setPrev({ uuid: player.uuid, bet: player.bet, totalBet: player.totalBet });
+    if (prev && prev.uuid === player.uuid) {
+      const committed = player.totalBet - prev.totalBet;
+      if (
+        player.bet === 0 &&
+        committed >= 0 &&
+        (prev.bet > 0 || committed > 0)
+      ) {
+        setSwept({
+          uuid: player.uuid,
+          amount: prev.bet + committed,
+          until: Date.now() + SWEPT_BET_MS,
+        });
+      } else {
+        // A real bet is showing again, or a new hand reset totalBet.
+        setSwept(null);
+      }
+    }
+  }
+
+  useEffect(() => {
+    if (!swept) {
+      return;
+    }
+    const timer = setTimeout(
+      () => setSwept(null),
+      Math.max(0, swept.until - Date.now())
+    );
+    return () => clearTimeout(timer);
+  }, [swept]);
+
+  if (!player) {
+    return 0;
+  }
+  if (player.bet !== 0) {
+    return player.bet;
+  }
+  return swept && swept.uuid === player.uuid ? swept.amount : 0;
 }
 
 function chipPosition(id: number) {
@@ -93,6 +160,7 @@ export default function Seat({ player, id, visualId, reveal }: seatProps) {
   const socket = useSocket();
   const { t } = useTranslation();
   const handLabel = useHandLabel();
+  const displayedBet = useDisplayedBet(player);
 
   const game = appState.game;
   const running = game?.running ?? false;
@@ -267,12 +335,12 @@ export default function Seat({ player, id, visualId, reveal }: seatProps) {
               🔔
             </div>
           )}
-          {player.bet !== 0 && (
+          {displayedBet !== 0 && (
             <p
-              key={player.bet}
+              key={displayedBet}
               className="animate-chip-pop flex h-6 w-9 items-center justify-center rounded-3xl bg-amber-300 text-sm font-semibold text-zinc-900 sm:h-8 sm:w-12 sm:text-xl"
             >
-              {player.bet}
+              {displayedBet}
             </p>
           )}
           {/* Best hand at showdown: shown on the table-facing side of the
