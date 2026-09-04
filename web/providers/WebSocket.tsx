@@ -21,6 +21,7 @@ import {
   saveSession,
   saveUser,
 } from "../lib/session";
+import { emitFx } from "../lib/fxBus";
 
 /*  
 WebSocket context creates a single connection to the server per client. 
@@ -145,6 +146,7 @@ export function SocketProvider(props: SocketProviderProps) {
               biggestPotWinners: event.game.biggestPotWinners ?? [],
             };
             dispatch({ type: "updateGame", payload: newGame });
+            emitFx(newGame);
             return;
           case "update-player-uuid":
             dispatch({ type: "updatePlayerID", payload: event.uuid });

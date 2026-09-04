@@ -6,6 +6,67 @@ import (
 	. "github.com/alexclewontin/riverboat/eval"
 )
 
+// Regression: when every opponent has left the room (still seated but marked
+// Left) and the last actor folds, no player is left In. updateRoundInfo must
+// not index into an empty inPlayerNums slice; the hand settles as a forfeit
+// into the Showdown state instead.
+func TestAllOpponentsLeaveThenFoldNoPanic(t *testing.T) {
+	g := NewGame()
+	Configure(g, 1, 2, 100, 100, 3, 0)
+
+	a := g.AddPlayer()
+	b := g.AddPlayer()
+	c := g.AddPlayer()
+
+	for _, pn := range []uint{a, b, c} {
+		if err := BuyIn(g, pn, 100); err != nil {
+			t.Fatalf("buyin %d: %v", pn, err)
+		}
+		if err := ToggleReady(g, pn, 0); err != nil {
+			t.Fatalf("ready %d: %v", pn, err)
+		}
+	}
+	if err := Deal(g, a, 0); err != nil {
+		t.Fatalf("deal: %v", err)
+	}
+
+	view := g.GenerateOmniView()
+	act := view.ActionNum // UTG acts first
+
+	// The two non-acting players leave while not on their turn: they stay In
+	// with Left=true until the next evaluation folds them.
+	for _, pn := range []uint{a, b, c} {
+		if pn == act {
+			continue
+		}
+		if err := LeaveHand(g, pn); err != nil {
+			t.Fatalf("leave %d: %v", pn, err)
+		}
+	}
+
+	// The acting player folds. Nobody is left in the hand.
+	if err := Fold(g, act, 0); err != nil {
+		t.Fatalf("fold: %v", err)
+	}
+
+	// The hand must have settled (forfeit) without panicking.
+	view = g.GenerateOmniView()
+	if view.Stage != Showdown {
+		t.Fatalf("expected Showdown after everyone conceded, got stage %v", view.Stage)
+	}
+	// No player is awarded anything.
+	for i := range view.Pots {
+		if len(view.Pots[i].WinningPlayerNums) != 0 {
+			t.Fatalf("pot %d should have no winners (forfeit), got %v", i, view.Pots[i].WinningPlayerNums)
+		}
+	}
+
+	// And the table settles forward without panicking.
+	if err := SettleShowdown(g); err != nil {
+		t.Fatalf("settle showdown: %v", err)
+	}
+}
+
 // A short stack must be able to call all-in for less than the full amount
 // needed to call, instead of getting stuck with no legal action.
 func TestAllInCallForLessThanFullAmount(t *testing.T) {

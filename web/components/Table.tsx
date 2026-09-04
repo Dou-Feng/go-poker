@@ -1,5 +1,6 @@
 import Seat from "./Seat";
 import Felt from "./Felt";
+import TableFx from "./TableFx";
 import { Game as GameType, Player } from "../interfaces";
 import { AppContext } from "../providers/AppStore";
 import { sendLog, dealGame, queueNext } from "../actions/actions";
@@ -288,6 +289,7 @@ export default function Table() {
         >
           <Felt />
         </div>
+        {game && <TableFx game={game} maxPlayers={maxPlayers} />}
         {game && (!appState.clientID || (me && !game.running && !me.ready)) && (
           <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center">
             <div className="pointer-events-auto flex flex-col items-center gap-1 rounded-lg bg-black/50 px-4 py-2 text-center">

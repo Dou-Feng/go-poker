@@ -501,6 +501,19 @@ func (g *Game) updateRoundInfo() {
 
 	// If less than two players are still in, the hand has been conceded
 	if len(inPlayerNums) < 2 {
+		// No player is left in the hand (e.g. every opponent left the room
+		// and the last actor folded): nobody is awarded the pot. Enter the
+		// Showdown state so the forfeit is displayed, then the client
+		// advances.
+		if len(inPlayerNums) == 0 {
+			for i := range g.pots {
+				g.pots[i].WinningScore = 8000
+				g.pots[i].WinningPlayerNums = []uint{}
+			}
+			g.setStageAndBetting(Showdown, false)
+			return
+		}
+
 		//the sole number in the array is the winner by default
 		//TODO: Create a pot here to simplify sending result description
 
