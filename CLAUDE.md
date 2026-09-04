@@ -1,0 +1,92 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+Real-time multiplayer Texas Hold'em: Go backend (`backend/`) + Next.js static-export frontend (`web/`), talking over a single WebSocket, with Redis for pub/sub fan-out and as the only persistent store. `AGENTS.md` holds the detailed coding conventions and known pitfalls for both halves — read it before editing; this file covers commands and the cross-file architecture it doesn't.
+
+## Commands
+
+Backend (Go 1.24, module `github.com/evanofslack/go-poker`, run from `backend/`):
+
+```bash
+go run ./cmd/go-poker            # needs REDIS_URL; godotenv reads .env from the *working directory*, so export it or copy the root .env into backend/
+go test ./...                    # all tests live in backend/poker (white-box, same package)
+go test ./poker -run 'TestAllInCallForLessThanFullAmount' -v   # single test
+go vet ./...
+```
+
+Frontend (run from `web/`):
+
+```bash
+npm run dev          # next dev; expects backend WS at ws://<host>:8080/ws unless NEXT_PUBLIC_WS_URL is set
+npm run type-check   # tsc --noEmit equivalent (strict); there is no lint or test script
+npm run build        # static export to web/out (served by the Go binary in production)
+npx prettier --write .   # formatting (prettier + prettier-plugin-tailwindcss in devDependencies, no config file)
+```
+
+Docker / deploy (from repo root; copy `.env.example` to `.env` first):
+
+```bash
+make redis     # docker compose up -d redis   (Redis is mandatory even for local runs)
+make next      # cd web && npm run dev (next dev on :3000, expects backend on :8080)
+make hot       # docker-compose-hot.yaml: air-reloaded backend on :3000, next dev on :8080, redis
+make deploy    # ./deploy.sh — git pull --ff-only then restart only what the diff requires (hot mode)
+docker compose up --build   # production image: root Dockerfile builds web/out + Go binary into one container on :8080
+```
+
+`make go` and `make start` are broken: they run `go run .` inside `backend/`, which has no main package. Use `go run ./cmd/go-poker` from `backend/` instead.
+
+Port gotcha: in hot mode the ports are swapped relative to `make start` (backend :3000, web :8080), so `NEXT_PUBLIC_WS_URL` and `NEXT_PUBLIC_API_BASE` are set explicitly in `docker-compose-hot.yaml`. `backend/Dockerfile` (Go 1.18) is legacy; the root `Dockerfile` (Go 1.24.3) is what CI publishes to Docker Hub on pushes to `main`.
+
+## Architecture
+
+### Three layers, one direction of imports
+
+`poker` (pure game engine) ← `server` (transport + persistence) ← `cmd/go-poker` (bootstrap). `poker` has no network or Redis dependencies and never imports `server`.
+
+### Game engine: two explicit state machines (`backend/poker`)
+
+- **Table stage** (`GameStage` in `game.go`): `NotReady → PreFlop → Flop → Turn → River → Showdown`, plus a `Terminal` constant that is declared but not yet set anywhere. Stage and a `Betting` bit are packed into `g.flags`. `Running` in views means "PreFlop..Showdown".
+- **Player state** (`PlayerState` in `player.go`): `NotReady, Ready, Playing, AllIn, Spectating, Offline`. `Ready`/`In` booleans are derived fast-path flags kept in sync by `setState`; the server still branches on `Ready`/`In`/`Left`.
+- **Hand resolution happens inside `updateRoundInfo`** (called after every bet/fold): it rebuilds side pots, awards chips, stamps `BestHand` names, then parks the table in `Showdown`. Nothing resets automatically. The table leaves `Showdown` only when a client sends `deal-game`, which the server maps to `SettleShowdown` → `resetForNextHand`.
+- **All-in runout is client-paced**: when everyone left is all-in, `Betting` goes false and the board stays incomplete; each `deal-game` calls `RunoutNext` (flop as three cards, then turn, then river), and the final one resolves.
+- Actions share the signature `func(g *Game, pn uint, data uint) error`; exported wrappers lock `g.mtx` and call a lowercase twin. `RemovePlayer`/`dropPlayer` re-index `Position` and every pot's player-number lists, so never cache positions across a removal.
+- `repro_test.go` is the regression suite for betting edge cases (short-stack all-in calls, leave-while-all-in, etc.). Add a scenario there when fixing an engine bug.
+
+### Server: hub → table → client (`backend/server`)
+
+- `Hub` owns the Redis client, the set of live `table`s, and an in-memory reservation of account UUIDs registered since boot.
+- Each `table` runs its own goroutine (`table.run`) with register/unregister/broadcast channels. **Every broadcast is published to a Redis channel named after the table and re-consumed by the same process** before being fanned out to clients, which is why Redis is required locally.
+- `Client.processEvents` (`client.go`) is the single dispatch switch over the `action` field; handlers live in `events.go`, request/response struct shapes in `messages.go`. Add a new message by touching all three plus `web/actions/actions.ts` and `web/providers/WebSocket.tsx`.
+- **Client-driven advancement**: the server never uses timers to advance a hand. The frontend (`web/components/Table.tsx`) elects one "runout driver" (first non-left player) whose browser sends `deal-game` after the showdown/runout animation delays. If that client is gone, the table stalls until another `deal-game` arrives.
+- Table lifecycle: a table is destroyed 2 min after its last client disconnects (`emptyTableTTL`); a disconnected player is folded and removed after 60 s (`offlineTimeout`) via `timeoutPlayer` → `ResetToReadyPhase`. Reconnects within that window restore the seat by per-session player UUID (`join-table` with `playerUUID`). A `join-table` flagged `reconnect: true` (what the browser replays from localStorage) never creates a room; if the room or seat is gone the server answers `session-expired` and the client clears its session and returns to the lobby.
+- Session accounting: `flushPlayerSession` (`store.go`) is the one place chips return to the wallet, lifetime stats are merged, and a history entry is appended. It is called on leave, spectate, offline timeout, bust, and settlement. Settlement (hand limit or majority `vote-settle`) emits a `settlement` message then `Reset()`s the game.
+- **Two UUIDs per client**: `accountUUID` (persistent login identity, chosen by the user at registration, ≥5 alphanumerics) vs `uuid` (per-seat/session id regenerated on each seat). Frontend `appState.clientID` is the latter.
+
+### Redis key layout
+
+| Key | Type | Contents |
+|---|---|---|
+| `gopoker:user:<accountUUID>` | string (JSON `UserRecord`) | bcrypt hash, chips, avatar, friends, lifetime `PlayerStats` |
+| `gopoker:username:<name>` | set of accountUUIDs | username alias index; login by username fails if the set has >1 member |
+| `gopoker:history:<accountUUID>` | list (JSON `HistoryRecord`), trimmed to 50 | one entry per finished session with ≥1 hand played |
+| `gopoker:avatar:<accountUUID>` | string (JSON) | base64 JPEGs at 1024/512/256/128/64 px |
+| `<tablename>` | pub/sub channel | broadcast fan-out |
+
+The only HTTP API besides `/ws` and `/ping` is `/api/avatar` (POST multipart upload ≤10 MB, GET `?uuid=&size=`), in `avatar.go`. Everything else goes over the socket.
+
+### Frontend (`web/`, Next.js 13 pages router, `output: 'export'`)
+
+- `pages/index.tsx` is a three-screen switch on `appState`: no username → `Register`, no table → `Lobby`, else `Game`. `Profile` and `Toast` overlay all three.
+- `providers/AppStore.tsx` is the single reducer store; `providers/WebSocket.tsx` owns the one socket, reconnects after a fixed 1 s delay, heartbeats with `ping`/`pong`, and translates every server event into a dispatch. Its `default:` case throws, so an unhandled server action crashes the client.
+- `lib/session.ts` persists `gopoker-user` (account UUID) and `gopoker-session` (table + per-seat clientID) in localStorage; `index.tsx` replays `reconnect` and `join-table` from them on every socket (re)connect.
+- `interfaces/index.ts` mirrors the `poker` view structs 1:1 by JSON tag. Changing a Go json tag means changing it there and in the `update-game` mapping in `WebSocket.tsx`.
+- `lib/api.ts` exposes `API_BASE` for the avatar HTTP endpoints; empty in production (same origin), set in hot mode.
+- `lib/sfx.ts` plays CC0 WAVs from `public/sfx`; `lib/language.ts` + `hooks/useTranslation.ts` provide zh/en strings and must stay synchronous for SSR hydration.
+
+## Working notes
+
+- `change.md` is the product owner's feature checklist (Chinese) and the source of truth for intended behaviour; its 「状态」 sections define the two state machines above. Check it before changing game flow.
+- `GenerateOmniView()` is what the server broadcasts, so every client currently receives every hole card. `GeneratePlayerView(pn)` exists for per-player censoring but is unused.
+- `Game.AddPlayer`, `Game.Start`, and `Game.Reset` mutate state without taking `g.mtx`; other exported entry points do lock.
+- The server deducts buy-ins from the wallet in `events.go` before calling `poker.BuyIn`; if you add a new seating path (see `seatQueuedClient` in `table.go` for the pattern), keep wallet debit, `SetAccountUUID`, `SetUsername`, `SetAvatar`, `BuyIn`, `SetSeatID` in that order because `SetSeatID` re-sorts players and invalidates `position`.

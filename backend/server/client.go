@@ -166,7 +166,7 @@ func (c *Client) processEvents(rawMessage []byte) error {
 		if err != nil {
 			return err
 		}
-		handleJoinTable(c, table.Tablename, table.Password, table.PlayerUUID)
+		handleJoinTable(c, table.Tablename, table.Password, table.PlayerUUID, table.Reconnect)
 		return nil
 
 	case actionLeaveTable:

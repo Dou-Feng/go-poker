@@ -12,14 +12,16 @@ import (
 	"github.com/go-redis/redis/v8"
 )
 
-// emptyTableTTL is how long a table lingers after the last client leaves
-// before it is destroyed. It doubles as the grace period for reconnects.
-const emptyTableTTL = time.Minute
+// emptyTableTTL is how long a table lingers with no connected clients before
+// it is recycled (change.md: no online players for more than 2 minutes). It
+// doubles as the grace period for reconnects.
+const emptyTableTTL = 2 * time.Minute
 
 // offlineTimeout is how long a disconnected player is allowed to reconnect
-// before their hand is folded and they are removed from the room. It is kept
-// shorter than emptyTableTTL so players are flushed before the room dies.
-const offlineTimeout = 55 * time.Second
+// before their hand is folded and they are removed from the room (change.md
+// 「离线状态」: 60 seconds). It is kept shorter than emptyTableTTL so players
+// are flushed (stack returned to wallet, stats recorded) before the room dies.
+const offlineTimeout = 60 * time.Second
 
 // table is a single table or game of poker
 type table struct {

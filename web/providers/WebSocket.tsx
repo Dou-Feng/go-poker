@@ -15,7 +15,12 @@ import {
   Profile,
   HistoryRecord,
 } from "../interfaces";
-import { loadSession, saveSession, saveUser } from "../lib/session";
+import {
+  clearSession,
+  loadSession,
+  saveSession,
+  saveUser,
+} from "../lib/session";
 
 /*  
 WebSocket context creates a single connection to the server per client. 
@@ -257,6 +262,21 @@ export function SocketProvider(props: SocketProviderProps) {
               payload: event.message ?? "Something went wrong",
             });
             return;
+          case "session-expired": {
+            // The saved room was recycled or our seat was released while we
+            // were away: forget the session and go back to the lobby instead
+            // of showing a dead room.
+            const existing = loadSession();
+            if (!existing || existing.table === event.tablename) {
+              clearSession();
+            }
+            dispatch({ type: "leaveRoom" });
+            dispatch({
+              type: "setAuthError",
+              payload: event.message ?? "room closed",
+            });
+            return;
+          }
           case "history":
             dispatch({
               type: "setHistory",

@@ -12,17 +12,22 @@ function send(socket: WebSocket | null | undefined, payload: object) {
   }
 }
 
+// joinTable joins a room. Pass reconnect=true when replaying a saved session
+// (page reload / socket reconnect): the server then never creates the room and
+// answers with "session-expired" if the room or seat is gone.
 export function joinTable(
   socket: WebSocket,
   tablename: string,
   playerUUID?: string,
-  password?: string
+  password?: string,
+  reconnect?: boolean
 ) {
   send(socket, {
     action: "join-table",
     tablename: tablename,
     ...(playerUUID ? { playerUUID } : {}),
     ...(password ? { password } : {}),
+    ...(reconnect ? { reconnect: true } : {}),
   });
 }
 

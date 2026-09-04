@@ -51,11 +51,19 @@ export default function IndexPage() {
 
     const session = loadSession();
     if (session && session.table) {
-      // The user was in a room: rejoin it (restore seat if possible).
+      // The user was in a room: rejoin it (restore seat if possible). This
+      // is flagged as a reconnect so a recycled room is not recreated; the
+      // server replies with "session-expired" and we fall back to the lobby.
       dispatch({ type: "setUsername", payload: session.username });
       dispatch({ type: "setTablename", payload: session.table });
       send(() =>
-        joinTable(socket, session.table, session.clientID ?? undefined)
+        joinTable(
+          socket,
+          session.table,
+          session.clientID ?? undefined,
+          undefined,
+          true
+        )
       );
     } else {
       // Not in a room: drop into the lobby.

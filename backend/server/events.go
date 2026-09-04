@@ -13,7 +13,12 @@ import (
 
 const gameAdminName string = "system"
 
-func handleJoinTable(c *Client, tablename string, password string, playerUUID string) {
+func handleJoinTable(c *Client, tablename string, password string, playerUUID string, reconnect bool) {
+	if reconnect {
+		handleReconnectTable(c, tablename, password, playerUUID)
+		return
+	}
+
 	table, _ := c.hub.createTableIfAbsent(tablename, "")
 	if table.password != "" && table.password != password {
 		c.send <- createError("wrong password")
@@ -22,10 +27,9 @@ func handleJoinTable(c *Client, tablename string, password string, playerUUID st
 	c.table = table
 	table.register <- c
 
-	// If the client is reconnecting with a known player id, restore their
-	// seat and identity instead of joining as a spectator.
-	if playerUUID != "" {
-		reconnectPlayer(c, playerUUID)
+	// A deliberate join that still carries a player id (e.g. the lobby
+	// re-joining the same room) restores the seat when it is still there.
+	if playerUUID != "" && reconnectPlayer(c, playerUUID) {
 		return
 	}
 
@@ -35,7 +39,62 @@ func handleJoinTable(c *Client, tablename string, password string, playerUUID st
 	c.send <- createUpdatedGame(c)
 }
 
-func reconnectPlayer(c *Client, playerUUID string) {
+// handleReconnectTable replays a saved browser session. It must never create
+// a room: when the room has been recycled (everyone offline for longer than
+// emptyTableTTL) or the player's seat was released by the offline timeout,
+// the client is told the session expired so it returns to the lobby instead
+// of landing in an empty, un-joinable copy of the old room.
+func handleReconnectTable(c *Client, tablename string, password string, playerUUID string) {
+	table := c.hub.findTable(tablename)
+	if table == nil {
+		c.send <- createSessionExpired(tablename, "room closed")
+		return
+	}
+
+	if playerUUID != "" {
+		// A seated player reconnecting within the offline grace period gets
+		// their seat back. They already passed the password check when they
+		// first joined, so it is not required again.
+		if !tableHasPlayer(table, playerUUID) {
+			c.send <- createSessionExpired(tablename, "room closed")
+			return
+		}
+		c.table = table
+		table.register <- c
+		if !reconnectPlayer(c, playerUUID) {
+			// Seat released between the check and the restore: stay in the
+			// room as a spectator rather than leaving the client stateless.
+			c.send <- createUpdatedGame(c)
+		}
+		return
+	}
+
+	// A spectator reconnecting to a live room: rejoin as a spectator. The
+	// saved session carries no password, so a locked room ends the session.
+	if table.password != "" && table.password != password {
+		c.send <- createSessionExpired(tablename, "room closed")
+		return
+	}
+	c.table = table
+	table.register <- c
+	c.send <- createUpdatedGame(c)
+}
+
+// tableHasPlayer reports whether a player with the given per-session uuid is
+// still seated at the table.
+func tableHasPlayer(t *table, playerUUID string) bool {
+	view := t.game.GenerateOmniView()
+	for i := range view.Players {
+		if view.Players[i].UUID == playerUUID {
+			return true
+		}
+	}
+	return false
+}
+
+// reconnectPlayer restores a client's seat and identity from a per-session
+// player uuid. It reports whether the player was found at the table.
+func reconnectPlayer(c *Client, playerUUID string) bool {
 	view := c.table.game.GenerateOmniView()
 	for i := range view.Players {
 		if view.Players[i].UUID == playerUUID {
@@ -45,9 +104,23 @@ func reconnectPlayer(c *Client, playerUUID string) {
 			c.table.markPlayerOnline(playerUUID)
 			c.send <- createUpdatedPlayerUUID(c)
 			c.send <- createUpdatedGame(c)
-			return
+			return true
 		}
 	}
+	return false
+}
+
+func createSessionExpired(tablename string, message string) []byte {
+	resp := sessionExpired{
+		base{actionSessionExpired},
+		tablename,
+		message,
+	}
+	bytes, err := json.Marshal(resp)
+	if err != nil {
+		slog.Default().Warn("Marshal session expired", "error", err)
+	}
+	return bytes
 }
 
 func handleRegisterUser(c *Client, username string, accountUUID string, password string, avatar string) {

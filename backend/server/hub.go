@@ -91,6 +91,20 @@ func (h *Hub) createTableIfAbsent(name string, password string) (*table, bool) {
 	return t, true
 }
 
+// findTable returns the live table with the given name, or nil if none exists.
+// Unlike createTableIfAbsent it never creates a table, so reconnect attempts
+// to a recycled room don't resurrect an empty copy of it.
+func (h *Hub) findTable(name string) *table {
+	h.tablesMu.Lock()
+	defer h.tablesMu.Unlock()
+	for t := range h.tables {
+		if t.name == name {
+			return t
+		}
+	}
+	return nil
+}
+
 // registerUser reserves an account uuid for the lifetime of the server. It
 // returns an error if the uuid is empty or already taken.
 func (h *Hub) registerUser(uuid string) error {

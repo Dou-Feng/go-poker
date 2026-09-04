@@ -51,6 +51,11 @@ type joinTable struct {
 	Tablename  string `json:"tablename"`
 	PlayerUUID string `json:"playerUUID,omitempty"`
 	Password   string `json:"password,omitempty"`
+	// Reconnect marks a join replayed from a saved browser session (page
+	// reload / socket reconnect) rather than a deliberate lobby join. A
+	// reconnect never creates a room: if the room is gone or the seat was
+	// lost, the server answers with actionSessionExpired instead.
+	Reconnect bool `json:"reconnect,omitempty"`
 }
 
 type leaveTable struct {
@@ -225,7 +230,17 @@ const (
 	actionSettlement           string = "settlement"
 	actionChangeUsernameResult string = "change-username-result"
 	actionPong                 string = "pong"
+	actionSessionExpired       string = "session-expired"
 )
+
+// sessionExpired tells a reconnecting client that its saved room/seat no
+// longer exists (room recycled or player timed out), so it should drop the
+// saved session and return to the lobby.
+type sessionExpired struct {
+	base             // actionSessionExpired
+	Tablename string `json:"tablename"`
+	Message   string `json:"message"`
+}
 
 type newMessage struct {
 	base             // actionNewMessage
