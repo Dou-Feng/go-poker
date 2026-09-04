@@ -46,6 +46,10 @@ export default function Input() {
   const canCheck = player.bet >= maxBet;
   const callAmount =
     maxBet - player.bet < player.stack ? maxBet - player.bet : player.stack;
+  // A player who already acted this street and is behind the top bet is
+  // facing a short all-in (less than a full raise). That does not reopen the
+  // betting: the server only accepts a call or a fold from them.
+  const callOnly = player.called && player.bet < maxBet;
 
   const handleCallOrCheck = (user: string | null) => {
     if (!socket) {
@@ -83,16 +87,20 @@ export default function Input() {
             title={canCheck ? t("check") : t("call") + " (" + callAmount + ")"}
             disabled={false}
           />
-          <InputButton
-            action={() => setShowRaise(!showRaise)}
-            title={t("bet")}
-            disabled={false}
-          />
-          <InputButton
-            action={() => handleAllIn(appState.username)}
-            title={t("allIn")}
-            disabled={false}
-          />
+          {!callOnly && (
+            <InputButton
+              action={() => setShowRaise(!showRaise)}
+              title={t("bet")}
+              disabled={false}
+            />
+          )}
+          {!callOnly && (
+            <InputButton
+              action={() => handleAllIn(appState.username)}
+              title={t("allIn")}
+              disabled={false}
+            />
+          )}
           <InputButton
             action={() => handleFold(appState.username)}
             title={t("fold")}

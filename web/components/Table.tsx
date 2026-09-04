@@ -44,8 +44,21 @@ function getWinners(game: GameType): WinnerResult[] {
     if (pot.amount === 0 || pot.winningPlayerNums.length === 0) {
       continue;
     }
+    // Mirror the server's split: even shares, with any odd chips handed out
+    // one each to the winners clockwise from the first seat after the button.
     const share = Math.floor(pot.amount / pot.winningPlayerNums.length);
-    for (const num of pot.winningPlayerNums) {
+    let remainder = pot.amount % pot.winningPlayerNums.length;
+    const seats = game.players.length;
+    const fromButton = (num: number) => (num - game.dealer - 1 + seats) % seats;
+    const order = [...pot.winningPlayerNums].sort(
+      (a, b) => fromButton(a) - fromButton(b)
+    );
+    for (const num of order) {
+      let award = share;
+      if (remainder > 0) {
+        award++;
+        remainder--;
+      }
       const player = game.players.find((p) => p.position === num);
       if (!player) {
         continue;
@@ -54,9 +67,9 @@ function getWinners(game: GameType): WinnerResult[] {
         (r) => r.player.position === player.position
       );
       if (existing) {
-        existing.amount += share;
+        existing.amount += award;
       } else {
-        results.push({ player, amount: share });
+        results.push({ player, amount: award });
       }
     }
   }

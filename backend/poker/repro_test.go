@@ -1157,6 +1157,349 @@ func TestFlopAllInRunoutRevealsTurnAndRiver(t *testing.T) {
 	}
 }
 
+// headsUpFlop deals a heads-up hand (a short, b deep), checks through the
+// preflop street and returns with the flop dealt and b about to bet 100.
+// Seat order is parameterised because the old excess-return code depended on
+// player indices.
+func headsUpFlop(t *testing.T, aFirst bool, aStack, bStack uint) (*Game, uint, uint) {
+	t.Helper()
+	g := NewGame()
+	Configure(g, 1, 2, 200, 1000, 2, 0)
+	var a, b uint
+	if aFirst {
+		a = g.AddPlayer()
+		b = g.AddPlayer()
+	} else {
+		b = g.AddPlayer()
+		a = g.AddPlayer()
+	}
+	BuyIn(g, a, aStack)
+	BuyIn(g, b, bStack)
+	for _, pn := range []uint{a, b} {
+		if err := ToggleReady(g, pn, 0); err != nil {
+			t.Fatalf("ready %d: %v", pn, err)
+		}
+	}
+	if err := Deal(g, g.GenerateOmniView().DealerNum, 0); err != nil {
+		t.Fatalf("deal: %v", err)
+	}
+	// Preflop: the dealer/SB completes, the BB checks.
+	first := g.GenerateOmniView().ActionNum
+	if err := Bet(g, first, 1); err != nil {
+		t.Fatalf("sb call: %v", err)
+	}
+	if err := Bet(g, 1-first, 0); err != nil {
+		t.Fatalf("bb check: %v", err)
+	}
+	if g.getStage() != Flop {
+		t.Fatalf("expected flop, got stage %d", g.getStage())
+	}
+	// If a is first to act on the flop, a checks so that b can lead out.
+	if g.GenerateOmniView().ActionNum == a {
+		if err := Bet(g, a, 0); err != nil {
+			t.Fatalf("a check: %v", err)
+		}
+	}
+	return g, a, b
+}
+
+// Regression: b bets 100 on the flop and a shoves for 148 more (total 150),
+// which is more than a call but less than a full raise. The old code treated
+// b as already "called", ended the street at once and, depending on seat
+// order, either excluded b from the pot (a won everything at showdown
+// without b ever acting) or silently downgraded a's shove to a call. b must
+// be asked to match the extra 48 (or fold), and a full call must conserve
+// chips and run the board out.
+func TestShortAllInRaiseOpponentMustAct(t *testing.T) {
+	for _, aFirst := range []bool{true, false} {
+		g, a, b := headsUpFlop(t, aFirst, 150, 400)
+
+		if err := Bet(g, b, 100); err != nil {
+			t.Fatalf("b bet: %v", err)
+		}
+		if err := Bet(g, a, g.players[a].Stack); err != nil {
+			t.Fatalf("a shove: %v", err)
+		}
+		if g.players[a].Stack != 0 {
+			t.Fatalf("a should be all-in, stack=%d", g.players[a].Stack)
+		}
+
+		// Still the flop, still betting, and b is up: the street did not end.
+		view := g.GenerateOmniView()
+		if view.Stage != Flop || !view.Betting || view.ActionNum != b {
+			t.Fatalf("aFirst=%v: b should face the short all-in on the flop, got stage=%d betting=%v action=%d",
+				aFirst, view.Stage, view.Betting, view.ActionNum)
+		}
+		// The shove must not have been downgraded to a call.
+		if g.players[a].TotalBet != 150 {
+			t.Fatalf("aFirst=%v: a's total should be 150, got %d", aFirst, g.players[a].TotalBet)
+		}
+
+		// b has already acted this street, so b may only call or fold: a
+		// re-raise (or a shove) must be rejected.
+		if err := Bet(g, b, 200); err == nil {
+			t.Fatalf("aFirst=%v: b should not be able to re-raise a short all-in", aFirst)
+		}
+		if err := Bet(g, b, g.players[b].Stack); err == nil {
+			t.Fatalf("aFirst=%v: b should not be able to shove over a short all-in", aFirst)
+		}
+		// Calling exactly the extra 48 works.
+		if err := Bet(g, b, 48); err != nil {
+			t.Fatalf("aFirst=%v: b call: %v", aFirst, err)
+		}
+
+		// Nobody can act any more: the board runs out.
+		if g.getBetting() {
+			t.Fatalf("aFirst=%v: betting should be off once only an all-in player is left to beat", aFirst)
+		}
+		for g.getStage() != Showdown {
+			if err := RunoutNext(g); err != nil {
+				t.Fatalf("runout: %v", err)
+			}
+		}
+		// The main pot holds 150 from each player; both are eligible.
+		if len(g.pots) == 0 || g.pots[0].Amt != 300 || len(g.pots[0].EligiblePlayerNums) != 2 {
+			t.Fatalf("aFirst=%v: expected a 300-chip pot contested by both, got %+v", aFirst, g.pots)
+		}
+		if err := SettleShowdown(g); err != nil {
+			t.Fatalf("settle: %v", err)
+		}
+		if total := g.players[a].Stack + g.players[b].Stack; total != 550 {
+			t.Fatalf("aFirst=%v: chips should be conserved (550), got %d", aFirst, total)
+		}
+	}
+}
+
+// A short all-in that is bigger than the bet must still be foldable by the
+// player who already acted: they lose only what they put in.
+func TestShortAllInRaiseOpponentMayFold(t *testing.T) {
+	g, a, b := headsUpFlop(t, true, 150, 400)
+
+	if err := Bet(g, b, 100); err != nil {
+		t.Fatalf("b bet: %v", err)
+	}
+	if err := Bet(g, a, g.players[a].Stack); err != nil {
+		t.Fatalf("a shove: %v", err)
+	}
+	if err := Fold(g, b, 0); err != nil {
+		t.Fatalf("b fold: %v", err)
+	}
+	if g.getStage() != Showdown {
+		t.Fatalf("expected Showdown after fold, got %d", g.getStage())
+	}
+	if err := SettleShowdown(g); err != nil {
+		t.Fatalf("settle: %v", err)
+	}
+	// a wins the 150 shove back plus b's 2 (preflop) + 100 (flop).
+	if g.players[a].Stack != 252 || g.players[b].Stack != 298 {
+		t.Fatalf("expected a=252 b=298, got a=%d b=%d", g.players[a].Stack, g.players[b].Stack)
+	}
+}
+
+// Regression: b bets more than a has and a calls all-in for less. b's uncalled
+// excess is returned immediately (whichever seat b sits in), the pots are
+// rebuilt without it so no chips are created, and the board runs out instead
+// of making b check alone through every street.
+func TestShortAllInCallReturnsExcessAndRunsOut(t *testing.T) {
+	for _, aFirst := range []bool{true, false} {
+		g, a, b := headsUpFlop(t, aFirst, 150, 400)
+
+		if err := Bet(g, b, 200); err != nil {
+			t.Fatalf("b bet: %v", err)
+		}
+		if err := Bet(g, a, g.players[a].Stack); err != nil {
+			t.Fatalf("a call all-in: %v", err)
+		}
+
+		// b's 52 uncalled chips (202 - 150) are back in b's stack.
+		if g.players[b].Stack != 400-150 || g.players[b].TotalBet != 150 || g.players[b].Bet != 148 {
+			t.Fatalf("aFirst=%v: b should have the excess back: stack=%d total=%d bet=%d",
+				aFirst, g.players[b].Stack, g.players[b].TotalBet, g.players[b].Bet)
+		}
+		// Nothing left to bet: runout, not a lone check-down.
+		if g.getBetting() {
+			t.Fatalf("aFirst=%v: betting should be off", aFirst)
+		}
+		if len(g.pots) == 0 || g.pots[0].Amt != 300 {
+			t.Fatalf("aFirst=%v: expected a 300-chip pot, got %+v", aFirst, g.pots)
+		}
+		for g.getStage() != Showdown {
+			if err := RunoutNext(g); err != nil {
+				t.Fatalf("runout: %v", err)
+			}
+		}
+		if err := SettleShowdown(g); err != nil {
+			t.Fatalf("settle: %v", err)
+		}
+		if total := g.players[a].Stack + g.players[b].Stack; total != 550 {
+			t.Fatalf("aFirst=%v: chips should be conserved (550), got %d", aFirst, total)
+		}
+	}
+}
+
+// Three-handed: a short all-in does not reopen the betting for a player who
+// already acted, but a player who has not yet acted this street may still
+// raise, and the minimum raise is measured from the all-in amount.
+func TestShortAllInThreeHandedRaiseRights(t *testing.T) {
+	g := NewGame()
+	Configure(g, 1, 2, 200, 1000, 3, 0)
+
+	a := g.AddPlayer()
+	b := g.AddPlayer()
+	c := g.AddPlayer()
+	BuyIn(g, a, 500) // dealer / UTG
+	BuyIn(g, b, 500) // small blind
+	BuyIn(g, c, 15)  // big blind, short
+	for _, pn := range []uint{a, b, c} {
+		if err := ToggleReady(g, pn, 0); err != nil {
+			t.Fatalf("ready %d: %v", pn, err)
+		}
+	}
+	if err := Deal(g, a, 0); err != nil {
+		t.Fatalf("deal: %v", err)
+	}
+
+	// a opens to 10 (min raise is now 8). c shoves 15 total: only 5 more, a
+	// short all-in.
+	if err := Bet(g, a, 10); err != nil {
+		t.Fatalf("a open: %v", err)
+	}
+	// b has not acted yet and just calls 9 more.
+	if err := Bet(g, b, 9); err != nil {
+		t.Fatalf("b call: %v", err)
+	}
+	if err := Bet(g, c, 13); err != nil {
+		t.Fatalf("c shove: %v", err)
+	}
+	if g.players[c].Stack != 0 {
+		t.Fatalf("c should be all-in")
+	}
+
+	// a already acted: a can call the extra 5 but cannot raise.
+	if g.actionNum != a {
+		t.Fatalf("a should be next, got %d", g.actionNum)
+	}
+	if err := Bet(g, a, 13); err == nil {
+		t.Fatalf("a already acted and must not be able to raise over a short all-in")
+	}
+	if err := Bet(g, a, 5); err != nil {
+		t.Fatalf("a call: %v", err)
+	}
+	// b already acted too: call only.
+	if g.actionNum != b {
+		t.Fatalf("b should be next, got %d", g.actionNum)
+	}
+	if err := Bet(g, b, 20); err == nil {
+		t.Fatalf("b already acted and must not be able to raise over a short all-in")
+	}
+	if err := Bet(g, b, 5); err != nil {
+		t.Fatalf("b call: %v", err)
+	}
+
+	// Everyone matched 15; the street is over and the flop is dealt with a
+	// and b still able to bet against each other.
+	if g.getStage() != Flop || !g.getBetting() {
+		t.Fatalf("expected flop betting, got stage=%d betting=%v", g.getStage(), g.getBetting())
+	}
+	for _, pn := range []uint{a, b} {
+		if g.players[pn].TotalBet != 15 {
+			t.Fatalf("player %d should have 15 in, got %d", pn, g.players[pn].TotalBet)
+		}
+	}
+}
+
+// A player who has NOT acted since the last full raise keeps the right to
+// raise over a short all-in, and the minimum raise is counted from the all-in
+// amount using the last full raise size.
+func TestShortAllInDoesNotBlockUnactedPlayer(t *testing.T) {
+	g := NewGame()
+	Configure(g, 1, 2, 200, 1000, 3, 0)
+
+	a := g.AddPlayer()
+	b := g.AddPlayer()
+	c := g.AddPlayer()
+	BuyIn(g, a, 500) // dealer / UTG
+	BuyIn(g, b, 15)  // small blind, short
+	BuyIn(g, c, 500) // big blind
+	for _, pn := range []uint{a, b, c} {
+		if err := ToggleReady(g, pn, 0); err != nil {
+			t.Fatalf("ready %d: %v", pn, err)
+		}
+	}
+	if err := Deal(g, a, 0); err != nil {
+		t.Fatalf("deal: %v", err)
+	}
+
+	// a opens to 10; b shoves to 15 (short: less than the 8-chip min raise).
+	if err := Bet(g, a, 10); err != nil {
+		t.Fatalf("a open: %v", err)
+	}
+	if err := Bet(g, b, 14); err != nil {
+		t.Fatalf("b shove: %v", err)
+	}
+	// c has not acted: a raise to 22 (15 + 8) is illegal, 23 is the minimum.
+	if g.actionNum != c {
+		t.Fatalf("c should be next, got %d", g.actionNum)
+	}
+	if err := Bet(g, c, 20); err == nil {
+		t.Fatalf("raise to 22 is below the minimum (15 + 8)")
+	}
+	if err := Bet(g, c, 21); err != nil {
+		t.Fatalf("c min raise to 23: %v", err)
+	}
+	// A full raise reopens the action for a.
+	if g.actionNum != a {
+		t.Fatalf("a should be next, got %d", g.actionNum)
+	}
+	if err := Bet(g, a, 13); err != nil {
+		t.Fatalf("a call: %v", err)
+	}
+	if g.getStage() != Flop {
+		t.Fatalf("expected flop, got stage %d", g.getStage())
+	}
+}
+
+// The minimum bet post-flop and the minimum raise preflop are one big blind.
+func TestMinimumBetIsBigBlind(t *testing.T) {
+	g := NewGame()
+	Configure(g, 5, 10, 1000, 1000, 2, 0)
+
+	a := g.AddPlayer()
+	b := g.AddPlayer()
+	for _, pn := range []uint{a, b} {
+		BuyIn(g, pn, 1000)
+		if err := ToggleReady(g, pn, 0); err != nil {
+			t.Fatalf("ready %d: %v", pn, err)
+		}
+	}
+	if err := Deal(g, a, 0); err != nil {
+		t.Fatalf("deal: %v", err)
+	}
+
+	// Preflop, dealer/SB (a) has 5 in: raising to 15 is illegal, 20 is the minimum.
+	if err := Bet(g, a, 10); err == nil {
+		t.Fatalf("raise to 15 should be below the minimum of 2 big blinds")
+	}
+	if err := Bet(g, a, 15); err != nil {
+		t.Fatalf("raise to 20: %v", err)
+	}
+	if err := Bet(g, b, 10); err != nil {
+		t.Fatalf("b call: %v", err)
+	}
+	if g.getStage() != Flop {
+		t.Fatalf("expected flop, got stage %d", g.getStage())
+	}
+
+	// Post-flop the first player may not bet less than a big blind.
+	first := g.actionNum
+	if err := Bet(g, first, 5); err == nil {
+		t.Fatalf("bet of 5 should be below the 10-chip minimum bet")
+	}
+	if err := Bet(g, first, 10); err != nil {
+		t.Fatalf("bet of 10: %v", err)
+	}
+}
+
 // A short stack that goes all-in on the flop and is called must still reveal
 // the turn and river before settling.
 func TestShortAllInFlopRevealsTurnAndRiver(t *testing.T) {

@@ -143,8 +143,14 @@ func (g *Game) readyCount() uint {
 	return readyCount
 }
 
+// isCalled reports whether a player has nothing left to do on this street:
+// they are all-in, or they have acted since the last full raise AND their
+// bet matches the highest bet. The second condition matters after a short
+// all-in (more than a call, less than a full raise): it does not reset the
+// Called flags, but everyone who is behind the new amount must still act.
 func (g *Game) isCalled(pn uint) bool {
-	return g.players[pn].allIn() || (g.players[pn].Called)
+	p := &g.players[pn]
+	return p.allIn() || (p.Called && p.Bet >= g.toCall())
 }
 
 // Returns nil if there are more than 2 players ready, ErrIllegalAction otherwise
@@ -456,48 +462,7 @@ func (g *Game) updateRoundInfo() {
 	}
 
 	// Update the pot information
-
-	sort.Slice(allInPlayerNums, func(i, j int) bool {
-		return g.players[allInPlayerNums[i]].TotalBet < g.players[allInPlayerNums[j]].TotalBet
-	}) //here, the whole slice needs to be sorted by the totalBet amount of the players represented
-
-	tmpPlayers := append([]player{}, g.players...)
-	g.pots = []Pot{}
-	for _, pn := range allInPlayerNums {
-
-		newPot := Pot{}
-		newPot.TopShare = tmpPlayers[pn].TotalBet
-
-		for i := range tmpPlayers {
-
-			if tmpPlayers[i].TotalBet >= newPot.TopShare {
-				if tmpPlayers[i].In {
-					newPot.EligiblePlayerNums = append(newPot.EligiblePlayerNums, uint(i))
-				}
-				newPot.Amt += newPot.TopShare
-				tmpPlayers[i].TotalBet -= newPot.TopShare
-			} else {
-				newPot.Amt += tmpPlayers[i].TotalBet
-				tmpPlayers[i].TotalBet = 0
-			}
-		}
-
-		g.pots = append(g.pots, newPot)
-	}
-
-	//The above takes care of all the all-in side pots. One last pot for the non-all-in people
-
-	var finalPot Pot
-	finalPot.EligiblePlayerNums = []uint{}
-
-	for i, p := range tmpPlayers {
-		finalPot.Amt += p.TotalBet
-		if p.In && !p.allIn() {
-			finalPot.EligiblePlayerNums = append(finalPot.EligiblePlayerNums, uint(i))
-		}
-	}
-
-	g.pots = append(g.pots, finalPot)
+	g.rebuildPots(allInPlayerNums)
 
 	// If less than two players are still in, the hand has been conceded
 	if len(inPlayerNums) < 2 {
@@ -565,25 +530,29 @@ func (g *Game) updateRoundInfo() {
 		return
 	}
 
-	//If there are two or more players in, and everybody has either called or is all-in, and at this point we determine that only one player is
-	//in but not all in, we take all the money above and beyond the second highest better (who is all in) and return it to the people who bet it
-	//If the only players in are both all in for the exact same amount of money, nothing happens here
-	//(but we can't skip in the "0 not all in" case because technically before this step happens a player who after this step may read as not all in
-	//could return true for the isAllIn method)
-	if (len(inPlayerNums) - len(allInPlayerNums)) < 2 {
-		var topBettor1 uint = 0
-		var topBettor2 uint = 0
-		// TODO: what if everyone is all in?
+	// Everybody has matched the highest bet or is all-in. If at most one
+	// player is not all-in, nobody can ever match the top bettor's excess over
+	// the second-highest total, so it goes back to them (an uncalled bet) and
+	// the pots are rebuilt without it. Only players still in the hand count:
+	// chips from folded players are dead money that stays in the pot.
+	canAct := len(inPlayerNums) - len(allInPlayerNums)
+	if canAct < 2 {
+		var top, second uint
+		topPn := inPlayerNums[0]
 		for _, ndx := range inPlayerNums {
-			if g.players[ndx].TotalBet > g.players[topBettor1].TotalBet {
-				topBettor2 = topBettor1
-				topBettor1 = ndx
-			} else if g.players[ndx].TotalBet > g.players[topBettor2].TotalBet {
-				topBettor2 = ndx
+			tb := g.players[ndx].TotalBet
+			if tb > top {
+				second = top
+				top = tb
+				topPn = ndx
+			} else if tb > second {
+				second = tb
 			}
 		}
-
-		g.players[topBettor1].returnChips(g.players[topBettor1].TotalBet - g.players[topBettor2].TotalBet)
+		if top > second {
+			g.players[topPn].returnChips(top - second)
+			g.rebuildPots(allInPlayerNums)
+		}
 	}
 
 	//If there are two or more players in, and everybody has called or is all in, then end the hand f we've just finished river betting
@@ -597,13 +566,73 @@ func (g *Game) updateRoundInfo() {
 		return
 
 		// otherwise, just set betting to false so the dealer can deal the next part of the hand
-	} else if len(inPlayerNums) == len(allInPlayerNums) {
-		// Every player still in the hand is all-in: stop betting. The board
-		// is then revealed one card at a time by the client via RunoutNext.
+	} else if canAct < 2 {
+		// Every player still in the hand is all-in, or only one of them has
+		// chips left and nobody can act against them: no more betting is
+		// possible this hand. Stop betting; the board is then revealed one
+		// card at a time by the client via RunoutNext.
 		g.setBetting(false)
 	} else {
 		g.setBetting(false)
 		deal(g, g.dealerNum, 0)
+	}
+}
+
+// rebuildPots recomputes the main pot and side pots from every player's
+// TotalBet. allInPlayerNums is the list of in-hand all-in players; each one
+// caps a pot at their total contribution. It assumes the game mutex is held.
+func (g *Game) rebuildPots(allInPlayerNums []uint) {
+	sort.Slice(allInPlayerNums, func(i, j int) bool {
+		return g.players[allInPlayerNums[i]].TotalBet < g.players[allInPlayerNums[j]].TotalBet
+	}) //here, the whole slice needs to be sorted by the totalBet amount of the players represented
+
+	tmpPlayers := append([]player{}, g.players...)
+	g.pots = []Pot{}
+	for _, pn := range allInPlayerNums {
+
+		newPot := Pot{}
+		newPot.TopShare = tmpPlayers[pn].TotalBet
+		if newPot.TopShare == 0 {
+			// This all-in player's contribution is already fully covered by
+			// a previous pot (equal all-ins, or a refunded excess): no new
+			// pot layer.
+			continue
+		}
+
+		for i := range tmpPlayers {
+
+			if tmpPlayers[i].TotalBet >= newPot.TopShare {
+				if tmpPlayers[i].In {
+					newPot.EligiblePlayerNums = append(newPot.EligiblePlayerNums, uint(i))
+				}
+				newPot.Amt += newPot.TopShare
+				tmpPlayers[i].TotalBet -= newPot.TopShare
+			} else {
+				newPot.Amt += tmpPlayers[i].TotalBet
+				tmpPlayers[i].TotalBet = 0
+			}
+		}
+
+		g.pots = append(g.pots, newPot)
+	}
+
+	//The above takes care of all the all-in side pots. One last pot for the non-all-in people
+
+	var finalPot Pot
+	finalPot.EligiblePlayerNums = []uint{}
+
+	for i, p := range tmpPlayers {
+		finalPot.Amt += p.TotalBet
+		if p.In && !p.allIn() {
+			finalPot.EligiblePlayerNums = append(finalPot.EligiblePlayerNums, uint(i))
+		}
+	}
+
+	// Only keep the trailing pot when it holds chips (or when it is the only
+	// pot, so the view always has a pot to display). An empty trailing pot
+	// would otherwise show up as a phantom pot with a phantom "winner".
+	if finalPot.Amt > 0 || len(g.pots) == 0 {
+		g.pots = append(g.pots, finalPot)
 	}
 }
 
@@ -614,6 +643,12 @@ func (g *Game) updateRoundInfo() {
 func (g *Game) resolveShowdown() {
 	for i := range g.pots {
 		g.pots[i].WinningScore = 8000
+
+		// An empty pot (e.g. the trailing pot after an uncalled bet was
+		// returned) has nothing to award: don't hand out a phantom win.
+		if g.pots[i].Amt == 0 {
+			continue
+		}
 
 		for _, num := range g.pots[i].EligiblePlayerNums {
 
@@ -649,13 +684,26 @@ func (g *Game) resolveShowdown() {
 		g.pots[i].WinningPlayerNums = legit
 
 		if totalWinners > 0 {
+			// Split evenly. When the pot does not divide, the odd chips go
+			// one each to the winners in clockwise order starting from the
+			// first seat after the button (the standard odd-chip rule).
+			// Forfeiting leavers still count as winners for the split, so
+			// their share (and any odd chip that falls to them) vanishes.
 			share := g.pots[i].Amt / totalWinners
-			for _, num := range legit {
-				g.players[num].Stack += share
-				//TODO: leave the remainder in the middle! (fractional money will disappear currently)
+			remainder := g.pots[i].Amt % totalWinners
+			for _, num := range g.oddChipOrder(g.pots[i].WinningPlayerNums) {
+				award := share
+				if remainder > 0 {
+					award++
+					remainder--
+				}
+				if g.players[num].Left {
+					continue
+				}
+				g.players[num].Stack += award
 				g.players[num].Stats.HandsWon++
-				if share > g.players[num].Stats.MaxPotWon {
-					g.players[num].Stats.MaxPotWon = share
+				if award > g.players[num].Stats.MaxPotWon {
+					g.players[num].Stats.MaxPotWon = award
 				}
 			}
 		}
@@ -671,6 +719,19 @@ func (g *Game) resolveShowdown() {
 			g.players[i].BestHand = BestHandName(g, uint(i))
 		}
 	}
+}
+
+// oddChipOrder returns the winners sorted clockwise from the first seat after
+// the button, so odd chips are handed out in the standard order.
+func (g *Game) oddChipOrder(winners []uint) []uint {
+	n := uint(len(g.players))
+	fromButton := func(pn uint) uint { return (pn + n - g.dealerNum - 1) % n }
+
+	ordered := append([]uint{}, winners...)
+	sort.Slice(ordered, func(i, j int) bool {
+		return fromButton(ordered[i]) < fromButton(ordered[j])
+	})
+	return ordered
 }
 
 // SettleShowdown closes the showdown window: reset the table for the next

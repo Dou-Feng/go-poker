@@ -52,52 +52,48 @@ func bet(g *Game, pn uint, data uint) error {
 	//rename this for readability
 	betVal := data
 
+	// minBet is the highest bet on the street; callAmount is what this player
+	// still owes to match it; total is this player's street bet after acting.
 	var minBet uint = g.toCall()
-
-	var betLegalError error = nil
+	callAmount := minBet - p.Bet
+	total := p.Bet + betVal
+	allIn := betVal >= p.Stack
 
 	if !g.canOpen(pn) {
 		//Won't hit now, reserved for future implementations
-		betLegalError = ErrIllegalAction
-	} else if betVal >= p.Stack {
-		// An all-in is always a legal bet, even when it is less than the
-		// full amount needed to call or less than a minimum raise. It only
-		// reopens the betting when it is at least a full minimum raise over
-		// the previous bet; otherwise players can only call.
-		betLegalError = nil
-		if betVal+p.Bet >= minBet+g.minRaise {
-			g.minRaise = betVal + p.Bet - minBet
-			for i := range g.players {
-				g.players[i].Called = false
-				g.calledNum = pn
-			}
-		}
-	} else if betVal < (minBet - p.Bet) {
-		//Not calling the minimum needed
-		betLegalError = ErrIllegalAction
-	} else if betVal == (minBet - p.Bet) {
-		//Calling exactly
-		betLegalError = nil
-	} else if betVal < (minBet + g.minRaise - p.Bet) {
-		// More than calling, but less than minimum raise
-		betLegalError = ErrIllegalAction
-	} else {
-		// More than calling, and at least the minimum raise
-		betLegalError = nil
-		g.minRaise = betVal + p.Bet - minBet
+		return ErrIllegalAction
+	}
+
+	switch {
+	case allIn && total <= minBet:
+		// All-in for no more than a call: always legal (a short stack may call
+		// for less than the full amount). Never reopens the betting.
+	case betVal < callAmount:
+		// Not calling the minimum needed.
+		return ErrIllegalAction
+	case betVal == callAmount:
+		// Checking or calling exactly.
+	case p.Called:
+		// This player has already acted since the last full raise, so the
+		// extra chips in front of them came from a short all-in. A short
+		// all-in does not reopen the betting: they may only call or fold.
+		return ErrIllegalAction
+	case total >= minBet+g.minRaise:
+		// A full raise: sets the new minimum raise and reopens the betting
+		// for everyone else.
+		g.minRaise = total - minBet
 		for i := range g.players {
 			g.players[i].Called = false
-			g.calledNum = pn
 		}
+		g.calledNum = pn
+	case allIn:
+		// All-in for more than a call but less than a full raise. Legal, but
+		// it does not reopen the betting: players who already acted must
+		// still match the extra chips (or fold), they just cannot re-raise.
+	default:
+		// More than calling, but less than a minimum raise.
+		return ErrIllegalAction
 	}
-
-	if betLegalError != nil {
-		//I could just return this in every spot, but i suspect the structure of what is legal
-		//will change as more betting schemes are introduced, so seems more extensible to keep it here
-		return betLegalError
-	}
-
-	callAmount := minBet - p.Bet
 
 	g.players[pn].putInChips(betVal)
 	g.players[pn].Called = true
@@ -105,7 +101,7 @@ func bet(g *Game, pn uint, data uint) error {
 	// record per-player statistics for the session
 	if betVal == 0 {
 		// check
-	} else if betVal == callAmount {
+	} else if betVal <= callAmount {
 		g.players[pn].Stats.Calls++
 	} else {
 		g.players[pn].Stats.Raises++
@@ -306,9 +302,10 @@ func deal(g *Game, pn uint, data uint) error {
 	}
 
 	g.betsThisStreet = 0
-	g.minRaise = g.config.SmallBlind
-
-	//TODO: if all or all but one are all-in and its not the end, don't set betting to true on the next deal
+	// The minimum opening bet and the minimum raise increment are one big
+	// blind: preflop a raise must be to at least 2×BB, post-flop a bet must be
+	// at least 1×BB. (Any later full raise sets its own size as the new minimum.)
+	g.minRaise = g.config.BigBlind
 
 	switch stage {
 	case NotReady:

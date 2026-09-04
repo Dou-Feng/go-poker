@@ -115,12 +115,17 @@ func (p *player) putInChips(amt uint) {
 	}
 }
 
+// returnChips gives back chips nobody could match (an uncalled bet). The
+// excess always belongs to the current street, so the street bet shrinks too.
 func (p *player) returnChips(amt uint) {
-	if p.TotalBet > amt {
-		p.TotalBet -= amt
-		p.Stack += amt
+	if amt > p.TotalBet {
+		amt = p.TotalBet
+	}
+	p.TotalBet -= amt
+	p.Stack += amt
+	if amt > p.Bet {
+		p.Bet = 0
 	} else {
-		p.Stack += p.TotalBet
-		p.TotalBet = 0
+		p.Bet -= amt
 	}
 }
