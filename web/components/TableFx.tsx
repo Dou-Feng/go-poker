@@ -166,6 +166,7 @@ export default function TableFx({ game, maxPlayers }: props) {
       last = snap;
 
       // Bet / fold feedback within a live betting street (PreFlop..River).
+      let betAnimated = false;
       for (const ev of diffTableActions(prev, snap)) {
         const slot = seatSlot(snap.players, ev.position);
         if (slot === null) continue;
@@ -173,6 +174,7 @@ export default function TableFx({ game, maxPlayers }: props) {
         if (ev.kind === "bet") {
           // A short stream of chips flies from the bettor's seat to the pot,
           // with a "+amount" label popping above the seat.
+          betAnimated = true;
           flyBetween(seat.x, seat.y, POT_X, POT_Y, "bg-amber-400", 0, 550);
           flyBetween(seat.x, seat.y, POT_X, POT_Y, "bg-amber-500", 140, 550);
           flyBetween(seat.x, seat.y, POT_X, POT_Y, "bg-amber-300", 280, 550);
@@ -195,8 +197,16 @@ export default function TableFx({ game, maxPlayers }: props) {
       }
 
       // Pot collect when the Showdown window first opens with decided pots.
+      // A call that closes the river lands in Showdown in the same snapshot;
+      // let its chips reach the pot before the pot streams out to the winner.
       if (snap.stage === 6 && (!prev || prev.stage !== 6)) {
-        scheduleCollect(snap.pots ?? [], snap.players ?? []);
+        const pots = snap.pots ?? [];
+        const players = snap.players ?? [];
+        if (betAnimated) {
+          window.setTimeout(() => scheduleCollect(pots, players), 700);
+        } else {
+          scheduleCollect(pots, players);
+        }
       }
 
       // Drop transient labels when a fresh hand starts.

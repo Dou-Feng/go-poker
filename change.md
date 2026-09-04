@@ -170,6 +170,8 @@
 
 - [x] 弃牌动画增强：玩家弃牌时在其座位上方弹出红色「弃牌/fold」标签，提示动作归属；下一手开始时清除所有瞬时标签。
 
+- [x] bug 修复：跟注不出动画 —— 只有下注/加注和 all-in 有动画，跟注没有（双人局尤其明显，每次跟注都没有）。根因是服务端在一条 `update-game` 内就把「收口的跟注」直接发到下一街（`updateRoundInfo` → `deal`），stage 已 +1、各人 `bet` 已清零；而 `diffTableActions` 要求前后快照 stage 相同且 `betting` 仍为 true 才发 bet 事件，于是收口的跟注、河牌收口进 Showdown 的跟注、以及让所有人都无法再行动的 all-in 全部漏掉。改为以**前一帧**处于下注街（stage 2..5 且 `betting`）为条件，用整手累计的 `totalBet` 差值判定筹码投入，与 stage/`betting` 是否变化无关；盲注仍不算（前一帧是 NotReady）。河牌收口跟注与收池发生在同一帧时，收池动画延后 700ms，避免两股筹码对穿。座位上的筹码额度同样保留 900ms 再消失（`Seat.tsx` 的 `useDisplayedBet`），使跟注方的额度也会弹出。
+
 - [x] bug 修复：动画座位错位 —— 自己坐 1 号位、对手坐 6 号位时，对手下注/收池动画却从 2 号位出现。根因是 `TableFx` 直接把玩家的游戏 position（行动位次）当作视觉槽位算坐标，而 `Table.tsx` 是按 seatID 排座、再以本人 seatID 旋转到槽位 0；position 与 seatID-1 并不相等。修复为新增 `seatSlot`：先把 position 解析成该玩家的 seatID，再按与 `Table.tsx` 相同的公式 `(seatID-1 - 本人seatID) % max` 计算视觉槽位；加注/弃牌/收池共用同一映射。已在「me 坐 1 号位、对手坐 6 号位」的真实对局中验证：对手下注筹码从其 6 号位（右上角槽位）飞出。
 
 * 支持https
