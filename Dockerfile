@@ -13,9 +13,14 @@ RUN go build cmd/go-poker/main.go
 
 FROM alpine:latest
 RUN apk --no-cache add ca-certificates && \
-    adduser -S -D -H -h /app appuser
+    adduser -S -D -H -h /app appuser && \
+    mkdir -p /app/certs && chown appuser /app/certs
 USER appuser
 WORKDIR /app
+
+# 8080: HTTP (or ACME + redirect when TLS is on). 443: HTTPS when
+# TLS_DOMAINS / TLS_CERT_FILE is configured (see .env.example).
+EXPOSE 8080 443
 
 COPY --from=backend-builder /build/main ./
 

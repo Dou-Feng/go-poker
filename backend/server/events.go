@@ -23,7 +23,11 @@ func handleJoinTable(c *Client, tablename string, password string, playerUUID st
 		return
 	}
 
-	table, _ := c.hub.createTableIfAbsent(tablename, "")
+	table, _, err := c.hub.createTableIfAbsent(tablename, "")
+	if err != nil {
+		c.send <- createError(err.Error())
+		return
+	}
 	if table.password != "" && table.password != password {
 		c.send <- createError("wrong password")
 		return
@@ -362,7 +366,11 @@ func handleListTables(c *Client) {
 }
 
 func handleCreateTable(c *Client, tablename string, password string, sb uint, bb uint, buyIn uint, maxBuy uint, maxPlayers uint, handsLimit uint) {
-	table, created := c.hub.createTableIfAbsent(tablename, password)
+	table, created, err := c.hub.createTableIfAbsent(tablename, password)
+	if err != nil {
+		c.send <- createResult(actionCreateResult, false, err.Error(), "")
+		return
+	}
 	if !created {
 		c.send <- createResult(actionCreateResult, false, "room already exists", "")
 		return

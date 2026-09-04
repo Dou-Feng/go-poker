@@ -19,7 +19,13 @@ type Hub struct {
 	tablesMu   sync.Mutex
 	users      map[string]bool
 	usersMu    sync.Mutex
+	// guard holds the abuse protections (rate limits, connection and room
+	// caps). Tests that build a Hub literal leave it nil, which disables them.
+	guard *guard
 }
+
+// errTooManyTables is returned when the live-room cap (MAX_TABLES) is hit.
+var errTooManyTables = errors.New("room limit reached, try again later")
 
 func newHub() (*Hub, error) {
 	redis, err := newRedisClient()
@@ -34,6 +40,7 @@ func newHub() (*Hub, error) {
 		unregister: make(chan *Client),
 		tables:     make(map[*table]bool),
 		users:      make(map[string]bool),
+		guard:      newGuard(guardConfigFromEnv()),
 	}
 	return hub, nil
 }
@@ -76,19 +83,31 @@ func (h *Hub) broadcastToClients(message []byte) {
 // createTableIfAbsent returns the table with the given name, creating it if it
 // does not already exist. The second return value reports whether the table
 // was newly created. The password is only applied to newly created tables.
-func (h *Hub) createTableIfAbsent(name string, password string) (*table, bool) {
+// Creating a room beyond the MAX_TABLES cap fails with errTooManyTables so a
+// client cannot exhaust memory by spamming new room names.
+func (h *Hub) createTableIfAbsent(name string, password string) (*table, bool, error) {
 	h.tablesMu.Lock()
 	defer h.tablesMu.Unlock()
 	for t := range h.tables {
 		if t.name == name {
-			return t, false
+			return t, false, nil
 		}
+	}
+	if h.tableCapReached() {
+		return nil, false, errTooManyTables
 	}
 	t := newTable(name, h.rdb, h)
 	t.password = password
 	go t.run()
 	h.tables[t] = true
-	return t, true
+	return t, true, nil
+}
+
+// tableCapReached reports whether no more rooms may be created (MAX_TABLES).
+// A hub without a guard (tests) or a cap of 0 has no limit. The caller must
+// hold h.tablesMu.
+func (h *Hub) tableCapReached() bool {
+	return h.guard != nil && h.guard.cfg.maxTables > 0 && len(h.tables) >= h.guard.cfg.maxTables
 }
 
 // findTable returns the live table with the given name, or nil if none exists.

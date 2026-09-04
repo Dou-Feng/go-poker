@@ -48,11 +48,15 @@ export function SocketProvider(props: SocketProviderProps) {
       return;
     }
 
+    // Production serves the static bundle and the socket from the same Go
+    // binary. Over https the socket is wss on the page's own host (the TLS
+    // listener, 443 by default); over plain http the backend listens on
+    // 8080, which is also where `next dev` on :3000 finds it.
     const wsUrl =
       process.env.NEXT_PUBLIC_WS_URL ??
-      `${window.location.protocol === "https:" ? "wss" : "ws"}://${
-        window.location.hostname
-      }:8080/ws`;
+      (window.location.protocol === "https:"
+        ? `wss://${window.location.host}/ws`
+        : `ws://${window.location.hostname}:8080/ws`);
     let ws: WebSocket | null = null;
     let disposed = false;
     let reconnectTimer: ReturnType<typeof setTimeout> | null = null;

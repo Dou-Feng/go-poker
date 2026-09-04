@@ -1,6 +1,7 @@
 package server
 
 import (
+	"crypto/tls"
 	"encoding/json"
 	"log/slog"
 	"mime"
@@ -9,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -17,6 +19,16 @@ import (
 
 const (
 	staticDir = "/app/out"
+
+	// Server-side timeouts. They bound how long a slow or idle client may
+	// hold a connection (slowloris-style exhaustion) without affecting
+	// WebSockets: gorilla clears the deadlines when it hijacks the socket
+	// and the read/write pumps apply their own.
+	readHeaderTimeout = 10 * time.Second
+	readTimeout       = 30 * time.Second
+	writeTimeout      = 60 * time.Second // avatar downloads on slow links
+	idleTimeout       = 120 * time.Second
+	maxHeaderBytes    = 16 << 10
 )
 
 type Server struct {
@@ -24,27 +36,37 @@ type Server struct {
 	server   *http.Server
 	router   *chi.Mux
 	hub      *Hub
+
+	// When TLS is enabled the plain listener/server only answer ACME
+	// challenges and redirect to https; the app is served from tlsListener.
+	tlsListener net.Listener
+	redirect    *http.Server
 }
 
 func New() (*Server, error) {
-	port := getPort()
-	addr := ":" + port
-
 	registerExtensions()
 
-	ln, err := net.Listen("tcp4", addr)
+	ln, err := net.Listen("tcp4", ":"+getPort())
 	if err != nil {
 		return nil, err
 	}
 
 	hub, err := newHub()
 	if err != nil {
+		ln.Close()
 		return nil, err
 	}
 
+	return newServer(hub, ln, tlsSettingsFromEnv())
+}
+
+// newServer wires the router onto an already-bound plain listener. It is
+// split from New so tests can boot the real stack on ephemeral ports with a
+// hand-built hub (no Redis).
+func newServer(hub *Hub, ln net.Listener, settings tlsSettings) (*Server, error) {
 	s := &Server{
 		listener: ln,
-		server:   &http.Server{Addr: addr},
+		server:   newHTTPServer(ln.Addr().String()),
 		router:   chi.NewRouter(),
 		hub:      hub,
 	}
@@ -56,7 +78,48 @@ func New() (*Server, error) {
 	s.mountAvatar()
 	s.mountStatic()
 
+	if settings.enabled() {
+		if err := s.enableTLS(settings); err != nil {
+			ln.Close()
+			return nil, err
+		}
+	}
+
 	return s, nil
+}
+
+// newHTTPServer returns an http.Server with the hardening timeouts applied.
+func newHTTPServer(addr string) *http.Server {
+	return &http.Server{
+		Addr:              addr,
+		ReadHeaderTimeout: readHeaderTimeout,
+		ReadTimeout:       readTimeout,
+		WriteTimeout:      writeTimeout,
+		IdleTimeout:       idleTimeout,
+		MaxHeaderBytes:    maxHeaderBytes,
+	}
+}
+
+// enableTLS moves the application onto an HTTPS listener and turns the plain
+// PORT listener into an ACME/redirect endpoint.
+func (s *Server) enableTLS(settings tlsSettings) error {
+	cfg, plainHandler, err := settings.build()
+	if err != nil {
+		return err
+	}
+	tlsAddr := ":" + settings.httpsPort
+	raw, err := net.Listen("tcp4", tlsAddr)
+	if err != nil {
+		return err
+	}
+	s.tlsListener = tls.NewListener(raw, cfg)
+	s.server.Addr = tlsAddr
+	s.server.TLSConfig = cfg
+
+	s.redirect = newHTTPServer(s.listener.Addr().String())
+	s.redirect.Handler = s.hub.guard.httpLimit(plainHandler)
+	slog.Default().Info("TLS enabled", "https", tlsAddr, "domains", settings.domains, "certFile", settings.certFile)
+	return nil
 }
 
 func (s *Server) mountAvatar() {
@@ -69,6 +132,12 @@ func (s *Server) mountAvatar() {
 func (s *Server) Run() error {
 	go s.hub.run()
 	slog.Default().Info("running websocket hub")
+	if s.tlsListener != nil {
+		go s.server.Serve(s.tlsListener)
+		go s.redirect.Serve(s.listener)
+		slog.Default().Info("starting https server", "addr", s.server.Addr, "redirectFrom", s.listener.Addr().String())
+		return nil
+	}
 	go s.server.Serve(s.listener)
 	slog.Default().Info("starting http server")
 	return nil
@@ -86,6 +155,9 @@ func getPort() string {
 func (s *Server) mountMiddleware() {
 	s.router.Use(middleware.Logger)
 	s.router.Use(middleware.Recoverer)
+	// Per-IP request rate limit (429) before any routing or CORS work.
+	s.router.Use(s.hub.guard.httpLimit)
+	s.router.Use(securityHeaders)
 	s.router.Use(cors.Handler(cors.Options{
 		// The frontend may be served from any origin: production (same
 		// origin, no CORS needed) and hot dev (localhost:8080 talking to
@@ -98,6 +170,21 @@ func (s *Server) mountMiddleware() {
 		AllowCredentials: false,
 		MaxAge:           500,
 	}))
+}
+
+// securityHeaders sets the usual browser hardening headers. HSTS is only sent
+// on TLS connections (browsers ignore it over plain HTTP anyway).
+func securityHeaders(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		h := w.Header()
+		h.Set("X-Content-Type-Options", "nosniff")
+		h.Set("X-Frame-Options", "DENY")
+		h.Set("Referrer-Policy", "strict-origin-when-cross-origin")
+		if r.TLS != nil {
+			h.Set("Strict-Transport-Security", "max-age=31536000")
+		}
+		next.ServeHTTP(w, r)
+	})
 }
 
 func (s *Server) mountStatus() {

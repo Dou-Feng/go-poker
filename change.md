@@ -174,9 +174,18 @@
 
 - [x] bug 修复：动画座位错位 —— 自己坐 1 号位、对手坐 6 号位时，对手下注/收池动画却从 2 号位出现。根因是 `TableFx` 直接把玩家的游戏 position（行动位次）当作视觉槽位算坐标，而 `Table.tsx` 是按 seatID 排座、再以本人 seatID 旋转到槽位 0；position 与 seatID-1 并不相等。修复为新增 `seatSlot`：先把 position 解析成该玩家的 seatID，再按与 `Table.tsx` 相同的公式 `(seatID-1 - 本人seatID) % max` 计算视觉槽位；加注/弃牌/收池共用同一映射。已在「me 坐 1 号位、对手坐 6 号位」的真实对局中验证：对手下注筹码从其 6 号位（右上角槽位）飞出。
 
-* 支持https
+- [x] bug 修复：短 all-in（大于跟注、小于最小加注）不再直接结束该街。原现象：A 因筹码不足 all-in 时，B 被自动当作「已跟注」，牌局直接进入下一街，B 没机会跟注就被排除在底池之外，最后 A 直接赢走底池。根因是 `isCalled` 只看 `Called` 标记，B 在本街之前已行动过所以被视为已跟平；按座位顺序不同，要么 B 的 `totalBet` 低于 A 而被排除出底池（A 未经比牌直接赢），要么 A 的 all-in 被静默降级成跟注。现 `isCalled` 要求「已行动 **且** 下注额追平最高注」，落后于短 all-in 的玩家必须补跟或弃牌。新增 `TestShortAllInRaiseOpponentMustAct`（两种座位顺序）、`TestShortAllInRaiseOpponentMayFold`。
+- [x] 下注规则按标准德州规则收口：短 all-in 合法但**不重开加注权**——自上一次完整加注后已经行动过的玩家只能跟注或弃牌（服务端拒绝其加注/all-in），尚未行动的玩家仍可加注，最小加注额以当前最高注（含短 all-in）为基准加上一次完整加注的增量。前端操作框在此情形下只显示「跟注/弃牌」。UT：`TestShortAllInThreeHandedRaiseRights`、`TestShortAllInDoesNotBlockUnactedPlayer`。
+- [x] 最小下注/最小加注增量改为一个大盲（原为一个小盲）：翻前最少加注到 2×BB，翻后最少下注 1×BB。UT：`TestMinimumBetIsBigBlind`。
+- [x] 边池与退码修正：A all-in 200、B all-in 100 时，A 多出的 100 无人能跟，在下注结束的当刻立即退回 A（不依赖座位下标，原实现按下标 0 初始化导致有时不退、有时退了但底池仍计入而凭空多出筹码）；退码后重建底池，并去掉金额为 0 的「幻影」边池（原来相同金额的 all-in 会多生成一个空池并给赢家多记一次胜场）。新增 `backend/poker/sidepot_test.go`，全部通过真实操作（发牌/下注/弃牌）驱动再定牌面摊牌：单挑不等额 all-in（深筹码为加注方 / 为跟注方）、三人 50/100/200 all-in 的主池+边池+退码（四种赢家排列）、弃牌者的死钱留在池中但不参与分配、活人跟两个 all-in、等额 all-in 只有一个池且只记一次胜场、平分主池+独立边池、跨街累积的边池；每个用例都断言桌面总筹码不变。
+- [x] 只剩一名玩家可行动（其他人全部 all-in 且下注已追平）时，跳过该玩家的回合：下注直接结束，按 all-in 摊牌流程逐街自动发完公牌（原来该玩家要独自一街街过牌）。当他仍欠短 all-in 的筹码时回合保留（需要跟注或弃牌）。UT：`TestLonePlayerWithChipsGetsNoTurn`、`TestLonePlayerStillActsWhenOwingChips`。
+- [x] 平分底池除不尽时的零头：按标准规则从庄家下一位开始顺时针每人一枚分给赢家（原实现零头直接消失）；前端赢家 toast 按同样规则显示金额。UT：`TestOddChipGoesToFirstAfterButton`（单挑 201 平分）、`TestTwoOddChipsHandedOutClockwise`（三人 302 平分）。
 
-* 保护服务器不受到攻击，比如syn flood，拒绝服务攻击等等。
+- [x] bug 修复：make hot 部署后登录、刷新页面，大厅显示的是账号 UUID 而不是用户名。根因是 `index.tsx` 回放登录时把 localStorage 里的 `gopoker-user`（账号 UUID）直接当作用户名派发，而服务端 `user-info` 回复里的 `username` 前端从未使用。现在用户名单独缓存到 `gopoker-username`（注册/登录/改名成功时写入），刷新后先用缓存名进大厅，服务端 `user-info` 回复为权威并回写缓存与房间 session；账号在服务端不存在（如 Redis 重置）时 `reconnect-user` 回 `session-expired`（tablename 为空表示账号级），前端清除本地登录并回到注册页。
+
+- [x] 支持 HTTPS：`.env` 配置即可，两种模式——`TLS_DOMAINS`（Let's Encrypt 自动申请与续期，证书缓存在 `certs` 卷）或 `TLS_CERT_FILE`+`TLS_KEY_FILE`（自备/自签证书）。开启后应用监听 `HTTPS_PORT`（443，TLS 1.2+），原 8080 端口只负责 ACME 验证与 301 跳转到 https，并下发 HSTS；前端在 https 页面下自动使用 `wss://<同域>/ws`。不配置则保持纯 HTTP（适合前置反向代理/CDN 终止 TLS）。compose 新增 `${HTTP_PORT:-8080}:8080`、`${HTTPS_PORT:-443}:443` 端口映射与 `certs` 卷，Dockerfile 预建 `/app/certs`。UT：`backend/server/tls_test.go`（环境解析、证书文件模式真实 TLS 握手、ACME 模式的挑战路径不跳转 + 其余请求 301 去端口、IPv6 Host、HSTS 仅 TLS 下发）。
+
+- [x] 保护服务器不受攻击（SYN flood / 拒绝服务等）。应用层（`backend/server/guard.go`，默认开启、`.env` 可调）：http.Server 超时（ReadHeader 10s / Read 30s / Write 60s / Idle 120s、16KiB 头上限）防 slowloris；每 IP HTTP 令牌桶限速（`RATE_HTTP_RPS`，超限 429）；WebSocket 每 IP / 全局连接数上限（`MAX_CONNS_PER_IP` / `MAX_CONNS`，握手前即拒绝）；每连接消息速率（`RATE_WS_MSGS`，超限以 1008 关闭）；登录/注册每 IP 每分钟尝试次数（`RATE_AUTH_PER_MIN`，防爆破）；房间数量上限（`MAX_TABLES`，防刷房耗尽内存）；WebSocket Origin 白名单（`ALLOWED_ORIGINS`）；代理头仅在 `TRUST_PROXY=true` 时采信，防伪造 IP；空闲 IP 记录 10 分钟后回收。内核/网络层（SYN flood 到不了用户态）：`deploy/sysctl-hardening.conf`（SYN cookies、backlog、重试次数、orphan/conntrack 上限等）+ `deploy/HARDENING.md`（nftables/ufw 限速示例、CDN 建议、公网上线清单）。UT：`backend/server/guard_test.go`（令牌桶补充/上限、429 按 IP 隔离与恢复、代理头信任、连接数上限与释放、登录限流、Origin 匹配、环境变量解析、空闲回收、房间上限）。
 
 
 ## 状态
@@ -187,8 +196,10 @@ OK，这一次直接两个人all in 发完牌直接卡死。我觉得我们的�
 2. 翻牌状态（Flop）：一次性发三张公牌（三张一起翻面），从庄家下一位开始轮流操作。跟平后进入转牌状态；只剩一人未弃牌则直接结算。
 3. 转牌状态（Turn）：发一张公牌，轮流操作。跟平后进入河牌状态；只剩一人未弃牌则直接结算。
 4. 河牌状态（River）：发一张公牌，轮流操作。跟平后进入结算状态；只剩一人未弃牌则直接结算。
-5. 补充——all-in 的处理：所有未弃牌玩家都 all-in 后，只是后续每一街的「玩家轮流操作」全部自动跳过，流程照常走：跟平 → 发下一街公牌 →（无人可操作，自动过）→ 下一街……本质上就是自动走完剩下的流程。实现上由客户端按固定节奏（每街 900ms）请求发牌，直到牌面发满。然后结算。
-6. 结算状态（showdown）：展示所有参与比牌玩家的手牌并判别大小（当只有一名玩家没有弃牌是，无需展示除非他点击秀牌），显示每位参与比牌玩家的最大牌型（随翻牌动画同时出现），等待 1 秒后弹出 toast 显示胜利玩家及筹码数量，toast 持续 4 秒；toast 期间牌桌保持亮牌与牌型展示；toast 消失后在胜利玩家框靠牌桌一侧显示 +xxx，随后（结算总计约 5 秒）进入下一状态：
+5. 补充——all-in 的处理：所有未弃牌玩家都 all-in、或只剩一名玩家还有筹码且下注已追平（没有人能再与他对抗）后，后续每一街的「玩家轮流操作」全部自动跳过，流程照常走：跟平 → 发下一街公牌 →（无人可操作，自动过）→ 下一街……本质上就是自动走完剩下的流程。实现上由客户端按固定节奏（每街 900ms）请求发牌，直到牌面发满。然后结算。
+   - 下注规则：最小下注 / 最小加注增量为一个大盲，之后每次完整加注以其增量作为新的最小加注。all-in 永远合法：不足跟注额的 all-in 视为「跟注不足」；超过跟注额但不到完整加注的「短 all-in」不重开加注权——已在本轮行动过的玩家只能跟注或弃牌，未行动过的玩家仍可加注（以当前最高注为基准）。
+   - 退码：下注结束时若无人能再跟最高注（对手全部 all-in），最高注者多出的部分立即退回其筹码，底池按每位 all-in 玩家的累计投入分层为主池/边池，弃牌者的筹码作为死钱留在对应层中。
+6. 结算状态（showdown）：展示所有参与比牌玩家的手牌并判别大小（当只有一名玩家没有弃牌是，无需展示除非他点击秀牌），每个底池/边池分别在其有资格的玩家中比牌；平分时除不尽的零头从庄家下一位起顺时针每人一枚分给赢家。显示每位参与比牌玩家的最大牌型（随翻牌动画同时出现），等待 1 秒后弹出 toast 显示胜利玩家及筹码数量，toast 持续 4 秒；toast 期间牌桌保持亮牌与牌型展示；toast 消失后在胜利玩家框靠牌桌一侧显示 +xxx，随后（结算总计约 5 秒）进入下一状态：
    1. 当有玩家筹码为 0、有玩家预订观战、有玩家退出房间、观战席有人排队上桌 → 进入未准备状态（0）
    2. 其他情况自动开始下一局（回到发牌状态 1）
 7. 终结状态：当局数耗尽，或投票提前结束对局，进入终结状态。弹出房间计分板（所有人净输赢总和为 0，中途离场玩家也在列），玩家关闭计分板后可回大厅，房间在所有人离开后销毁。

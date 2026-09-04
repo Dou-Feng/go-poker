@@ -85,6 +85,11 @@ The only HTTP API besides `/ws` and `/ping` is `/api/avatar` (POST multipart upl
 - `lib/api.ts` exposes `API_BASE` for the avatar HTTP endpoints; empty in production (same origin), set in hot mode.
 - `lib/sfx.ts` plays CC0 WAVs from `public/sfx`; `lib/language.ts` + `hooks/useTranslation.ts` provide zh/en strings and must stay synchronous for SSR hydration.
 
+### HTTPS and abuse protection (`backend/server/tls.go`, `guard.go`)
+
+- TLS is env-driven: `TLS_DOMAINS` (Let's Encrypt via `autocert`, cache in `TLS_CACHE_DIR`) or `TLS_CERT_FILE`+`TLS_KEY_FILE`. When on, the app moves to `HTTPS_PORT` (443) and the plain `PORT` listener only serves ACME challenges and 301s to https. Unset = plain HTTP as before. The frontend derives `wss://<page host>/ws` on https pages, `ws://<host>:8080/ws` otherwise.
+- `Hub.guard` holds per-IP HTTP rate limiting (429), per-IP/global WebSocket connection caps (refused pre-upgrade), a per-connection message bucket (socket closed with 1008 on flood), a login/register attempt limiter, the room cap (`MAX_TABLES`, `createTableIfAbsent` returns `errTooManyTables`) and the Origin allow-list. Knobs and defaults are listed in `.env.example`; a nil guard (tests that build `Hub{}` literals) disables everything. Kernel-level SYN-flood settings live in `deploy/sysctl-hardening.conf`, explained in `deploy/HARDENING.md`.
+
 ## Working notes
 
 - `change.md` is the product owner's feature checklist (Chinese) and the source of truth for intended behaviour; its 「状态」 sections define the two state machines above. Check it before changing game flow.

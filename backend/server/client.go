@@ -37,15 +37,30 @@ type Client struct {
 	// spectateReserved marks that the player wants to move to the spectator
 	// side once the current hand ends.
 	spectateReserved bool
+
+	// ip is the peer address used for rate limiting; msgBucket throttles the
+	// inbound message rate of this connection; releaseConn gives the
+	// connection slot back to the guard when the socket closes.
+	ip          string
+	msgBucket   tokenBucket
+	releaseConn func()
+	// kick carries a close frame that writePump must send before shutting
+	// the socket (writePump is the only goroutine allowed to write).
+	kick chan []byte
 }
 
 func newClient(conn *websocket.Conn, hub *Hub) *Client {
-	return &Client{
+	c := &Client{
 		hub:  hub,
 		conn: conn,
 		send: make(chan []byte, 1024),
+		kick: make(chan []byte, 1),
 		uuid: uuid.New().String(),
 	}
+	if hub != nil && hub.guard != nil {
+		c.msgBucket = hub.guard.newMessageBucket()
+	}
+	return c
 }
 
 func (c *Client) disconnect() {
@@ -55,6 +70,26 @@ func (c *Client) disconnect() {
 		c.table.markPlayerOffline(c.uuid)
 	}
 	c.conn.Close()
+	if c.releaseConn != nil {
+		c.releaseConn()
+	}
+}
+
+// allowMessage reports whether this connection may send another message.
+func (c *Client) allowMessage() bool {
+	if c.hub == nil || c.hub.guard == nil {
+		return true
+	}
+	return c.msgBucket.allow(c.hub.guard.nowFunc())
+}
+
+// allowAuth reports whether this connection's IP may make another login or
+// registration attempt (brute-force protection).
+func (c *Client) allowAuth() bool {
+	if c.hub == nil || c.hub.guard == nil {
+		return true
+	}
+	return c.hub.guard.allowAuth(c.ip)
 }
 
 // readPump pumps events from the websocket connection to the hub.
@@ -71,6 +106,7 @@ func (c *Client) readPump() {
 		slog.Default().Warn("set read deadline", "error", err)
 	}
 	c.conn.SetPongHandler(func(string) error { c.conn.SetReadDeadline(time.Now().Add(pongWait)); return nil })
+	flooded := false
 	for {
 		_, message, err := c.conn.ReadMessage()
 		if err != nil {
@@ -79,6 +115,25 @@ func (c *Client) readPump() {
 			}
 			slog.Default().Warn("Read from websocket", "error", err)
 			break
+		}
+		if flooded {
+			// Draining until writePump has sent the close frame and shut
+			// the socket; nothing more is processed from this peer.
+			continue
+		}
+		if !c.allowMessage() {
+			// A client flooding the socket is cut off rather than queued:
+			// queuing would let it tie up the table goroutine. The close
+			// frame goes through writePump (the sole writer); the short
+			// read deadline bounds how long we keep draining.
+			slog.Default().Warn("Websocket message rate exceeded, closing", "ip", c.ip)
+			flooded = true
+			select {
+			case c.kick <- websocket.FormatCloseMessage(websocket.ClosePolicyViolation, "message rate exceeded"):
+			default:
+			}
+			c.conn.SetReadDeadline(time.Now().Add(writeWait))
+			continue
 		}
 		if err = c.processEvents(message); err != nil {
 			slog.Default().Warn("Process websocket message", "error", err)
@@ -125,19 +180,48 @@ func (c *Client) writePump() {
 				slog.Default().Warn("Write websocket ping", "error", err)
 				return
 			}
+
+		case closeMsg := <-c.kick:
+			// The read side asked us to drop this peer (message flood):
+			// send the close frame and let the deferred Close end readPump.
+			c.conn.SetWriteDeadline(time.Now().Add(writeWait))
+			c.conn.WriteMessage(websocket.CloseMessage, closeMsg)
+			return
 		}
 	}
 }
 
 // serveWs handles websocket requests from the peer.
 func serveWs(hub *Hub, w http.ResponseWriter, r *http.Request) {
-	upgrader.CheckOrigin = func(r *http.Request) bool { return true }
-	conn, err := upgrader.Upgrade(w, r, nil)
+	g := hub.guard
+	ip := ""
+	var release func()
+	if g != nil {
+		ip = g.clientIP(r)
+		// Refuse the handshake outright when this IP (or the whole server)
+		// already holds too many sockets, before any upgrade work is done.
+		var ok bool
+		release, ok = g.admitConn(ip)
+		if !ok {
+			w.Header().Set("Retry-After", "5")
+			http.Error(w, "too many connections", http.StatusTooManyRequests)
+			return
+		}
+	}
+
+	up := upgrader // copy: CheckOrigin closes over the hub's guard
+	up.CheckOrigin = func(r *http.Request) bool { return g == nil || g.allowOrigin(r) }
+	conn, err := up.Upgrade(w, r, nil)
 	if err != nil {
 		log.Println(err)
+		if release != nil {
+			release()
+		}
 		return
 	}
 	client := newClient(conn, hub)
+	client.ip = ip
+	client.releaseConn = release
 
 	client.hub.register <- client
 
@@ -211,6 +295,10 @@ func (c *Client) processEvents(rawMessage []byte) error {
 		if err != nil {
 			return err
 		}
+		if !c.allowAuth() {
+			c.send <- createResult(actionRegisterResult, false, "too many attempts, try again later", "")
+			return nil
+		}
 		handleRegisterUser(c, user.Username, user.UUID, user.Password, user.Avatar)
 		return nil
 
@@ -219,6 +307,10 @@ func (c *Client) processEvents(rawMessage []byte) error {
 		err := json.Unmarshal(rawMessage, &login)
 		if err != nil {
 			return err
+		}
+		if !c.allowAuth() {
+			c.send <- createResult(actionLoginResult, false, "too many attempts, try again later", "")
+			return nil
 		}
 		handleLogin(c, login.Identifier, login.Password)
 		return nil
