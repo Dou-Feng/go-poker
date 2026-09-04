@@ -42,7 +42,11 @@ services:
     image: redis:latest
     container_name: go-poker-redis-hot
     restart: unless-stopped
-    entrypoint: redis-server --appendonly yes
+    # The redis image does not expand env vars itself, so requirepass must go
+    # through a shell. "$$" escapes compose interpolation; the shell inside
+    # the container expands $REDIS_PASSWORD. REDIS_URL must then carry the
+    # credentials: redis://default:$REDIS_PASSWORD@redis:6379
+    entrypoint: sh -c 'redis-server --appendonly yes --requirepass "$$REDIS_PASSWORD"'
     environment:
       REDIS_PASSWORD: ${REDIS_PASSWORD}
     volumes:
