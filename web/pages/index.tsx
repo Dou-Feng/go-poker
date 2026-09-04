@@ -8,7 +8,7 @@ import { useContext, useEffect } from "react";
 import { AppContext } from "../providers/AppStore";
 import { useSocket } from "../hooks/useSocket";
 import { joinTable, reconnectUser } from "../actions/actions";
-import { loadSession, loadUser } from "../lib/session";
+import { loadSession, loadUser, loadUsername } from "../lib/session";
 import { detectLanguage } from "../lib/language";
 
 export default function IndexPage() {
@@ -66,8 +66,14 @@ export default function IndexPage() {
         )
       );
     } else {
-      // Not in a room: drop into the lobby.
-      dispatch({ type: "setUsername", payload: user });
+      // Not in a room: drop into the lobby under the cached display name.
+      // `user` is the account UUID, never a display name. If no name is
+      // cached yet, stay on the register screen until the server's user-info
+      // reply (or a session-expired) settles it.
+      const username = loadUsername();
+      if (username) {
+        dispatch({ type: "setUsername", payload: username });
+      }
     }
   }, [socket, dispatch]);
 

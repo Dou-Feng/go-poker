@@ -17,9 +17,11 @@ import {
 } from "../interfaces";
 import {
   clearSession,
+  clearUser,
   loadSession,
   saveSession,
   saveUser,
+  saveUsername,
 } from "../lib/session";
 import { emitFx } from "../lib/fxBus";
 
@@ -163,6 +165,7 @@ export function SocketProvider(props: SocketProviderProps) {
                 saveUser(event.uuid);
                 dispatch({ type: "setUuid", payload: event.uuid });
               }
+              saveUsername(event.username);
               dispatch({ type: "setUsername", payload: event.username });
               dispatch({ type: "setAuthError", payload: null });
             } else {
@@ -178,6 +181,7 @@ export function SocketProvider(props: SocketProviderProps) {
                 saveUser(event.uuid);
                 dispatch({ type: "setUuid", payload: event.uuid });
               }
+              saveUsername(event.username);
               dispatch({ type: "setUsername", payload: event.username });
               dispatch({ type: "setAuthError", payload: null });
             } else {
@@ -193,6 +197,7 @@ export function SocketProvider(props: SocketProviderProps) {
                 saveUser(event.uuid);
                 dispatch({ type: "setUuid", payload: event.uuid });
               }
+              saveUsername(event.username);
               dispatch({ type: "setUsername", payload: event.username });
               dispatch({ type: "setProfile", payload: null });
               const existing = loadSession();
@@ -236,6 +241,17 @@ export function SocketProvider(props: SocketProviderProps) {
             if (event.self) {
               saveUser(event.uuid);
               dispatch({ type: "setUuid", payload: event.uuid ?? null });
+              // The server's record is authoritative for the display name:
+              // after a refresh the client only has the cached username (or
+              // nothing) until this reply arrives.
+              if (event.username) {
+                saveUsername(event.username);
+                dispatch({ type: "setUsername", payload: event.username });
+                const existing = loadSession();
+                if (existing && existing.username !== event.username) {
+                  saveSession({ ...existing, username: event.username });
+                }
+              }
               dispatch({ type: "setChips", payload: event.chips ?? 0 });
               dispatch({ type: "setAvatar", payload: event.avatar ?? "🙂" });
               dispatch({
@@ -265,6 +281,19 @@ export function SocketProvider(props: SocketProviderProps) {
             });
             return;
           case "session-expired": {
+            // No tablename means the account itself is gone (e.g. the
+            // server's Redis was reset): forget the login and return to the
+            // register screen instead of showing a lobby with no account.
+            if (!event.tablename) {
+              clearUser();
+              clearSession();
+              dispatch({ type: "resetGame" });
+              dispatch({
+                type: "setAuthError",
+                payload: event.message ?? "login expired",
+              });
+              return;
+            }
             // The saved room was recycled or our seat was released while we
             // were away: forget the session and go back to the lobby instead
             // of showing a dead room.

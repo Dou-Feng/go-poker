@@ -209,6 +209,11 @@ func handleReconnectUser(c *Client, accountUUID string) {
 	}
 	user, err := loadUser(c.hub.rdb, accountUUID)
 	if err != nil || user.PasswordHash == "" {
+		// The saved login points at an account that no longer exists (e.g.
+		// Redis was reset). Tell the client so it drops the stale login
+		// instead of sitting in a lobby with no account behind it. An empty
+		// tablename marks this as account-level, not room-level.
+		c.send <- createSessionExpired("", "login expired, please sign in again")
 		return
 	}
 	c.username = user.Username
