@@ -3,14 +3,15 @@ import { FiBarChart2 } from "react-icons/fi";
 import classNames from "classnames";
 import { AppContext } from "../providers/AppStore";
 import { useTranslation } from "../hooks/useTranslation";
-import Avatar from "./Avatar";
-import Portal from "./Portal";
+import Scoreboard, { ScoreRow } from "./Scoreboard";
 
 type roomStatsProps = {
   /** Extra classes for the trigger button. */
   className?: string;
 };
 
+// Live room scoreboard ("战绩"): the same table the settlement screen shows,
+// computed from the current game view.
 export default function RoomStats({ className }: roomStatsProps) {
   const { appState } = useContext(AppContext);
   const { t } = useTranslation();
@@ -18,16 +19,7 @@ export default function RoomStats({ className }: roomStatsProps) {
 
   // One row per account: a player who left and sat down again has a departed
   // snapshot and a live seat, so buy-ins and stacks are summed per account.
-  type row = {
-    key: string;
-    username: string;
-    accountUuid: string;
-    avatar: string;
-    avatarImage: boolean;
-    totalBuyIn: number;
-    stack: number;
-  };
-  const players: row[] = [];
+  const rows: ScoreRow[] = [];
   const index = new Map<string, number>();
   for (const p of [
     ...(appState.game?.players ?? []),
@@ -36,18 +28,18 @@ export default function RoomStats({ className }: roomStatsProps) {
     const key = p.accountUuid || "seat:" + p.uuid;
     const i = index.get(key);
     if (i !== undefined) {
-      players[i].totalBuyIn += p.totalBuyIn;
-      players[i].stack += p.stack;
+      rows[i].buyIn += p.totalBuyIn;
+      rows[i].stack += p.stack;
       continue;
     }
-    index.set(key, players.length);
-    players.push({
+    index.set(key, rows.length);
+    rows.push({
       key,
       username: p.username,
-      accountUuid: p.accountUuid,
+      uuid: p.accountUuid,
       avatar: p.avatar,
       avatarImage: p.avatarImage,
-      totalBuyIn: p.totalBuyIn,
+      buyIn: p.totalBuyIn,
       stack: p.stack,
     });
   }
@@ -64,70 +56,11 @@ export default function RoomStats({ className }: roomStatsProps) {
       </button>
 
       {show && (
-        <Portal>
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-            <div className="w-full max-w-md rounded-lg bg-card p-6 shadow-2xl">
-              <div className="mb-4 flex flex-row items-center justify-between">
-                <p className="type-heading">{t("roomStats")}</p>
-                <button onClick={() => setShow(false)} className="btn btn-text">
-                  ✕
-                </button>
-              </div>
-
-              {players.length === 0 && (
-                <p className="type-label">{t("noPlayers")}</p>
-              )}
-
-              <div className="type-caption mb-2 flex flex-row items-center justify-between px-3 font-mono">
-                <span>{t("player")}</span>
-                <div className="flex flex-row items-center gap-2">
-                  <span className="w-12 text-right">{t("buyInLabel")}</span>
-                  <span className="w-12 text-right">{t("chips")}</span>
-                  <span className="w-14 text-right">{t("net")}</span>
-                </div>
-              </div>
-
-              <div className="flex flex-col gap-2">
-                {players.map((p) => {
-                  const net = p.stack - p.totalBuyIn;
-                  return (
-                    <div
-                      key={p.key}
-                      className="flex flex-row items-center justify-between rounded-md bg-floor px-3 py-2"
-                    >
-                      <div className="flex min-w-0 flex-row items-center gap-2">
-                        <Avatar
-                          username={p.username}
-                          uuid={p.accountUuid}
-                          emoji={p.avatar || "🙂"}
-                          hasImage={p.avatarImage}
-                          size={28}
-                        />
-                        <span className="truncate text-ink">{p.username}</span>
-                      </div>
-                      <div className="flex flex-row items-center gap-2 font-mono text-sm">
-                        <span className="w-12 text-right text-muted">
-                          {p.totalBuyIn}
-                        </span>
-                        <span className="w-12 text-right text-ink">
-                          {p.stack}
-                        </span>
-                        <span
-                          className={`w-14 text-right font-semibold ${
-                            net >= 0 ? "text-emerald-400" : "text-rose-400"
-                          }`}
-                        >
-                          {net >= 0 ? "+" : ""}
-                          {net}
-                        </span>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-        </Portal>
+        <Scoreboard
+          title={t("roomStats")}
+          rows={rows}
+          onClose={() => setShow(false)}
+        />
       )}
     </>
   );
