@@ -15,9 +15,12 @@ export default function Pot() {
     0
   );
 
+  // A translucent pill over the felt rather than a solid dark disc (which
+  // read as a hole in the table): the felt texture shows through and only the
+  // number is emphasised.
   return (
     <div className="flex flex-col">
-      <p className="flex h-10 w-24 flex-col items-center justify-center rounded-3xl bg-tablehi text-2xl font-semibold text-ink">
+      <p className="type-num flex h-9 min-w-[5.5rem] flex-col items-center justify-center rounded-full border border-white/10 bg-black/25 px-4 text-xl text-amber-200 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)] sm:h-10 sm:text-2xl">
         {total}
       </p>
     </div>

@@ -194,6 +194,26 @@ export default function Table() {
       peekTimerRef.current = null;
     }
     setPeeking(false);
+    if (heldRef.current) {
+      // The click event for this release (if the browser fires one) arrives
+      // right after pointerup and is swallowed by the capture handler
+      // below. Clear the flag shortly after so a hold that produced no
+      // click cannot eat the next genuine tap.
+      setTimeout(() => {
+        heldRef.current = false;
+      }, 300);
+    }
+  };
+  // Capture-phase click filter: a click that ends a hold must not act as a
+  // tap on whatever was under the finger (opening a seat's profile, pressing
+  // ready, toggling the board view). Stopping it here, before it reaches the
+  // target, covers every child without touching their handlers.
+  const swallowClickAfterHold = (e: React.MouseEvent<HTMLElement>) => {
+    if (heldRef.current) {
+      heldRef.current = false;
+      e.stopPropagation();
+      e.preventDefault();
+    }
   };
   const toggleBoardView = () => {
     if (heldRef.current) {
@@ -353,6 +373,7 @@ export default function Table() {
       style={{ WebkitTouchCallout: "none" } as React.CSSProperties}
       onPointerDown={startPeek}
       onPointerUp={endPeek}
+      onClickCapture={swallowClickAfterHold}
       onPointerCancel={endPeek}
       onPointerLeave={endPeek}
       onContextMenu={(e) => {
@@ -367,7 +388,10 @@ export default function Table() {
           className={classNames(
             // Anchored to the top of the table, not the centre: the finger
             // that is holding the table would otherwise cover the popup.
-            "absolute inset-x-0 top-2 z-40 flex items-start justify-center sm:top-6",
+            // Below the room's top toolbars (leave/vote row, hands pill,
+            // wallet column) so it never overlaps them; it may cover the
+            // top seats, which is fine for a transient popup.
+            "absolute inset-x-0 top-28 z-40 flex items-start justify-center sm:top-24",
             // While held the popup is see-through to pointer events so the
             // release is always caught by the table; when pinned, a tap on
             // it closes it.
@@ -461,8 +485,11 @@ export default function Table() {
           )}
         </div>
       )}
+      {/* Showdown toast at the bottom of the screen (above the chat tabs;
+          the action bar is hidden while betting is over), leaving the
+          revealed cards and hand labels on the table unobstructed. */}
       {(winners.length > 0 || forfeited) && (
-        <div className="pointer-events-none absolute inset-0 z-30 flex items-center justify-center">
+        <div className="pointer-events-none absolute inset-x-0 bottom-14 z-30 flex items-end justify-center px-2 sm:bottom-20">
           <div className="animate-winner-pop rounded-2xl border-2 border-amber-300 bg-tablehi/90 px-8 py-4 text-center shadow-2xl">
             <p className="type-heading">
               {forfeited ? t("chipsForfeited") : t("winner")}

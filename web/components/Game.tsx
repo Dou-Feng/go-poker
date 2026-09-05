@@ -58,21 +58,30 @@ export default function Game() {
         <Table />
       </div>
       {game && (
-        <div className="absolute left-1/2 top-0 z-50 flex -translate-x-1/2 flex-row items-center gap-2 rounded-b-lg bg-tablehi/90 px-4 py-1.5">
+        <div className="absolute left-1/2 top-0 z-50 flex -translate-x-1/2 flex-row items-center gap-2 rounded-b-lg bg-tablehi/90 px-3 py-1.5 sm:px-4">
           {showVotes && (
-            <div className="flex flex-row items-center gap-1.5">
-              {game.players.map((p) => (
-                <span key={p.position} className="text-lg leading-none">
-                  {game.settleVotes.includes(p.username) ? (
-                    <FiCheckCircle className="text-emerald-400" />
-                  ) : (
-                    <FiCircle className="text-muted" />
-                  )}
-                </span>
-              ))}
-            </div>
+            <>
+              {/* One circle per player on wide screens; a compact "voted /
+                  seated" count on phones so the pill stays narrow enough
+                  not to reach the toolbars on either side. */}
+              <div className="hidden flex-row items-center gap-1.5 sm:flex">
+                {game.players.map((p) => (
+                  <span key={p.position} className="text-lg leading-none">
+                    {game.settleVotes.includes(p.username) ? (
+                      <FiCheckCircle className="text-emerald-400" />
+                    ) : (
+                      <FiCircle className="text-muted" />
+                    )}
+                  </span>
+                ))}
+              </div>
+              <span className="flex flex-row items-center gap-1 text-xs text-muted sm:hidden">
+                <FiCheckCircle className="text-emerald-400" />
+                {game.settleVotes.length}/{game.players.length}
+              </span>
+            </>
           )}
-          <span className="whitespace-nowrap text-sm font-medium text-ink">
+          <span className="whitespace-nowrap text-xs font-medium text-ink sm:text-sm">
             {t("hands")}{" "}
             {game.config.handsLimit > 0
               ? Math.min(game.handsPlayed + 1, game.config.handsLimit)
@@ -92,7 +101,9 @@ export default function Game() {
           <ChatLog />
         </div>
       </div>
-      <div className="absolute left-0 top-0 z-10 flex flex-row items-center">
+      {/* Leave / vote row. On phones it drops below the centred hands pill
+          (which hangs from the top edge) so the two never overlap. */}
+      <div className="absolute left-0 top-8 z-10 flex flex-row items-center sm:top-0">
         <button onClick={handleLeave} className="btn btn-danger m-2">
           {t("leave")}
         </button>
