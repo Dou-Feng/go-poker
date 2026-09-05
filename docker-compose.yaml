@@ -14,7 +14,7 @@ services:
       REDIS_URL: ${REDIS_URL}
     volumes:
       - ./.env:/app/.env   # 挂载 .env 文件到容器内 (TLS_* / rate-limit knobs are read from here too)
-      - certs:/app/certs   # Let's Encrypt cache, or drop your own cert/key here
+      - ./certs:/app/certs   # Let's Encrypt cache, or drop your own cert/key here
     # Many concurrent WebSockets need many file descriptors.
     ulimits:
       nofile:

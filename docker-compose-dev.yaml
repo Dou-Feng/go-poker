@@ -5,11 +5,18 @@ services:
     build: .
     restart: unless-stopped
     ports:
-      - 8080:8080
+      - "${HTTP_PORT:-8080}:8080"
+      # HTTPS listener (only bound when TLS_DOMAINS or TLS_CERT_FILE is set).
+      - "${HTTPS_PORT:-443}:443"
     environment:
       REDIS_URL: ${REDIS_URL}
     volumes:
       - ./.env:/app/.env   # 挂载 .env 文件到容器内
+      - ./certs:/app/certs   # Let's Encrypt cache, or drop your own cert/key here
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
     depends_on:
       - redis
 

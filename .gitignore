@@ -71,3 +71,5 @@ backend/tmp/
 data/
 
 .claude/
+
+certs/
