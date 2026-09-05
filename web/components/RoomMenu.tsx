@@ -1,5 +1,5 @@
 import { useContext, useEffect, useState } from "react";
-import { FiMoreHorizontal, FiX } from "react-icons/fi";
+import { FiCheck, FiCpu, FiMoreHorizontal, FiX } from "react-icons/fi";
 import classNames from "classnames";
 import { AppContext } from "../providers/AppStore";
 import { useSocket } from "../hooks/useSocket";
@@ -15,7 +15,7 @@ import RoomStats from "./RoomStats";
 // the action bar, so a player taps "..." again to clear the way when it is
 // their turn.
 export default function RoomMenu() {
-  const { appState } = useContext(AppContext);
+  const { appState, dispatch } = useContext(AppContext);
   const socket = useSocket();
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
@@ -33,6 +33,13 @@ export default function RoomMenu() {
   if (!game) {
     return null;
   }
+
+  // Bots are seats played by the server. Only the room's host manages them,
+  // between hands, through a placement mode: while it is on, empty seats show
+  // "+" (tap to seat a bot there) and seated bots can be tapped to remove.
+  const isHost = !!appState.uuid && game.host === appState.uuid;
+  const botMode = appState.botMode;
+  const botCount = game.players.filter((p) => p.bot).length;
 
   return (
     <div className="absolute bottom-28 right-2 z-40 flex flex-col items-end gap-1 sm:bottom-32">
@@ -66,6 +73,32 @@ export default function RoomMenu() {
             </button>
           )}
           <RoomStats className="w-full justify-start" />
+          {isHost && (
+            <button
+              onClick={() =>
+                dispatch({ type: "setBotMode", payload: !botMode })
+              }
+              disabled={game.running}
+              title={
+                game.running
+                  ? t("gameAlreadyRunning")
+                  : botMode
+                  ? t("botModeDone")
+                  : t("botModeHint")
+              }
+              aria-pressed={botMode}
+              className={classNames(
+                "btn w-full justify-start",
+                botMode ? "btn-confirm" : "btn-ghost"
+              )}
+            >
+              {botMode ? <FiCheck size="1rem" /> : <FiCpu size="1rem" />}
+              {botMode ? t("botModeDone") : t("addBot")}
+              {botCount > 0 && !botMode && (
+                <span className="type-caption ml-auto">🤖 {botCount}</span>
+              )}
+            </button>
+          )}
         </div>
       )}
       <button

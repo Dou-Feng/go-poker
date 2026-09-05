@@ -36,6 +36,8 @@ export type AppState = {
   history: HistoryRecord[];
   settlement: Settlement | null;
   language: "en" | "zh";
+  /** Host is placing/removing bots: empty seats show "+", bots are removable. */
+  botMode: boolean;
 };
 
 export type TableInfo = {
@@ -103,6 +105,8 @@ export type Player = {
   stats: PlayerStats;
   avatar: string;
   avatarImage: boolean;
+  /** Seat played by the server (see backend bot.go). */
+  bot?: boolean;
   revealed: boolean;
   bestHand: string;
 };
@@ -125,6 +129,8 @@ export type Game = {
   readyCount: number;
   waiting: string[];
   settleVotes: string[];
+  /** Account UUID of the room host (the only one who manages bots). */
+  host: string;
   handsPlayed: number;
   biggestPotAmt: number;
   biggestPotWinners: number[];

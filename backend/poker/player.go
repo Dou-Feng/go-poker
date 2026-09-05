@@ -76,7 +76,9 @@ type player struct {
 	Stats        PlayerStats `json:"stats"`
 	Avatar       string      `json:"avatar"`
 	AvatarImage  bool        `json:"avatarImage"`
-	Revealed     bool        `json:"revealed"`
+	// Bot marks a seat played by the server rather than a person.
+	Bot      bool `json:"bot,omitempty"`
+	Revealed bool `json:"revealed"`
 	// BestHand is populated on showdown for revealed/all-in players: the
 	// name of their best five-card hand (e.g. "full house").
 	BestHand string `json:"bestHand,omitempty"`

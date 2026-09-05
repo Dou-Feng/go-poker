@@ -36,6 +36,7 @@ const initialState: AppState = {
   // useEffect (pages/index.tsx) after hydration, to avoid a hydration
   // mismatch (the server has no `navigator`).
   language: "en",
+  botMode: false,
 };
 
 type ACTIONTYPE =
@@ -60,7 +61,8 @@ type ACTIONTYPE =
   | { type: "setProfile"; payload: Profile | null }
   | { type: "setHistory"; payload: HistoryRecord[] }
   | { type: "setSettlement"; payload: Settlement | null }
-  | { type: "setLanguage"; payload: Language };
+  | { type: "setLanguage"; payload: Language }
+  | { type: "setBotMode"; payload: boolean };
 function reducer(state: AppState, action: ACTIONTYPE) {
   switch (action.type) {
     case "addMessage":
@@ -83,9 +85,17 @@ function reducer(state: AppState, action: ACTIONTYPE) {
         table: null,
       };
     case "leaveRoom":
-      return { ...state, clientID: null, game: null, table: null };
+      return {
+        ...state,
+        clientID: null,
+        game: null,
+        table: null,
+        botMode: false,
+      };
     case "clearGame":
-      return { ...state, clientID: null, game: null };
+      return { ...state, clientID: null, game: null, botMode: false };
+    case "setBotMode":
+      return { ...state, botMode: action.payload };
     case "updatePlayerID":
       return { ...state, clientID: action.payload };
     case "setTablename":

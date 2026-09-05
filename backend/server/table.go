@@ -57,6 +57,8 @@ type table struct {
 	// ledger totals each account's buy-ins across the whole room session so
 	// MaxBuy cannot be dodged by leaving and re-sitting (see scoreboard.go).
 	ledger *sessionLedger
+	// Server-played seats and their pacing timer (see bot.go).
+	botState
 }
 
 // newTable creates a new table
@@ -79,12 +81,17 @@ func newTable(name string, redisClient *redis.Client, hub *Hub) *table {
 		waiting:       make(map[*Client]bool),
 		settleVotes:   make(map[string]bool),
 		ledger:        newSessionLedger(),
+		botState:      botState{botDelays: defaultBotDelays},
 	}
 }
 
 // flushSession persists a player's session through the injected flushFunc,
 // falling back to Redis.
 func (t *table) flushSession(accountUUID string, totalBuyIn uint, stack uint, stats poker.PlayerStats) (uint, error) {
+	if isBotAccount(accountUUID) {
+		// Bots have no wallet, stats or history to persist.
+		return stack, nil
+	}
 	if t.flush != nil {
 		return t.flush(accountUUID, t.name, totalBuyIn, stack, stats)
 	}
@@ -117,6 +124,7 @@ func (t *table) shutdown() {
 		t.offlineTimers = nil
 		t.offlineMu.Unlock()
 
+		t.stopBots()
 		close(t.stop)
 	})
 }
@@ -263,7 +271,8 @@ func (t *table) registerClient(client *Client) {
 	t.clients[client] = true
 	t.clientsMu.Unlock()
 
-	if t.emptyTimer != nil {
+	// Only a real connection keeps the room alive; bots do not.
+	if !client.isBot && t.emptyTimer != nil {
 		t.emptyTimer.Stop()
 		t.emptyTimer = nil
 	}
@@ -279,8 +288,17 @@ func (t *table) unregisterClient(client *Client) {
 	if wasMember {
 		delete(t.clients, client)
 	}
-	empty := len(t.clients) == 0
+	// A room holding only bots is empty: it is recycled like any other, and
+	// the bots go with it.
+	empty := t.humanCount() == 0
+	hostChanged := wasMember && client.accountUUID != "" && t.reassignHostIfGoneLocked()
 	t.clientsMu.Unlock()
+
+	if hostChanged {
+		// Let everyone's UI pick up the new host (this runs on the table's
+		// own goroutine, so the broadcast must not block on its own channel).
+		go t.broadcastGame()
+	}
 
 	if wasMember {
 		t.announceVoiceLeave(client)
@@ -341,6 +359,7 @@ func (m *updateGame) censoredFor(viewerUUID string) []byte {
 		Game:        m.Game.CensorFor(m.Game.ViewerNum(viewerUUID)),
 		Waiting:     m.Waiting,
 		SettleVotes: m.SettleVotes,
+		Host:        m.Host,
 	}
 
 	resp, err := json.Marshal(game)
@@ -550,6 +569,7 @@ func (t *table) broadcastGame() {
 	}
 	t.autoSpectateBusted()
 	t.broadcast <- createUpdatedGameBytes(t)
+	t.scheduleBots()
 }
 
 // maybeSettleAfterHand settles a session once a majority has voted to settle
@@ -670,7 +690,13 @@ func (t *table) voteSettle(c *Client) {
 		t.settleVotes[c.username] = true
 	}
 	votes := len(t.settleVotes)
-	seatedCount := len(view.Players)
+	// Bots never vote and never block a vote: the majority is over humans.
+	seatedCount := 0
+	for _, p := range view.Players {
+		if !isBotAccount(p.AccountUUID) {
+			seatedCount++
+		}
+	}
 	approved := seatedCount > 0 && votes > seatedCount/2
 	t.settleAfterHand = approved
 	t.settleMu.Unlock()

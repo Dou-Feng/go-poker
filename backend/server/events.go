@@ -416,6 +416,10 @@ func handleCreateTable(c *Client, tablename string, password string, sb uint, bb
 		c.send <- createResult(actionCreateResult, false, "room already exists", "")
 		return
 	}
+	// The creator hosts the room (manages bots); see table.isHost.
+	table.hostMu.Lock()
+	table.host = c.accountUUID
+	table.hostMu.Unlock()
 
 	cfg := normalizeRoomConfig(sb, bb, buyIn, maxBuy, maxPlayers, handsLimit, tournament)
 	poker.Configure(table.game, cfg.sb, cfg.bb, cfg.buyIn, cfg.maxBuy, cfg.maxPlayers, cfg.handsLimit)
@@ -959,6 +963,54 @@ func handleFold(c *Client) {
 }
 
 // handleVoteSettle registers a vote to settle the current session early.
+// handleAddBot seats a server-played bot between hands at the chosen seat
+// (0 = first free). Only the room's host may manage bots.
+func handleAddBot(c *Client, seatID uint) {
+	if c.table == nil {
+		c.send <- createError("not in a room")
+		return
+	}
+	if c.accountUUID == "" {
+		c.send <- createError("not logged in")
+		return
+	}
+	if !c.table.isHost(c) {
+		c.send <- createError(msgHostOnly)
+		return
+	}
+	bot, err := c.table.addBot(seatID)
+	if err != nil {
+		c.send <- createError(err.Error())
+		return
+	}
+	c.table.broadcast <- createNewMessage(gameAdminName, fmt.Sprintf("%s has joined", bot.username))
+	c.table.broadcastGame()
+}
+
+// handleRemoveBot removes a bot (the given seat, or the last added one). Mid
+// hand the bot folds on its turn and leaves when the hand ends.
+func handleRemoveBot(c *Client, uuid string) {
+	if c.table == nil {
+		c.send <- createError("not in a room")
+		return
+	}
+	if c.accountUUID == "" {
+		c.send <- createError("not logged in")
+		return
+	}
+	if !c.table.isHost(c) {
+		c.send <- createError(msgHostOnly)
+		return
+	}
+	name, err := c.table.removeBot(uuid)
+	if err != nil {
+		c.send <- createError(err.Error())
+		return
+	}
+	c.table.broadcast <- createNewLog(fmt.Sprintf("%s left the table", name))
+	c.table.broadcastGame()
+}
+
 func handleVoteSettle(c *Client) {
 	if c.table == nil {
 		c.send <- createError("not in a room")
@@ -1148,6 +1200,7 @@ func createUpdatedGame(c *Client) []byte {
 		view.CensorFor(view.ViewerNum(c.uuid)),
 		c.table.waitingUsernames(),
 		c.table.settleVoteList(),
+		c.table.hostAccount(),
 	}
 
 	resp, err := json.Marshal(game)
@@ -1167,6 +1220,7 @@ func createUpdatedGameBytes(t *table) []byte {
 		t.game.GenerateOmniView(),
 		t.waitingUsernames(),
 		t.settleVoteList(),
+		t.hostAccount(),
 	}
 
 	resp, err := json.Marshal(game)

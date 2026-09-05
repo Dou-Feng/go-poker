@@ -48,6 +48,16 @@ export default function Game() {
   const game = appState.game;
   const me = game?.players.find((p) => p.uuid === appState.clientID);
 
+  // Bot placement mode is a between-hands affair: leave it when a hand
+  // starts or when this client stops being the host.
+  const running = !!game?.running;
+  const isHost = !!game && !!appState.uuid && game.host === appState.uuid;
+  useEffect(() => {
+    if (appState.botMode && (running || !isHost)) {
+      dispatch({ type: "setBotMode", payload: false });
+    }
+  }, [appState.botMode, running, isHost, dispatch]);
+
   // A session is active once it has started running or finished a hand.
   const showVotes = !!game && (game.running || game.handsPlayed > 0);
   const myVoted = !!game && game.settleVotes.includes(appState.username ?? "");

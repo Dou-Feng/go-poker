@@ -193,6 +193,17 @@ func SetAvatar(g *Game, pn uint, avatar string, hasImage bool) error {
 // SetAccountUUID stores the account's unique id on a player so the server can
 // settle the session to the right account. It is distinct from the
 // per-session UUID used for reconnect.
+// SetBot flags the player as server-played (see server/bot.go).
+func SetBot(g *Game, pn uint, bot bool) error {
+	g.mtx.Lock()
+	defer g.mtx.Unlock()
+	if pn >= uint(len(g.players)) {
+		return ErrOutOfBounds
+	}
+	g.getPlayer(pn).Bot = bot
+	return nil
+}
+
 func SetAccountUUID(g *Game, pn uint, data string) error {
 	g.mtx.Lock()
 	defer g.mtx.Unlock()

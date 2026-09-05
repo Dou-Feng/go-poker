@@ -13,8 +13,11 @@ import {
   sendLog,
   moveSeat,
   showHand,
+  addBot,
+  removeBot,
 } from "../actions/actions";
 import Avatar from "./Avatar";
+import PlusIcon from "./PlusIcon";
 import MicIcon from "./MicIcon";
 import { useVoice } from "../hooks/useVoice";
 
@@ -99,12 +102,18 @@ export default function Seat({ player, id, visualId, reveal }: seatProps) {
 
   const game = appState.game;
   const running = game?.running ?? false;
+  // Bot placement mode (host only, between hands): empty seats become "+"
+  // to add a bot there, seated bots become removable.
+  const isHost = !!game && !!appState.uuid && game.host === appState.uuid;
+  const botMode = appState.botMode && isHost && !running;
 
   // Occupied seat.
   if (player && game) {
     const isMine = player.uuid === appState.clientID;
     const hidden = running && !isMine;
     const left = player.left;
+    const isBot = !!player.bot;
+    const removable = botMode && isBot;
     // Live-mic badge: our own toggle, or what the peer announced over voice.
     const micLive = isMine
       ? voiceState.micOn
@@ -128,6 +137,12 @@ export default function Seat({ player, id, visualId, reveal }: seatProps) {
       });
     };
     const handleClick = () => {
+      if (removable) {
+        if (socket) {
+          removeBot(socket, player.uuid);
+        }
+        return;
+      }
       if (
         isMine &&
         running &&
@@ -151,15 +166,18 @@ export default function Seat({ player, id, visualId, reveal }: seatProps) {
               ? "m-1 h-16 w-32 sm:m-4 sm:h-20 sm:w-56"
               : "m-0.5 h-16 w-32 sm:m-2 sm:h-20 sm:w-44",
             left && "opacity-40 grayscale",
+            removable && "ring-2 ring-rose-500",
             "relative"
           )}
           onClick={handleClick}
           title={
-            isMine &&
-            running &&
-            player.in &&
-            player.stack === 0 &&
-            !player.revealed
+            removable
+              ? t("removeBot")
+              : isMine &&
+                running &&
+                player.in &&
+                player.stack === 0 &&
+                !player.revealed
               ? t("showCards")
               : t("viewRoomStats")
           }
@@ -217,6 +235,14 @@ export default function Seat({ player, id, visualId, reveal }: seatProps) {
                 {t("ready")}
               </p>
             </div>
+          )}
+          {removable && (
+            <span
+              className="absolute -left-1.5 -top-1.5 z-20 flex h-5 w-5 items-center justify-center rounded-full bg-rose-600 text-xs font-bold text-ink shadow"
+              aria-hidden
+            >
+              ✕
+            </span>
           )}
           {(micLive || micMuted) && (
             <span
@@ -321,6 +347,22 @@ export default function Seat({ player, id, visualId, reveal }: seatProps) {
       <div>
         <button className="m-1 h-16 w-32 rounded-2xl border border-muted/40 bg-transparent p-2 text-muted opacity-20 sm:m-4 sm:h-20 sm:w-56">
           <p className="text-3xl sm:text-4xl">{t("open")}</p>
+          <h2 className="text-xs opacity-70 sm:text-base">{id}</h2>
+        </button>
+      </div>
+    );
+  }
+
+  // Bot placement: the host taps "+" to seat a bot here.
+  if (botMode) {
+    return (
+      <div>
+        <button
+          className="m-1 flex h-16 w-32 flex-col items-center justify-center rounded-2xl border-2 border-dashed border-emerald-500/70 bg-emerald-900/20 p-2 text-emerald-300 transition-colors hover:bg-emerald-900/40 sm:m-4 sm:h-20 sm:w-56"
+          onClick={() => socket && addBot(socket, id)}
+          title={t("addBot")}
+        >
+          <PlusIcon className="h-7 w-7 sm:h-9 sm:w-9" />
           <h2 className="text-xs opacity-70 sm:text-base">{id}</h2>
         </button>
       </div>

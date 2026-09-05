@@ -47,7 +47,21 @@ const (
 	// actionGetIceServers asks for the STUN/TURN servers and short-lived TURN
 	// credentials to use for voice chat (see turn.go).
 	actionGetIceServers string = "get-ice-servers"
+	// actionAddBot / actionRemoveBot seat or remove a server-played bot
+	// between hands (see bot.go).
+	actionAddBot    string = "add-bot"
+	actionRemoveBot string = "remove-bot"
 )
+
+type addBot struct {
+	base        // actionAddBot
+	SeatID uint `json:"seatID,omitempty"` // 0 = first free seat
+}
+
+type removeBot struct {
+	base        // actionRemoveBot
+	UUID string `json:"uuid,omitempty"` // seat uuid of the bot; empty = last added
+}
 
 type getIceServers struct {
 	base        // actionGetIceServers
@@ -303,6 +317,7 @@ type updateGame struct {
 	Game        *poker.GameView `json:"game"`
 	Waiting     []string        `json:"waiting"`
 	SettleVotes []string        `json:"settleVotes"`
+	Host        string          `json:"host,omitempty"` // account UUID of the room host (manages bots)
 }
 
 type updatePlayerUUID struct {

@@ -273,6 +273,16 @@ export function playerFold(socket: WebSocket) {
   });
 }
 
+// Seat a server-played bot between hands at seatID (0 = first free) / remove
+// one (the given seat, or the last added). Host only.
+export function addBot(socket: WebSocket, seatID?: number) {
+  send(socket, { action: "add-bot", ...(seatID ? { seatID } : {}) });
+}
+
+export function removeBot(socket: WebSocket, uuid?: string) {
+  send(socket, { action: "remove-bot", ...(uuid ? { uuid } : {}) });
+}
+
 // Ask for the STUN/TURN servers (and short-lived TURN credentials) to use for
 // voice chat. `host` is the page's hostname, used by the server when TURN_HOST
 // is not configured (coturn runs next to the game server).

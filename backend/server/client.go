@@ -57,6 +57,10 @@ type Client struct {
 	// side once the current hand ends.
 	spectateReserved bool
 
+	// isBot marks a server-played seat (see bot.go): no socket, no wallet,
+	// never counted as a human for room lifetime or votes.
+	isBot bool
+
 	// ip is the peer address used for rate limiting; msgBucket throttles the
 	// inbound message rate of this connection; releaseConn gives the
 	// connection slot back to the guard when the socket closes.
@@ -589,6 +593,22 @@ func (c *Client) processEvents(rawMessage []byte) error {
 			return err
 		}
 		handleGetIceServers(c, req.Host)
+		return nil
+
+	case actionAddBot:
+		var req addBot
+		if err := json.Unmarshal(rawMessage, &req); err != nil {
+			return err
+		}
+		handleAddBot(c, req.SeatID)
+		return nil
+
+	case actionRemoveBot:
+		var req removeBot
+		if err := json.Unmarshal(rawMessage, &req); err != nil {
+			return err
+		}
+		handleRemoveBot(c, req.UUID)
 		return nil
 
 	default:
