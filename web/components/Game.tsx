@@ -108,13 +108,20 @@ export default function Game() {
       {/* Secondary controls (rebuy / spectate / stats) live behind the "..."
           button; the room name sits in the chat tab row. */}
       <RoomMenu />
+      {/* Bottom of the room: on phones only the action keys live here (the
+          bottom edge is for core actions and the system gesture area);
+          chat/log move to the table's left edge. Desktop keeps the chat
+          tabs bottom-left. */}
       <div className="absolute inset-x-0 bottom-0 z-10 flex flex-col sm:block">
         <div className="w-full sm:pointer-events-none sm:absolute sm:inset-x-0 sm:bottom-0 sm:z-20">
           <Input />
         </div>
-        <div className="w-full sm:absolute sm:bottom-0 sm:left-0 sm:right-auto sm:z-10">
+        <div className="hidden w-full sm:absolute sm:bottom-0 sm:left-0 sm:right-auto sm:z-10 sm:block">
           <ChatLog />
         </div>
+      </div>
+      <div className="absolute left-1 top-[46%] z-20 -translate-y-1/2 sm:hidden">
+        <ChatLog compact />
       </div>
       {/* Leave / surrender buttons, anchored at the very top-left. On phones
           the surrender button stacks under the leave button (both flush

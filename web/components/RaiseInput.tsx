@@ -8,6 +8,7 @@ import InputButton from "./InputButton";
 import Chip from "./Chip";
 import { Slider } from "@mantine/core";
 import classNames from "classnames";
+import { FiArrowUpCircle, FiX, FiZap } from "react-icons/fi";
 
 type raiseProps = {
   showRaise: boolean;
@@ -54,8 +55,8 @@ export default function RaiseInput({ showRaise, setShowRaise }: raiseProps) {
   // Quick amounts are a pot-sized raise relative to the current pot.
   const potBet = currentPot + 2 * (maxBet - currentBet);
   const half = Math.ceil(potBet / 2);
-  const threeQuarter = Math.ceil((potBet * 3) / 4);
   const full = potBet;
+  const double = potBet * 2;
   const allInTotal = currentStack + currentBet;
 
   const [inputValue, setInputValue] = useState(minRaise);
@@ -75,8 +76,8 @@ export default function RaiseInput({ showRaise, setShowRaise }: raiseProps) {
   };
 
   return (
-    <div className="pointer-events-auto flex w-full justify-center p-2 pb-4 sm:p-6">
-      <div className="animate-fade-in flex flex-row flex-wrap items-center justify-center gap-2 rounded-xl border border-muted/30 bg-tablehi/95 p-2 shadow-lg ring-1 ring-amber-300/50 sm:gap-3 sm:p-3">
+    <div className="pointer-events-auto flex w-full justify-center px-2 pt-2 pb-[max(1.5rem,env(safe-area-inset-bottom))] sm:p-6">
+      <div className="animate-fade-in flex flex-row flex-wrap items-center justify-center gap-2 rounded-2xl border border-amber-700/40 bg-tablehi/95 p-2.5 shadow-lg sm:gap-3 sm:p-3">
         <div className="flex flex-col items-center justify-center gap-1.5 rounded-lg bg-card px-3 py-2">
           <div className="flex items-center justify-center gap-1.5 text-xl font-semibold text-amber-300 sm:text-2xl">
             <Chip className="h-5 w-5 sm:h-6 sm:w-6" amount={inputValue} />
@@ -102,18 +103,18 @@ export default function RaiseInput({ showRaise, setShowRaise }: raiseProps) {
             <button
               className={button()}
               onClick={() =>
-                setInputValue(betValidator(threeQuarter, minRaise, allInTotal))
-              }
-            >
-              {t("threeQuarterPot")}
-            </button>
-            <button
-              className={button()}
-              onClick={() =>
                 setInputValue(betValidator(full, minRaise, allInTotal))
               }
             >
               {t("pot")}
+            </button>
+            <button
+              className={button()}
+              onClick={() =>
+                setInputValue(betValidator(double, minRaise, allInTotal))
+              }
+            >
+              {t("twoPot")}
             </button>
           </div>
           <div className="w-44 pb-1 sm:w-72">
@@ -138,12 +139,16 @@ export default function RaiseInput({ showRaise, setShowRaise }: raiseProps) {
             title={isAllIn ? t("allIn") : t("bet")}
             disabled={inputValue < minRaise || inputValue > allInTotal}
             variant={isAllIn ? "allin" : "bet"}
+            icon={
+              isAllIn ? <FiZap size="1em" /> : <FiArrowUpCircle size="1em" />
+            }
           />
           <InputButton
             action={() => setShowRaise(!showRaise)}
             title={t("close")}
             disabled={false}
             variant="neutral"
+            icon={<FiX size="1em" />}
           />
         </div>
       </div>

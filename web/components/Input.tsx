@@ -12,6 +12,13 @@ import { useTranslation } from "../hooks/useTranslation";
 import { playSfx } from "../lib/sfx";
 import InputButton from "./InputButton";
 import RaiseInput from "./RaiseInput";
+import {
+  FiArrowUpCircle,
+  FiCornerDownLeft,
+  FiSkipForward,
+  FiX,
+  FiZap,
+} from "react-icons/fi";
 
 export default function Input() {
   const socket = useSocket();
@@ -83,36 +90,52 @@ export default function Input() {
   if (showRaise) {
     return <RaiseInput setShowRaise={setShowRaise} showRaise={showRaise} />;
   }
+  // Layout: the three "play on" keys in a row, fold alone underneath so a
+  // thumb aiming for call/raise cannot land on it. The bar keeps clear of
+  // the phone's bottom gesture area (safe-area inset, at least 24px).
   return (
-    <div className="pointer-events-auto flex w-full justify-center p-2 pb-4 sm:p-6">
-      <div className="animate-fade-in flex flex-row flex-wrap items-center justify-center gap-1.5 rounded-xl border border-muted/30 bg-tablehi/95 p-2 shadow-lg ring-1 ring-amber-300/50 sm:gap-2 sm:p-3">
-        <InputButton
-          action={() => handleCallOrCheck(appState.username)}
-          title={canCheck ? t("check") : t("call") + " " + callAmount}
-          disabled={false}
-          variant="call"
-        />
-        {!callOnly && (
+    <div className="pointer-events-auto flex w-full justify-center px-2 pt-2 pb-[max(1.5rem,env(safe-area-inset-bottom))] sm:p-6">
+      <div className="animate-fade-in flex flex-col items-center gap-2 rounded-2xl border border-amber-700/40 bg-tablehi/95 p-2.5 shadow-lg sm:gap-2.5 sm:p-3">
+        <div className="flex flex-row items-center justify-center gap-2 sm:gap-3">
           <InputButton
-            action={() => setShowRaise(!showRaise)}
-            title={t("bet")}
+            action={() => handleCallOrCheck(appState.username)}
+            title={canCheck ? t("check") : t("call") + " " + callAmount}
             disabled={false}
-            variant="bet"
+            variant="call"
+            icon={
+              canCheck ? (
+                <FiSkipForward size="1em" />
+              ) : (
+                <FiCornerDownLeft size="1em" />
+              )
+            }
           />
-        )}
-        {!callOnly && (
-          <InputButton
-            action={() => handleAllIn(appState.username)}
-            title={t("allIn")}
-            disabled={false}
-            variant="allin"
-          />
-        )}
+          {!callOnly && (
+            <InputButton
+              action={() => setShowRaise(!showRaise)}
+              title={t("bet")}
+              disabled={false}
+              variant="bet"
+              icon={<FiArrowUpCircle size="1em" />}
+            />
+          )}
+          {!callOnly && (
+            <InputButton
+              action={() => handleAllIn(appState.username)}
+              title={t("allIn")}
+              disabled={false}
+              variant="allin"
+              icon={<FiZap size="1em" />}
+            />
+          )}
+        </div>
         <InputButton
           action={() => handleFold(appState.username)}
           title={t("fold")}
           disabled={false}
           variant="fold"
+          icon={<FiX size="1em" />}
+          className="min-w-[9rem] sm:min-w-[11rem]"
         />
       </div>
     </div>
