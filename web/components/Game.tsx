@@ -106,16 +106,18 @@ export default function Game() {
           <ChatLog />
         </div>
       </div>
-      {/* Leave / vote row. On phones it drops below the centred hands pill
-          (which hangs from the top edge) so the two never overlap. */}
-      <div className="absolute left-0 top-8 z-10 flex flex-row items-center sm:top-0">
+      {/* Leave / surrender buttons, anchored at the very top-left. On phones
+          the surrender button stacks under the leave button (both flush
+          left); the narrow column stays clear of the centred hands pill,
+          which hangs from the top edge. */}
+      <div className="absolute left-0 top-0 z-10 flex flex-col items-start sm:flex-row sm:items-center">
         <button onClick={handleLeave} className="btn btn-danger m-2">
           {t("leave")}
         </button>
         {me && showVotes && (
           <button
             onClick={() => socket && voteSettle(socket)}
-            className={`btn my-2 mr-2 ${
+            className={`btn mx-2 mb-2 sm:ml-0 sm:mt-2 ${
               myVoted ? "btn-secondary border-muted/40" : "btn-danger"
             }`}
           >
