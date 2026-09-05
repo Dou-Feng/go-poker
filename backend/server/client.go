@@ -595,6 +595,14 @@ func (c *Client) processEvents(rawMessage []byte) error {
 		handleGetIceServers(c, req.Host)
 		return nil
 
+	case actionGetSession:
+		var req getSession
+		if err := json.Unmarshal(rawMessage, &req); err != nil {
+			return err
+		}
+		handleGetSession(c, req.ID)
+		return nil
+
 	case actionAddBot:
 		var req addBot
 		if err := json.Unmarshal(rawMessage, &req); err != nil {

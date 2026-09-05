@@ -2,6 +2,8 @@ import { useContext } from "react";
 import { AppContext } from "../providers/AppStore";
 import { HistoryRecord } from "../interfaces";
 import { useTranslation } from "../hooks/useTranslation";
+import { useSocket } from "../hooks/useSocket";
+import { getSession } from "../actions/actions";
 import Avatar from "./Avatar";
 
 function formatTime(iso: string): string {
@@ -19,9 +21,17 @@ type HistoryProps = {
 export default function History({ onClose }: HistoryProps) {
   const { appState, dispatch } = useContext(AppContext);
   const { t } = useTranslation();
+  const socket = useSocket();
   const records = appState.history ?? [];
 
+  // Entries written since session records exist open the whole room's
+  // scoreboard (SessionBoard); older ones fall back to the player's own
+  // session stats.
   const viewSession = (rec: HistoryRecord) => {
+    if (rec.sessionId && socket) {
+      getSession(socket, rec.sessionId);
+      return;
+    }
     dispatch({
       type: "setProfile",
       payload: {
@@ -43,10 +53,7 @@ export default function History({ onClose }: HistoryProps) {
       <div className="flex h-full max-h-[80vh] w-full max-w-md flex-col rounded-lg bg-card shadow-2xl">
         <div className="flex flex-row items-center justify-between border-b border-muted/30 px-4 py-3">
           <p className="text-sm font-semibold text-ink">{t("history")}</p>
-          <button
-            onClick={onClose}
-            className="btn btn-text"
-          >
+          <button onClick={onClose} className="btn btn-text">
             ✕
           </button>
         </div>

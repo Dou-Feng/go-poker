@@ -9,6 +9,7 @@ import {
   Profile,
   HistoryRecord,
   Settlement,
+  SessionRecord,
   Friend,
 } from "../interfaces";
 import { Language } from "../lib/translations";
@@ -32,6 +33,7 @@ const initialState: AppState = {
   profile: null,
   history: [],
   settlement: null,
+  sessionView: null,
   // Deterministic on server and client: the real language is applied in a
   // useEffect (pages/index.tsx) after hydration, to avoid a hydration
   // mismatch (the server has no `navigator`).
@@ -61,6 +63,7 @@ type ACTIONTYPE =
   | { type: "setProfile"; payload: Profile | null }
   | { type: "setHistory"; payload: HistoryRecord[] }
   | { type: "setSettlement"; payload: Settlement | null }
+  | { type: "setSessionView"; payload: SessionRecord | null }
   | { type: "setLanguage"; payload: Language }
   | { type: "setBotMode"; payload: boolean };
 function reducer(state: AppState, action: ACTIONTYPE) {
@@ -83,6 +86,9 @@ function reducer(state: AppState, action: ACTIONTYPE) {
         username: null,
         game: null,
         table: null,
+        history: [],
+        sessionView: null,
+        profile: null,
       };
     case "leaveRoom":
       return {
@@ -120,6 +126,8 @@ function reducer(state: AppState, action: ACTIONTYPE) {
       return { ...state, profile: action.payload };
     case "setHistory":
       return { ...state, history: action.payload };
+    case "setSessionView":
+      return { ...state, sessionView: action.payload };
     case "setSettlement":
       return { ...state, settlement: action.payload };
     case "setLanguage":

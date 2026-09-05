@@ -35,6 +35,8 @@ export type AppState = {
   profile: Profile | null;
   history: HistoryRecord[];
   settlement: Settlement | null;
+  /** A past session's scoreboard opened from the history, or null. */
+  sessionView: SessionRecord | null;
   language: "en" | "zh";
   /** Host is placing/removing bots: empty seats show "+", bots are removable. */
   botMode: boolean;
@@ -83,6 +85,29 @@ export type HistoryRecord = {
   avatar: string;
   avatarImage: boolean;
   stats: PlayerStats;
+  /** Id of the shared session scoreboard this entry belongs to. */
+  sessionId?: string;
+};
+
+/** One account's result in a past room session (see SessionRecord). */
+export type SessionPlayer = {
+  uuid: string;
+  username: string;
+  avatar: string;
+  avatarImage: boolean;
+  bot?: boolean;
+  buyIn: number;
+  net: number;
+  stats: PlayerStats;
+};
+
+/** Shared scoreboard of a past room session, opened from the history. */
+export type SessionRecord = {
+  id: string;
+  room: string;
+  time: string;
+  settled: boolean;
+  players: SessionPlayer[];
 };
 
 export type Card = string;

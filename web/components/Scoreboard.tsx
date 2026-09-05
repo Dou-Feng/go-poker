@@ -18,16 +18,25 @@ export type ScoreRow = {
 
 type scoreboardProps = {
   title: string;
+  /** Small line under the title (room, time, status). */
+  subtitle?: string;
   rows: ScoreRow[];
   /** Shown above the table when the session has settled. */
   biggestPot?: { winner: string; amount: number } | null;
+  /** When set, rows are buttons and this receives the tapped row's key. */
+  onSelect?: (key: string) => void;
+  /** Hint shown under the table when rows are selectable. */
+  selectHint?: string;
   onClose: () => void;
 };
 
 export default function Scoreboard({
   title,
+  subtitle,
   rows,
   biggestPot,
+  onSelect,
+  selectHint,
   onClose,
 }: scoreboardProps) {
   const { t } = useTranslation();
@@ -40,7 +49,10 @@ export default function Scoreboard({
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
         <div className="w-full max-w-md rounded-lg bg-card p-6 shadow-2xl">
           <div className="mb-4 flex flex-row items-center justify-between">
-            <p className="type-heading">{title}</p>
+            <div className="min-w-0">
+              <p className="type-heading">{title}</p>
+              {subtitle && <p className="type-caption truncate">{subtitle}</p>}
+            </div>
             <button onClick={onClose} className="btn btn-text">
               ✕
             </button>
@@ -71,10 +83,14 @@ export default function Scoreboard({
             {ranked.map((p, i) => {
               const net = netOf(p);
               const rank = rankAt(ranked, i, netOf);
+              const Row = onSelect ? "button" : "div";
               return (
-                <div
+                <Row
                   key={p.key}
-                  className="flex flex-row items-center justify-between rounded-md bg-floor px-3 py-2"
+                  onClick={onSelect ? () => onSelect(p.key) : undefined}
+                  className={`flex w-full flex-row items-center justify-between rounded-md bg-floor px-3 py-2 text-left ${
+                    onSelect ? "hover:bg-cardhi" : ""
+                  }`}
                 >
                   <div className="flex min-w-0 flex-row items-center gap-2">
                     <RankBadge rank={rank} title={t("rank") + " " + rank} />
@@ -101,10 +117,13 @@ export default function Scoreboard({
                       {net}
                     </span>
                   </div>
-                </div>
+                </Row>
               );
             })}
           </div>
+          {onSelect && selectHint && ranked.length > 0 && (
+            <p className="type-caption mt-3 text-center">{selectHint}</p>
+          )}
         </div>
       </div>
     </Portal>

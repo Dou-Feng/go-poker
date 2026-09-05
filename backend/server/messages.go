@@ -51,7 +51,15 @@ const (
 	// between hands (see bot.go).
 	actionAddBot    string = "add-bot"
 	actionRemoveBot string = "remove-bot"
+	// actionGetSession fetches the shared scoreboard of a past room session
+	// (referenced by sessionId in the caller's history entries).
+	actionGetSession string = "get-session"
 )
+
+type getSession struct {
+	base        // actionGetSession
+	ID   string `json:"id"`
+}
 
 type addBot struct {
 	base        // actionAddBot
@@ -278,7 +286,14 @@ const (
 	actionPong                 string = "pong"
 	actionSessionExpired       string = "session-expired"
 	actionIceServers           string = "ice-servers"
+	actionSession              string = "session"
 )
+
+// sessionMessage answers actionGetSession.
+type sessionMessage struct {
+	base                  // actionSession
+	Session SessionRecord `json:"session"`
+}
 
 // iceServers answers actionGetIceServers. TTL is the credential lifetime in
 // seconds so the client knows when to ask again.

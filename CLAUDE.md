@@ -76,7 +76,8 @@ Port gotcha: in hot mode the ports are swapped relative to `make start` (backend
 |---|---|---|
 | `gopoker:user:<accountUUID>` | string (JSON `UserRecord`) | bcrypt hash, chips, avatar, friends, lifetime `PlayerStats` |
 | `gopoker:username:<name>` | set of accountUUIDs | username alias index; login by username fails if the set has >1 member |
-| `gopoker:history:<accountUUID>` | list (JSON `HistoryRecord`), trimmed to 50 | one entry per finished session with ≥1 hand played |
+| `gopoker:history:<accountUUID>` | list (JSON `HistoryRecord`), trimmed to 50 | one entry per finished session with ≥1 hand played; `sessionId` links to the shared record below |
+| `gopoker:session:<sessionID>` | string (JSON `SessionRecord`), 60-day TTL | whole-room scoreboard of one session (every participant's buy-in, net, stats); rewritten by `table.persistSession` on each leave/bust/spectate and at settlement (`Settled: true`); read via `get-session`, participants only |
 | `gopoker:avatar:<accountUUID>` | string (JSON) | base64 JPEGs at 1024/512/256/128/64 px |
 | `<tablename>` | pub/sub channel | broadcast fan-out |
 

@@ -234,6 +234,48 @@ func handleReconnectUser(c *Client, accountUUID string) {
 	c.hub.bindSession(c)
 }
 
+const msgSessionNotFound = "record not found"
+
+// handleGetSession returns the shared scoreboard of a past room session to
+// one of its participants (anyone else gets "record not found", so ids
+// cannot be probed).
+func handleGetSession(c *Client, id string) {
+	if c.accountUUID == "" {
+		c.send <- createError("not logged in")
+		return
+	}
+	if id == "" {
+		c.send <- createError(msgSessionNotFound)
+		return
+	}
+	rec, err := loadSessionRecord(c.hub.rdb, id)
+	if err != nil {
+		c.send <- createError(msgSessionNotFound)
+		return
+	}
+	participant := false
+	for _, p := range rec.Players {
+		if p.UUID == c.accountUUID {
+			participant = true
+			break
+		}
+	}
+	if !participant {
+		c.send <- createError(msgSessionNotFound)
+		return
+	}
+	c.send <- createSessionMessage(*rec)
+}
+
+func createSessionMessage(rec SessionRecord) []byte {
+	resp := sessionMessage{base{actionSession}, rec}
+	bytes, err := json.Marshal(resp)
+	if err != nil {
+		slog.Default().Warn("Marshal session", "error", err)
+	}
+	return bytes
+}
+
 func handleGetHistory(c *Client) {
 	records, err := loadHistory(c.hub.rdb, c.accountUUID)
 	if err != nil {

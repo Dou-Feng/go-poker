@@ -211,6 +211,15 @@ export function getHistory(socket: WebSocket) {
   });
 }
 
+// Fetch the shared scoreboard of a past room session (a history entry's
+// sessionId). Only its participants may read it.
+export function getSession(socket: WebSocket, id: string) {
+  send(socket, {
+    action: "get-session",
+    id,
+  });
+}
+
 export function toggleReady(socket: WebSocket) {
   send(socket, {
     action: "toggle-ready",

@@ -223,3 +223,66 @@ func TestNormalizeRoomConfigTournament(t *testing.T) {
 		t.Fatalf("cap → tournament")
 	}
 }
+
+// The room-session roster merges a re-seated account's stats as well as its
+// chips, and the shared session record is rewritten whenever a result becomes
+// final (leave) and once more, marked settled, at settlement; the next session
+// gets a new id.
+func TestSessionRecordPersistedOnLeaveAndSettle(t *testing.T) {
+	tbl, _ := newTestTable(t)
+	var saved []SessionRecord
+	tbl.persist = func(rec SessionRecord) error {
+		saved = append(saved, rec)
+		return nil
+	}
+	firstID := tbl.sessionID
+	if firstID == "" {
+		t.Fatalf("a table must start with a session id")
+	}
+
+	a := seat(t, tbl, "acc-a", 1, false)
+	b := seat(t, tbl, "acc-b", 2, false)
+	// Give both a played hand's worth of stats so history would be written.
+	view := tbl.game.GenerateOmniView()
+	pa, _ := findPlayer(view, a)
+	pb, _ := findPlayer(view, b)
+	view.Players[pa].Stats.HandsPlayed, view.Players[pa].Stats.Folds = 3, 1
+	view.Players[pb].Stats.HandsPlayed, view.Players[pb].Stats.Raises = 3, 2
+	view.Players[pa].Stack, view.Players[pb].Stack = 150, 250
+	tbl.game.FillFromView(view)
+
+	// acc-a leaves: the record is written with both players, not settled.
+	tbl.evictPlayer(a)
+	if len(saved) != 1 || saved[0].ID != firstID || saved[0].Settled {
+		t.Fatalf("leave must persist an unsettled record for the session, got %+v", saved)
+	}
+	if len(saved[0].Players) != 2 {
+		t.Fatalf("record must list every participant, got %+v", saved[0].Players)
+	}
+
+	// acc-a sits back down and plays more: stats merge across the two stints.
+	a2 := seat(t, tbl, "acc-a", 3, false)
+	view = tbl.game.GenerateOmniView()
+	pa2, _ := findPlayer(view, a2)
+	view.Players[pa2].Stats.HandsPlayed, view.Players[pa2].Stats.Folds = 2, 1
+	view.Players[pa2].Stack = 220
+	tbl.game.FillFromView(view)
+
+	tbl.settle()
+	last := saved[len(saved)-1]
+	if !last.Settled || last.ID != firstID {
+		t.Fatalf("settlement must persist the final, settled record: %+v", last)
+	}
+	var rowA *SessionPlayer
+	for i := range last.Players {
+		if last.Players[i].UUID == "acc-a" {
+			rowA = &last.Players[i]
+		}
+	}
+	if rowA == nil || rowA.BuyIn != 400 || rowA.Net != -30 || rowA.Stats.HandsPlayed != 5 || rowA.Stats.Folds != 2 {
+		t.Fatalf("acc-a must merge both stints (buy-ins, net and stats): %+v", rowA)
+	}
+	if tbl.sessionID == firstID {
+		t.Fatalf("a new session must get a new id after settlement")
+	}
+}

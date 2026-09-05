@@ -117,7 +117,9 @@ func saveUser(rdb *redis.Client, u *UserRecord) error {
 	return rdb.Set(ctx, userKey(u.UUID), raw, 0).Err()
 }
 
-// HistoryRecord is one finished table session for a user.
+// HistoryRecord is one finished table session for a user. SessionID links it
+// to the shared SessionRecord of that room session (every participant's
+// result), so the history can open the whole scoreboard.
 type HistoryRecord struct {
 	Room        string            `json:"room"`
 	Username    string            `json:"username"`
@@ -128,6 +130,58 @@ type HistoryRecord struct {
 	Avatar      string            `json:"avatar"`
 	AvatarImage bool              `json:"avatarImage"`
 	Stats       poker.PlayerStats `json:"stats"`
+	SessionID   string            `json:"sessionId,omitempty"`
+}
+
+// SessionPlayer is one account's result in a room session: buy-ins, net and
+// the stats it accumulated there (merged across re-seats).
+type SessionPlayer struct {
+	UUID        string            `json:"uuid"`
+	Username    string            `json:"username"`
+	Avatar      string            `json:"avatar"`
+	AvatarImage bool              `json:"avatarImage"`
+	Bot         bool              `json:"bot,omitempty"`
+	BuyIn       uint              `json:"buyIn"`
+	Net         int               `json:"net"`
+	Stats       poker.PlayerStats `json:"stats"`
+}
+
+// SessionRecord is the shared scoreboard of one room session. It is rewritten
+// whenever a player's result becomes final (leave, bust, spectate) and once
+// more at settlement, so it is complete no matter how the session ended.
+type SessionRecord struct {
+	ID      string          `json:"id"`
+	Room    string          `json:"room"`
+	Time    string          `json:"time"` // last update, RFC 3339
+	Settled bool            `json:"settled"`
+	Players []SessionPlayer `json:"players"`
+}
+
+// sessionTTL bounds how long a shared session scoreboard is kept.
+const sessionTTL = 60 * 24 * time.Hour
+
+func sessionKey(id string) string {
+	return fmt.Sprintf("gopoker:session:%s", id)
+}
+
+func saveSessionRecord(rdb *redis.Client, rec SessionRecord) error {
+	raw, err := json.Marshal(rec)
+	if err != nil {
+		return err
+	}
+	return rdb.Set(ctx, sessionKey(rec.ID), raw, sessionTTL).Err()
+}
+
+func loadSessionRecord(rdb *redis.Client, id string) (*SessionRecord, error) {
+	raw, err := rdb.Get(ctx, sessionKey(id)).Result()
+	if err != nil {
+		return nil, err
+	}
+	var rec SessionRecord
+	if err := json.Unmarshal([]byte(raw), &rec); err != nil {
+		return nil, err
+	}
+	return &rec, nil
 }
 
 func historyKey(uuid string) string {
@@ -187,7 +241,7 @@ func mergeStats(dst *poker.PlayerStats, src poker.PlayerStats) {
 // flushPlayerSession merges a single table session into a user's lifetime
 // record, returns the remaining stack to the balance, appends a history entry,
 // and persists the result.
-func flushPlayerSession(rdb *redis.Client, accountUUID string, room string, totalBuyIn uint, stack uint, stats poker.PlayerStats) (uint, error) {
+func flushPlayerSession(rdb *redis.Client, accountUUID string, room string, sessionID string, totalBuyIn uint, stack uint, stats poker.PlayerStats) (uint, error) {
 	user, err := loadUser(rdb, accountUUID)
 	if err != nil {
 		return 0, err
@@ -215,6 +269,7 @@ func flushPlayerSession(rdb *redis.Client, accountUUID string, room string, tota
 		Avatar:      user.Avatar,
 		AvatarImage: user.AvatarImage,
 		Stats:       stats,
+		SessionID:   sessionID,
 	}
 	if err := appendHistory(rdb, accountUUID, rec); err != nil {
 		slog.Default().Warn("Append history", "error", err)

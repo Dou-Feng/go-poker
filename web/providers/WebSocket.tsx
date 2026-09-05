@@ -14,6 +14,7 @@ import {
   PlayerStats,
   Profile,
   HistoryRecord,
+  SessionRecord,
 } from "../interfaces";
 import {
   clearSession,
@@ -342,6 +343,12 @@ export function SocketProvider(props: SocketProviderProps) {
             dispatch({
               type: "setHistory",
               payload: (event.history ?? []) as HistoryRecord[],
+            });
+            return;
+          case "session":
+            dispatch({
+              type: "setSessionView",
+              payload: (event.session ?? null) as SessionRecord | null,
             });
             return;
           case "voice-signal":

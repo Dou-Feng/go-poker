@@ -367,3 +367,71 @@ func TestE2ESurrenderAfterSocketReconnect(t *testing.T) {
 
 	expectVoteAccepted(t, fresh)
 }
+
+// After a session settles, each player's history entry points at the shared
+// session record, which lists every participant with their stats; someone who
+// was not at the table cannot read it.
+func TestE2EHistoryOpensSharedSession(t *testing.T) {
+	addr, _ := bootE2E(t)
+	a := dialWS(t, "alice", addr)
+	b := dialWS(t, "bob", addr)
+	register(a, "alice", "alice1")
+	register(b, "bob", "bob001")
+
+	a.send(map[string]any{"action": actionCreateTable, "tablename": "e2e3", "sb": 1, "bb": 2, "buyIn": 100, "maxPlayers": 2})
+	a.await("create-result", 3*time.Second, isAction(actionCreateResult))
+	b.send(map[string]any{"action": actionJoinTable, "tablename": "e2e3"})
+	b.await("join update", 3*time.Second, isAction(actionUpdateGame))
+	a.send(map[string]any{"action": actionTakeSeat, "username": "alice", "seatID": 1, "buyIn": 100})
+	a.await("alice seat uuid", 3*time.Second, isAction(actionUpdatePlayerUUID))
+	b.send(map[string]any{"action": actionTakeSeat, "username": "bob", "seatID": 2, "buyIn": 100})
+	b.await("bob seat uuid", 3*time.Second, isAction(actionUpdatePlayerUUID))
+
+	playUntilBust(t, a, b)
+
+	// Both vote to surrender: with one player busted the table is between
+	// hands, so the second vote settles at once.
+	a.send(map[string]any{"action": actionVoteSettle})
+	b.send(map[string]any{"action": actionVoteSettle})
+	a.await("settlement", 5*time.Second, isAction(actionSettlement))
+
+	a.send(map[string]any{"action": actionGetHistory})
+	hist := a.await("history", 3*time.Second, isAction(actionHistory))
+	entries, _ := hist["history"].([]any)
+	if len(entries) == 0 {
+		t.Fatalf("alice must have a history entry")
+	}
+	sessionID, _ := entries[0].(map[string]any)["sessionId"].(string)
+	if sessionID == "" {
+		t.Fatalf("history entry must reference the session record: %v", entries[0])
+	}
+
+	a.send(map[string]any{"action": actionGetSession, "id": sessionID})
+	m := a.await("session", 3*time.Second, isAction(actionSession))
+	raw, _ := json.Marshal(m["session"])
+	var rec SessionRecord
+	if err := json.Unmarshal(raw, &rec); err != nil {
+		t.Fatalf("decode session: %v", err)
+	}
+	if !rec.Settled || rec.Room != "e2e3" || len(rec.Players) != 2 {
+		t.Fatalf("unexpected session record: %+v", rec)
+	}
+	sum := 0
+	for _, p := range rec.Players {
+		sum += p.Net
+		if p.Stats.HandsPlayed == 0 {
+			t.Fatalf("each participant carries their session stats: %+v", p)
+		}
+	}
+	if sum != 0 {
+		t.Fatalf("nets must sum to zero, got %d", sum)
+	}
+
+	// A third account that never sat there is refused.
+	c := dialWS(t, "carol", addr)
+	register(c, "carol", "carol1")
+	c.send(map[string]any{"action": actionGetSession, "id": sessionID})
+	if e := c.await("refusal", 3*time.Second, isAction(actionError)); e["message"] != msgSessionNotFound {
+		t.Fatalf("non-participant must get %q, got %v", msgSessionNotFound, e["message"])
+	}
+}

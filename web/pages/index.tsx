@@ -3,6 +3,7 @@ import Game from "../components/Game";
 import Register from "../components/Register";
 import Lobby from "../components/Lobby";
 import Profile from "../components/Profile";
+import SessionBoard from "../components/SessionBoard";
 import Toast from "../components/Toast";
 import { useContext, useEffect } from "react";
 import { AppContext } from "../providers/AppStore";
@@ -95,6 +96,7 @@ export default function IndexPage() {
       ) : (
         <Game />
       )}
+      <SessionBoard />
       <Profile />
       <Toast />
     </Layout>

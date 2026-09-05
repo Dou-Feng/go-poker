@@ -74,7 +74,9 @@ export default function Profile() {
     : profile.avatarImage;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+    // Above the scoreboards (z-50, some rendered through a body portal) so a
+    // player tapped on a session board opens on top of it.
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4">
       <div className="w-full max-w-sm rounded-lg bg-card p-6 shadow-2xl">
         <div className="mb-4 flex flex-row items-center justify-between">
           <div className="flex flex-row items-center gap-3">

@@ -11,6 +11,7 @@ import (
 
 	"github.com/evanofslack/go-poker/poker"
 	"github.com/go-redis/redis/v8"
+	"github.com/google/uuid"
 )
 
 // emptyTableTTL is how long a table lingers with no connected clients before
@@ -57,6 +58,11 @@ type table struct {
 	// ledger totals each account's buy-ins across the whole room session so
 	// MaxBuy cannot be dodged by leaving and re-sitting (see scoreboard.go).
 	ledger *sessionLedger
+	// sessionID identifies the current room session's shared scoreboard
+	// (SessionRecord); every history entry written during it carries the id.
+	// persist is the test hook for saving that record (nil = Redis).
+	sessionID string
+	persist   func(SessionRecord) error
 	// Server-played seats and their pacing timer (see bot.go).
 	botState
 }
@@ -81,6 +87,7 @@ func newTable(name string, redisClient *redis.Client, hub *Hub) *table {
 		waiting:       make(map[*Client]bool),
 		settleVotes:   make(map[string]bool),
 		ledger:        newSessionLedger(),
+		sessionID:     uuid.New().String(),
 		botState:      botState{botDelays: defaultBotDelays},
 	}
 }
@@ -95,7 +102,7 @@ func (t *table) flushSession(accountUUID string, totalBuyIn uint, stack uint, st
 	if t.flush != nil {
 		return t.flush(accountUUID, t.name, totalBuyIn, stack, stats)
 	}
-	return flushPlayerSession(t.rdb, accountUUID, t.name, totalBuyIn, stack, stats)
+	return flushPlayerSession(t.rdb, accountUUID, t.name, t.sessionID, totalBuyIn, stack, stats)
 }
 
 func (t *table) run() {
@@ -236,6 +243,9 @@ func (t *table) evictPlayer(playerUUID string) (string, bool) {
 	if _, err := t.flushSession(pre.AccountUUID, pre.TotalBuyIn, pre.Stack, stats); err != nil {
 		slog.Default().Warn("Flush player", "error", err)
 	}
+	// Their result is final: refresh the shared session scoreboard now, so
+	// their history entry can open it even if the room never settles.
+	t.persistSession(false)
 
 	// Remove the player from the room once no hand is active. If they
 	// folded mid-hand they are dropped when the hand ends.
@@ -643,12 +653,14 @@ func (t *table) settle() {
 		}
 	}
 
-	// Record each player's session (history + lifetime stats + chips back).
+	// Record each player's session (history + lifetime stats + chips back),
+	// then the final shared scoreboard everyone's history entry points at.
 	for _, p := range view.Players {
 		if _, err := t.flushSession(p.AccountUUID, p.TotalBuyIn, p.Stack, p.Stats); err != nil {
 			slog.Default().Warn("Settle flush", "error", err)
 		}
 	}
+	t.persistSession(true)
 
 	t.broadcast <- createSettlement(results, biggestWinner, view.BiggestPotAmt)
 	t.game.Reset()
@@ -761,6 +773,7 @@ func (t *table) applySpectate(c *Client) bool {
 	if _, err := t.flushSession(pre.AccountUUID, pre.TotalBuyIn, pre.Stack, stats); err != nil {
 		slog.Default().Warn("Spectate flush", "error", err)
 	}
+	t.persistSession(false)
 
 	c.uuid = ""
 	c.spectateReserved = false
@@ -834,6 +847,7 @@ func (t *table) autoSpectateBusted() {
 		if err := poker.RemovePlayer(t.game, uint(pos)); err != nil {
 			slog.Default().Warn("Auto spectate remove", "error", err)
 		}
+		t.persistSession(false)
 		// Tell the player why they are suddenly watching; the ledger keeps
 		// them from taking a seat again this session (no buy-ins left).
 		t.notifyAccount(p.AccountUUID, createError(msgBustedOut))
