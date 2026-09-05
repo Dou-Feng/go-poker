@@ -4,9 +4,13 @@ import { Profile as ProfileType, PlayerStats } from "../interfaces";
 import { useTranslation } from "../hooks/useTranslation";
 import { useSocket } from "../hooks/useSocket";
 import { TranslationKey } from "../lib/translations";
-import { changeUsername } from "../actions/actions";
+import { addFriend, changeUsername } from "../actions/actions";
+import { useVoice } from "../hooks/useVoice";
+import { voice } from "../lib/voice";
 import Avatar from "./Avatar";
 import AvatarPicker from "./AvatarPicker";
+import MicIcon from "./MicIcon";
+import PlusIcon from "./PlusIcon";
 
 function rate(n: number, d: number): string {
   if (d === 0) {
@@ -41,6 +45,7 @@ export default function Profile() {
   const [showChangeUsername, setShowChangeUsername] = useState(false);
   const [newUsername, setNewUsername] = useState("");
   const [copied, setCopied] = useState(false);
+  const voiceState = useVoice();
   const profile: ProfileType | null = appState.profile;
   const stats: PlayerStats | null = profile ? profile.stats : null;
 
@@ -51,6 +56,12 @@ export default function Profile() {
   const isSelf = !!profile.uuid && profile.uuid === appState.uuid;
   // A history entry is shown as a session view: its own stats, no avatar editing.
   const isSession = profile.net !== undefined || profile.buyIn !== undefined;
+  // Another account: offer "add friend" (unless already a friend) and a
+  // local-only mute of their voice.
+  const otherUuid = !isSelf && profile.uuid ? profile.uuid : null;
+  const isFriend =
+    !!otherUuid && appState.friends.some((f) => f.uuid === otherUuid);
+  const peerMuted = !!otherUuid && voiceState.mutedPeers.includes(otherUuid);
   const avatarEmoji = isSession
     ? profile.avatar || "🙂"
     : isSelf
@@ -92,9 +103,7 @@ export default function Profile() {
               />
             </button>
             <div>
-              <p className="type-heading">
-                {profile.username}
-              </p>
+              <p className="type-heading">{profile.username}</p>
               {isSession && (
                 <p className="type-label">
                   {t("buyInLabel")}: {profile.buyIn} · {t("net")}:{" "}
@@ -114,7 +123,7 @@ export default function Profile() {
                     setCopied(true);
                     window.setTimeout(() => setCopied(false), 1200);
                   }}
-                  className="flex flex-row items-center gap-1 font-mono type-caption hover:text-ink"
+                  className="type-caption flex flex-row items-center gap-1 font-mono hover:text-ink"
                   title={profile.uuid}
                 >
                   <span className="max-w-[180px] truncate">
@@ -125,15 +134,51 @@ export default function Profile() {
               )}
             </div>
           </div>
-          <button
-            onClick={() => {
-              setShowPicker(false);
-              dispatch({ type: "setProfile", payload: null });
-            }}
-            className="btn btn-text"
-          >
-            ✕
-          </button>
+          <div className="flex flex-row items-center gap-1">
+            {otherUuid && appState.uuid && (
+              <button
+                onClick={() => {
+                  if (isFriend || !socket) {
+                    return;
+                  }
+                  dispatch({ type: "setAuthError", payload: null });
+                  addFriend(socket, otherUuid);
+                }}
+                disabled={isFriend}
+                title={isFriend ? t("isFriend") : t("addFriend")}
+                className={
+                  isFriend
+                    ? "btn btn-icon border-emerald-600 text-emerald-400 disabled:opacity-100"
+                    : "btn btn-icon"
+                }
+              >
+                {isFriend ? "✓" : <PlusIcon className="h-4 w-4" />}
+              </button>
+            )}
+            {otherUuid && voiceState.supported && (
+              <button
+                onClick={() => voice.toggleMutePeer(otherUuid)}
+                title={peerMuted ? t("unmuteMicFor") : t("muteMicFor")}
+                aria-pressed={peerMuted}
+                className={
+                  peerMuted
+                    ? "btn btn-icon border-rose-600 text-rose-500"
+                    : "btn btn-icon"
+                }
+              >
+                <MicIcon off={peerMuted} className="h-4 w-4" />
+              </button>
+            )}
+            <button
+              onClick={() => {
+                setShowPicker(false);
+                dispatch({ type: "setProfile", payload: null });
+              }}
+              className="btn btn-text"
+            >
+              ✕
+            </button>
+          </div>
         </div>
 
         {isSelf && !isSession && (

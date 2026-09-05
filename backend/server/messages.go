@@ -1,6 +1,8 @@
 package server
 
 import (
+	"encoding/json"
+
 	"github.com/evanofslack/go-poker/poker"
 )
 
@@ -39,7 +41,18 @@ const (
 	actionSpectate       string = "spectate"
 	actionPing           string = "ping"
 	actionChangeUsername string = "change-username"
+	// actionVoiceSignal is both inbound and outbound: the server relays it
+	// verbatim between clients of one room (see voice.go).
+	actionVoiceSignal string = "voice-signal"
+	// actionGetIceServers asks for the STUN/TURN servers and short-lived TURN
+	// credentials to use for voice chat (see turn.go).
+	actionGetIceServers string = "get-ice-servers"
 )
+
+type getIceServers struct {
+	base        // actionGetIceServers
+	Host string `json:"host,omitempty"` // window.location.hostname, used when TURN_HOST is unset
+}
 
 type base struct {
 	// allows for correctly identifying messages
@@ -214,6 +227,21 @@ type changeUsername struct {
 	NewUsername string `json:"newUsername"`
 }
 
+// voiceSignal carries WebRTC signalling (SDP offers/answers, ICE candidates)
+// and voice-roster notices (join/leave/state) between the clients of one room.
+// The server never inspects Payload: it stamps From with the sender's account
+// UUID and forwards the message to To (one account) or, when To is empty, to
+// every other client in the room. Peers are identified by account UUID because
+// every account holds exactly one live connection and spectators have no seat
+// uuid.
+type voiceSignal struct {
+	base                    // actionVoiceSignal
+	To      string          `json:"to,omitempty"`
+	From    string          `json:"from,omitempty"`
+	Kind    string          `json:"kind"`
+	Payload json.RawMessage `json:"payload,omitempty"`
+}
+
 // outbound (server) actions
 const (
 	actionNewMessage           string = "new-message"
@@ -231,7 +259,16 @@ const (
 	actionChangeUsernameResult string = "change-username-result"
 	actionPong                 string = "pong"
 	actionSessionExpired       string = "session-expired"
+	actionIceServers           string = "ice-servers"
 )
+
+// iceServers answers actionGetIceServers. TTL is the credential lifetime in
+// seconds so the client knows when to ask again.
+type iceServers struct {
+	base                // actionIceServers
+	Servers []iceServer `json:"servers"`
+	TTL     int         `json:"ttl"`
+}
 
 // sessionExpired tells a reconnecting client that its saved room/seat no
 // longer exists (room recycled or player timed out), so it should drop the
@@ -265,7 +302,7 @@ type updateGame struct {
 }
 
 type updatePlayerUUID struct {
-	base      //actionUpdatePlayerUUID
+	base             //actionUpdatePlayerUUID
 	Uuid      string `json:"uuid"`
 	Tablename string `json:"tablename,omitempty"` // set whenever the client is attached to a room
 }

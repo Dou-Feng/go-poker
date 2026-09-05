@@ -10,11 +10,13 @@ import Settlement from "./Settlement";
 import Settings from "./Settings";
 import RoomStats from "./RoomStats";
 import Rebuy from "./Rebuy";
+import VoiceControls from "./VoiceControls";
 import { AppContext } from "../providers/AppStore";
 import { useSocket } from "../hooks/useSocket";
 import { useTranslation } from "../hooks/useTranslation";
 import { leaveTable, voteSettle, spectate } from "../actions/actions";
 import { clearSession } from "../lib/session";
+import { voice } from "../lib/voice";
 import { FiCheckCircle, FiCircle } from "react-icons/fi";
 
 export default function Game() {
@@ -22,7 +24,22 @@ export default function Game() {
   const socket = useSocket();
   const { t } = useTranslation();
 
+  // Voice chat is scoped to the room: bind the mesh to this room under our
+  // account id, and switch it off when the screen goes away (leave button,
+  // session expired, settlement back to lobby).
+  const roomName = appState.table;
+  const accountUuid = appState.uuid;
+  useEffect(() => {
+    if (roomName && accountUuid) {
+      voice.enterRoom(roomName, accountUuid);
+    }
+  }, [roomName, accountUuid]);
+  useEffect(() => {
+    return () => voice.leaveRoom();
+  }, []);
+
   const handleLeave = () => {
+    voice.leaveRoom();
     clearSession();
     if (socket && appState.table) {
       leaveTable(socket, appState.table);
@@ -140,6 +157,7 @@ export default function Game() {
           </div>
         )}
         <Settings />
+        <VoiceControls />
       </div>
       <div className="absolute top-0 right-0 z-10 hidden flex-col items-end gap-2 p-2 sm:flex">
         <GameInfo />
@@ -151,6 +169,7 @@ export default function Game() {
           </div>
         )}
         <Settings />
+        <VoiceControls />
       </div>
       <Settlement />
     </div>

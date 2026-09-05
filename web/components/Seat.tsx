@@ -15,6 +15,8 @@ import {
   showHand,
 } from "../actions/actions";
 import Avatar from "./Avatar";
+import MicIcon from "./MicIcon";
+import { useVoice } from "../hooks/useVoice";
 
 type seatProps = {
   player: Player | null;
@@ -93,6 +95,7 @@ export default function Seat({ player, id, visualId, reveal }: seatProps) {
   const socket = useSocket();
   const { t } = useTranslation();
   const handLabel = useHandLabel();
+  const voiceState = useVoice();
 
   const game = appState.game;
   const running = game?.running ?? false;
@@ -102,6 +105,12 @@ export default function Seat({ player, id, visualId, reveal }: seatProps) {
     const isMine = player.uuid === appState.clientID;
     const hidden = running && !isMine;
     const left = player.left;
+    // Live-mic badge: our own toggle, or what the peer announced over voice.
+    const micLive = isMine
+      ? voiceState.micOn
+      : !!voiceState.peers[player.accountUuid]?.mic;
+    const micMuted =
+      !isMine && voiceState.mutedPeers.includes(player.accountUuid);
     const openStats = () => {
       dispatch({
         type: "setProfile",
@@ -208,6 +217,17 @@ export default function Seat({ player, id, visualId, reveal }: seatProps) {
                 {t("ready")}
               </p>
             </div>
+          )}
+          {(micLive || micMuted) && (
+            <span
+              className={classNames(
+                "absolute -right-1.5 -top-1.5 z-20 flex h-5 w-5 items-center justify-center rounded-full border border-brand/40 shadow",
+                micMuted ? "bg-rose-600 text-ink" : "bg-emerald-600 text-ink"
+              )}
+              title={micMuted ? t("muteMicFor") : t("micOn")}
+            >
+              <MicIcon off={micMuted} className="h-3 w-3" />
+            </span>
           )}
         </div>
         {running &&

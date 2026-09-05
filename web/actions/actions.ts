@@ -270,3 +270,38 @@ export function playerFold(socket: WebSocket) {
     action: "player-fold",
   });
 }
+
+// Ask for the STUN/TURN servers (and short-lived TURN credentials) to use for
+// voice chat. `host` is the page's hostname, used by the server when TURN_HOST
+// is not configured (coturn runs next to the game server).
+export function getIceServers(socket: WebSocket, host: string) {
+  send(socket, {
+    action: "get-ice-servers",
+    ...(host ? { host } : {}),
+  });
+}
+
+// Voice-chat signalling. The server relays the message to the account named
+// by `to` (or to everyone else in the room when `to` is empty) and stamps it
+// with our account UUID; see backend/server/voice.go.
+export type VoiceSignalKind =
+  | "join"
+  | "leave"
+  | "state"
+  | "offer"
+  | "answer"
+  | "ice";
+
+export function sendVoiceSignal(
+  socket: WebSocket,
+  to: string | null,
+  kind: VoiceSignalKind,
+  payload?: unknown
+) {
+  send(socket, {
+    action: "voice-signal",
+    ...(to ? { to } : {}),
+    kind,
+    ...(payload !== undefined ? { payload } : {}),
+  });
+}

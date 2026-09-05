@@ -118,12 +118,42 @@ Aliyun Anti-DDoS, ...). They terminate TLS and proxy WebSockets; then run the
 app with TLS off, `TRUST_PROXY=true`, and restrict the origin firewall to the
 provider's IP ranges so attackers cannot bypass the CDN.
 
-## 5. Checklist for a public host
+## 5. Voice chat ports (coturn)
+
+In-room voice is WebRTC between browsers. Without any STUN/TURN it only works
+between players who can reach each other directly (same LAN). For players on
+different networks, enable the bundled coturn (`COMPOSE_PROFILES=voice` and
+`TURN_SECRET` in `.env`); it runs with `network_mode: host` so no third-party
+service is involved. It needs, in addition to 80/443:
+
+| Port | Protocol | Purpose |
+|---|---|---|
+| `TURN_PORT` (3478) | UDP + TCP | STUN binding requests and TURN control |
+| `TURN_MIN_PORT`–`TURN_MAX_PORT` (49160–49200) | UDP | Relayed media |
+
+Only authenticated players can allocate a relay: the game server mints
+credentials from `TURN_SECRET` (coturn `--use-auth-secret`) with a 24 h expiry
+(`TURN_TTL_HOURS`) bound to the account, and coturn is started with quotas and
+`--denied-peer-ip` for every private range, so the relay cannot be used as a
+pivot into the docker network or the LAN. coturn refuses to start without a
+`TURN_SECRET`. With nftables add:
+
+```nft
+    udp dport 3478 accept
+    tcp dport 3478 ct state new limit rate 30/second burst 60 packets accept
+    udp dport 49160-49200 accept
+```
+
+If the host is a cloud VM behind 1:1 NAT, set `TURN_EXTERNAL_IP=public/private`
+so relay candidates carry the public address.
+
+## 6. Checklist for a public host
 
 1. `.env`: `TLS_DOMAINS` or cert files; `ALLOWED_ORIGINS=https://your.domain`.
 2. Strong `REDIS_PASSWORD`; Redis is not published to the host (compose keeps
-   it on the internal network only).
-3. `deploy/sysctl-hardening.conf` installed; firewall allows only 80/443 (+22).
+   it on the internal network only). Strong `TURN_SECRET` if voice relay is on.
+3. `deploy/sysctl-hardening.conf` installed; firewall allows only 80/443 (+22)
+   plus, with the `voice` profile, the ports in section 5.
 4. Keep the image updated (`./deploy.sh` or `docker compose pull && up -d`).
 5. Watch the container log for `too many connections` / `message rate
    exceeded` lines: they show who is being throttled.

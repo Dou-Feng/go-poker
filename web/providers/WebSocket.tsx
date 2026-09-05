@@ -27,6 +27,7 @@ import {
   saveUsername,
 } from "../lib/session";
 import { emitFx } from "../lib/fxBus";
+import { voice } from "../lib/voice";
 
 /*  
 WebSocket context creates a single connection to the server per client. 
@@ -93,6 +94,10 @@ export function SocketProvider(props: SocketProviderProps) {
         console.log("websocket connected");
         lastPongAt = Date.now();
         setSocket(ws);
+        // Voice signalling rides on this socket; a reconnect rebuilds the
+        // peer mesh (peers were told we left when the old socket dropped).
+        voice.setSocket(ws);
+        voice.onSocketConnected();
       };
       ws.onclose = () => {
         // StrictMode's first-pass socket is closed intentionally by the
@@ -104,6 +109,7 @@ export function SocketProvider(props: SocketProviderProps) {
         }
         console.log("websocket disconnected");
         setSocket(null);
+        voice.setSocket(null);
         scheduleReconnect();
       };
       ws.onerror = (error) => {
@@ -336,6 +342,14 @@ export function SocketProvider(props: SocketProviderProps) {
               type: "setHistory",
               payload: (event.history ?? []) as HistoryRecord[],
             });
+            return;
+          case "voice-signal":
+            // Peer-to-peer voice chat signalling relayed by the server; it
+            // never touches the app store.
+            voice.handleSignal(event);
+            return;
+          case "ice-servers":
+            voice.setIceServers(event.servers ?? [], event.ttl ?? 0);
             return;
           case "settlement":
             dispatch({

@@ -197,7 +197,13 @@
 
 * 语音功能，我们应该把设置按钮也搬到房间界面，并且加入语音输入音量和其他人的麦克风音量的滚动条，然后在房间加入两个按钮，分别是麦克风和喇叭（已经上传在了public中）来控制是否打开麦克风（默认关闭），喇叭来控制是否听取其他人的语音（默认关闭），然后我们在每个人的profile中加入一个麦克风按钮，来单独禁止它的麦克风（这个麦克风只是对自己而言，房间里的其他人依然能够听见）。需要考虑PC端和手机端的界面的排列问题。
 
+- [x] 语音功能：房间内点对点 WebRTC 语音（浏览器之间直连，服务端只转发信令）。服务端新增 `voice-signal` 消息（`backend/server/voice.go`）：按账号 UUID 在同一房间内单播 / 广播 join、leave、state、offer、answer、ice，服务端盖上 `from`（不可伪造），不在房间 / 未登录 / 未知类型 / 自己发给自己 / 广播 SDP 一律拒绝；客户端断开、离开、被顶号时服务端自动向房间广播 leave，让其他人立即拆掉连接。单帧上限从 1 KiB 提到 16 KiB 以容纳 SDP。UT：`backend/server/voice_test.go`（单播只到目标、广播不含发送者与匿名观众、伪造 from 被覆盖、各类拒绝、目标不在房间不外泄、unregister 广播 leave 且不发给同账号新连接、对方队列满时不阻塞）。前端 `web/lib/voice.ts`：麦克风或喇叭任一打开即加入语音网格并广播 join，其余在线成员发 offer；采用「perfect negotiation」处理两人同时加入的冲突；ICE 候选 150ms 合批以避开每连接消息限速；麦克风经 GainNode（输入音量滑块）后再发送，对方音频走 `<audio>` 元素（他人音量滑块 + 按人本地屏蔽）。房间右上角（PC 与手机两套布局）新增麦克风 / 喇叭两个按钮（默认均关闭，图标取自 public/microphone.svg、speaker.svg 内联为可着色组件，关闭时画斜线）；⚙️ 设置面板（大厅与房间共用）新增「麦克风输入音量」「他人语音音量」滑块并本地记忆；点击玩家头像的 profile 弹窗新增麦克风按钮，仅对自己屏蔽该玩家的语音（屏蔽名单本地记忆，房间其他人不受影响）；座位框右上角显示对方开麦 / 被我屏蔽的小徽标。
+
+- [x] 自建 STUN/TURN：不依赖 Google 等第三方。三个 compose 文件（默认 / hot / dev）均新增 **可选** 的 `coturn` 服务（profile `voice`，在 `.env` 里设 `COMPOSE_PROFILES=voice` + `TURN_SECRET` 才会启动；缺 secret 时容器拒绝启动而不是变成开放中继；host 网络，`--use-auth-secret`，限额 + 拒绝所有内网段作为中继目标，防止被当作跳板）。不启用 coturn 时服务端返回空列表，浏览器只交换本机候选，同一局域网内语音照常可用，跨 NAT 则连不上；后端 `backend/server/turn.go` 新增 `get-ice-servers` → `ice-servers`：仅对已登录连接返回 coturn 的 STUN/TURN URL（`TURN_HOST` 未设置时用页面所在主机）及按账号签发、24 小时过期的 TURN 凭据（`<过期时间>:<账号>` + HMAC-SHA1(`TURN_SECRET`)），只设 `TURN_HOST` 未设 `TURN_SECRET` 时只给 STUN，两者都未设时返回空列表。前端进房即请求、临近过期自动刷新，收到回复前不猜任何地址（避免等待一个不存在的 STUN 超时）；`NEXT_PUBLIC_ICE_SERVERS` 仍可整体覆盖。`.env.example` 新增 `TURN_*`，`deploy/HARDENING.md` 新增需放行的端口（3478 UDP/TCP、49160–49200 UDP）。UT：`backend/server/turn_test.go`（凭据与独立 HMAC 计算一致、过期时间 = now+TTL、无 secret 只给 STUN、主机回退/优先级/IPv6、不同账号与不同时间凭据不同、环境变量解析与越界回退、页面主机校验、匿名请求被拒且恶意主机名不被反射进 URL）。
+
 * 用户点击玩家的头像进入profile窗口之后应该添加一个“+”的按钮，表示添加好友。
+
+- [x] profile 弹窗（他人）标题栏新增「+」添加好友按钮，复用现有 `add-friend` 消息；已是好友时显示 ✓ 并禁用；服务端回 `user-info` 后好友列表即时刷新。
 
 ## 状态
 

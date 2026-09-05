@@ -38,6 +38,51 @@ services:
     depends_on:
       - go-poker
 
+  # STUN/TURN for in-room voice chat (WebRTC) — OPT-IN. Enable it with
+  # COMPOSE_PROFILES=voice in .env (or `docker compose --profile voice up`).
+  # Without it voice still works between players who can reach each other
+  # directly (same LAN / Wi-Fi); players behind different NATs need this:
+  # STUN lets browsers learn their public address, TURN relays audio when a
+  # direct path is impossible. Authentication is coturn's shared-secret
+  # scheme: the Go server knows TURN_SECRET too and mints per-player,
+  # time-limited credentials (backend/server/turn.go), so the relay is never
+  # open to anonymous use.
+  coturn:
+    image: coturn/coturn:4.6-alpine
+    container_name: go-poker-coturn-hot
+    restart: unless-stopped
+    profiles: ["voice"]
+    # Host networking (Linux only): the relay hands out a UDP port range and
+    # must advertise the host's real address; publishing the range through
+    # the docker bridge is slow and would expose the container's private IP.
+    network_mode: host
+    environment:
+      TURN_SECRET: ${TURN_SECRET:-}
+      TURN_PORT: ${TURN_PORT:-3478}
+      TURN_MIN_PORT: ${TURN_MIN_PORT:-49160}
+      TURN_MAX_PORT: ${TURN_MAX_PORT:-49200}
+      TURN_REALM: ${TURN_REALM:-gopoker}
+      TURN_EXTERNAL_IP: ${TURN_EXTERNAL_IP:-}
+    # Refuses to start without a secret: an unauthenticated relay would be an
+    # open proxy. "$$" escapes compose interpolation so the shell inside the
+    # container expands the variables. --denied-peer-ip blocks every private
+    # range so the relay cannot be used as a pivot into the docker network or
+    # the LAN.
+    entrypoint: >
+      sh -c 'test -n "$$TURN_SECRET" || { echo "coturn: TURN_SECRET is not set in .env" >&2; exit 1; };
+      exec turnserver -n --log-file=stdout --no-cli --no-tls --no-dtls --fingerprint
+      --listening-port="$$TURN_PORT" --min-port="$$TURN_MIN_PORT" --max-port="$$TURN_MAX_PORT"
+      --realm="$$TURN_REALM" --use-auth-secret --static-auth-secret="$$TURN_SECRET"
+      --user-quota=12 --total-quota=300 --stale-nonce=600 --no-multicast-peers
+      --denied-peer-ip=0.0.0.0-0.255.255.255
+      --denied-peer-ip=10.0.0.0-10.255.255.255
+      --denied-peer-ip=100.64.0.0-100.127.255.255
+      --denied-peer-ip=127.0.0.0-127.255.255.255
+      --denied-peer-ip=169.254.0.0-169.254.255.255
+      --denied-peer-ip=172.16.0.0-172.31.255.255
+      --denied-peer-ip=192.168.0.0-192.168.255.255
+      $${TURN_EXTERNAL_IP:+--external-ip=$$TURN_EXTERNAL_IP}'
+
   redis:
     image: redis:latest
     container_name: go-poker-redis-hot

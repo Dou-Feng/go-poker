@@ -270,11 +270,16 @@ func (t *table) unregisterClient(client *Client) {
 	t.waitingMu.Unlock()
 
 	t.clientsMu.Lock()
-	if _, ok := t.clients[client]; ok {
+	_, wasMember := t.clients[client]
+	if wasMember {
 		delete(t.clients, client)
 	}
 	empty := len(t.clients) == 0
 	t.clientsMu.Unlock()
+
+	if wasMember {
+		t.announceVoiceLeave(client)
+	}
 
 	if empty && t.emptyTimer == nil {
 		t.emptyTimer = time.AfterFunc(emptyTableTTL, func() {

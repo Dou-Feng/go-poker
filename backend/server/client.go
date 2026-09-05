@@ -14,10 +14,12 @@ import (
 )
 
 const (
-	writeWait      = 10 * time.Second
-	pongWait       = 60 * time.Second
-	pingPeriod     = (pongWait * 9) / 10
-	maxMessageSize = 1024
+	writeWait  = 10 * time.Second
+	pongWait   = 60 * time.Second
+	pingPeriod = (pongWait * 9) / 10
+	// maxMessageSize bounds one inbound frame. Game messages are a few hundred
+	// bytes; a WebRTC SDP offer/answer relayed for voice chat is 2–8 KiB.
+	maxMessageSize = 16 * 1024
 )
 
 var upgrader = websocket.Upgrader{
@@ -533,6 +535,23 @@ func (c *Client) processEvents(rawMessage []byte) error {
 
 	case actionPing:
 		c.send <- createPong()
+		return nil
+
+	case actionVoiceSignal:
+		var sig voiceSignal
+		err := json.Unmarshal(rawMessage, &sig)
+		if err != nil {
+			return err
+		}
+		return handleVoiceSignal(c, sig)
+
+	case actionGetIceServers:
+		var req getIceServers
+		err := json.Unmarshal(rawMessage, &req)
+		if err != nil {
+			return err
+		}
+		handleGetIceServers(c, req.Host)
 		return nil
 
 	default:
