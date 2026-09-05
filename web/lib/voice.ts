@@ -30,7 +30,10 @@ export type VoicePeer = {
 };
 
 export type VoiceState = {
+  /** The browser has WebRTC: voice can at least be listened to. */
   supported: boolean;
+  /** The microphone API exists (secure context: https or localhost). */
+  micAvailable: boolean;
   micOn: boolean;
   speakerOn: boolean;
   /** 0..1, gain applied to the outgoing mic signal. */
@@ -127,13 +130,27 @@ function pageHost(): string {
   return typeof window === "undefined" ? "" : window.location.hostname;
 }
 
+// Peer connections work on any origin, so listening is always possible when
+// the browser has WebRTC at all.
 function webrtcSupported(): boolean {
   return (
-    typeof window !== "undefined" &&
-    typeof RTCPeerConnection !== "undefined" &&
-    typeof navigator !== "undefined" &&
-    !!navigator.mediaDevices
+    typeof window !== "undefined" && typeof RTCPeerConnection !== "undefined"
   );
+}
+
+// getUserMedia is only exposed in a secure context (https, or localhost).
+// A phone opening http://192.168.x.x:8080 has no navigator.mediaDevices, so
+// it can hear the table but cannot talk until the site is served over https.
+function micAvailable(): boolean {
+  return (
+    typeof navigator !== "undefined" &&
+    !!navigator.mediaDevices &&
+    typeof navigator.mediaDevices.getUserMedia === "function"
+  );
+}
+
+function isSecureContext(): boolean {
+  return typeof window !== "undefined" && window.isSecureContext === true;
 }
 
 class VoiceManager {
@@ -161,6 +178,7 @@ class VoiceManager {
     const settings = loadSettings();
     this.state = {
       supported: webrtcSupported(),
+      micAvailable: micAvailable(),
       micOn: false,
       speakerOn: false,
       micVolume: settings.micVolume,
@@ -304,6 +322,15 @@ class VoiceManager {
   async setMic(on: boolean): Promise<void> {
     if (!this.state.supported) {
       this.emit({ error: "voiceUnsupported" });
+      return;
+    }
+    if (on && !micAvailable()) {
+      // Most likely a plain-http page on a LAN address: the browser hides
+      // the microphone API outside secure contexts. Say so instead of a
+      // generic "unsupported".
+      this.emit({
+        error: isSecureContext() ? "voiceUnsupported" : "micNeedsHttps",
+      });
       return;
     }
     if (on === this.state.micOn) {
@@ -693,8 +720,10 @@ class VoiceManager {
     if (this.micTrack) {
       return true;
     }
-    if (!navigator.mediaDevices?.getUserMedia) {
-      this.emit({ error: "voiceUnsupported" });
+    if (!micAvailable()) {
+      this.emit({
+        error: isSecureContext() ? "voiceUnsupported" : "micNeedsHttps",
+      });
       return false;
     }
     let raw: MediaStream;

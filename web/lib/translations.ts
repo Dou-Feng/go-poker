@@ -166,6 +166,8 @@ export const translations = {
     muteMicFor: "Mute this player for me",
     unmuteMicFor: "Unmute this player",
     micDenied: "microphone unavailable — check browser permissions",
+    micNeedsHttps:
+      "microphone needs a secure page — open the site over https (listening still works)",
     voiceUnsupported: "voice chat is not supported in this browser",
     isFriend: "friends",
   },
@@ -334,6 +336,8 @@ export const translations = {
     muteMicFor: "屏蔽此人语音（仅对我）",
     unmuteMicFor: "取消屏蔽此人语音",
     micDenied: "无法使用麦克风，请检查浏览器权限",
+    micNeedsHttps:
+      "麦克风需要 https 页面 — 请用 https 打开本站（收听不受影响）",
     voiceUnsupported: "当前浏览器不支持语音",
     isFriend: "已是好友",
   },

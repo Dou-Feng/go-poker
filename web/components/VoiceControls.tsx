@@ -31,19 +31,31 @@ export default function VoiceControls({ className }: voiceControlsProps) {
     return null;
   }
 
-  const button = (on: boolean) =>
+  // Same `btn btn-icon` box as the Settings gear so the three sit on one
+  // row at identical size; the icon is 1rem like FiSettings.
+  const button = (on: boolean, dimmed = false) =>
     classNames(
-      "btn btn-icon h-7 w-9 px-0",
-      on && "border-emerald-500 bg-emerald-700/80 text-ink hover:text-ink"
+      "btn btn-icon",
+      on && "border-emerald-500 bg-emerald-700/80 text-ink hover:text-ink",
+      dimmed && "opacity-50"
     );
+
+  // Over plain http on a LAN address the browser hides the microphone API:
+  // the button stays visible (so the player learns why) but dimmed, and
+  // tapping it shows the explanation toast via the manager's error.
+  const micTitle = !v.micAvailable
+    ? t("micNeedsHttps")
+    : v.micOn
+    ? t("micOn")
+    : t("micOff");
 
   return (
     <div className={classNames("flex flex-row items-center gap-1", className)}>
       <button
         onClick={() => void voice.setMic(!v.micOn)}
-        title={v.micOn ? t("micOn") : t("micOff")}
+        title={micTitle}
         aria-pressed={v.micOn}
-        className={button(v.micOn)}
+        className={button(v.micOn, !v.micAvailable)}
       >
         <MicIcon off={!v.micOn} className="h-4 w-4" />
       </button>

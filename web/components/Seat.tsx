@@ -272,7 +272,9 @@ export default function Seat({ player, id, visualId, reveal }: seatProps) {
               }
             }}
             className={classNames(
-              "btn mt-1 w-full py-1 text-xs font-bold sm:text-sm",
+              // Narrower than the seat box (w-32 / sm:w-56) and centered, so
+              // it reads as a control under the seat rather than a bar.
+              "btn mx-auto mt-1 flex w-24 py-1 text-xs font-bold sm:w-36 sm:text-sm",
               player.ready ? "btn-secondary" : "btn-confirm"
             )}
           >

@@ -148,7 +148,13 @@ export default function Game() {
           </button>
         )}
       </div>
+      {/* Top-right toolbar: the mic / speaker / settings row sits at the very
+          top of the room, above the wallet and stack. */}
       <div className="absolute top-0 right-0 z-10 flex flex-col items-end gap-1 p-2 sm:hidden">
+        <div className="flex flex-row items-center gap-1">
+          <VoiceControls />
+          <Settings />
+        </div>
         <Wallet />
         {me && game && (
           <div className="inline-flex w-20 flex-row items-center justify-between rounded-md bg-card/90 px-2.5 py-1 text-sm text-amber-300">
@@ -156,10 +162,12 @@ export default function Game() {
             <span className="type-num leading-none">{me.stack}</span>
           </div>
         )}
-        <Settings />
-        <VoiceControls />
       </div>
       <div className="absolute top-0 right-0 z-10 hidden flex-col items-end gap-2 p-2 sm:flex">
+        <div className="flex flex-row items-center gap-1">
+          <VoiceControls />
+          <Settings />
+        </div>
         <GameInfo />
         <Wallet />
         {me && game && (
@@ -168,8 +176,6 @@ export default function Game() {
             <span className="type-num leading-none">{me.stack}</span>
           </div>
         )}
-        <Settings />
-        <VoiceControls />
       </div>
       <Settlement />
     </div>
