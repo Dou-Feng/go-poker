@@ -22,6 +22,11 @@ func setChips(t *testing.T, tbl *table, uuid string, stack uint, totalBuyIn uint
 	}
 	view.Players[pos].Stack = stack
 	view.Players[pos].TotalBuyIn = totalBuyIn
+	// Chips can only change hands in a hand: a result implies at least one
+	// hand played (the scoreboard skips stints without any).
+	if stack != totalBuyIn && view.Players[pos].Stats.HandsPlayed == 0 {
+		view.Players[pos].Stats.HandsPlayed = 1
+	}
 	tbl.game.FillFromView(view)
 }
 
@@ -71,15 +76,16 @@ func TestSettlementRowsMergeSameAccount(t *testing.T) {
 // in) are not shown; accounts without an id are kept apart, not merged.
 func TestSettlementRowsSkipZeroBuyInAndKeepAnonymousApart(t *testing.T) {
 	view := &poker.GameView{}
-	raw := `{"players":[{"uuid":"s1","username":"x","totalBuyIn":100,"stack":150},
-	                    {"uuid":"s2","username":"y","totalBuyIn":100,"stack":50}],
+	raw := `{"players":[{"uuid":"s1","username":"x","totalBuyIn":100,"stack":150,"stats":{"handsPlayed":1}},
+	                    {"uuid":"s2","username":"y","totalBuyIn":100,"stack":50,"stats":{"handsPlayed":1}},
+	                    {"uuid":"s3","username":"fresh","totalBuyIn":100,"stack":100}],
 	         "departedPlayers":[{"uuid":"d1","username":"ghost","totalBuyIn":0,"stack":0}]}`
 	if err := json.Unmarshal([]byte(raw), view); err != nil {
 		t.Fatalf("decode view: %v", err)
 	}
 	rows := settlementRows(view)
 	if len(rows) != 2 {
-		t.Fatalf("zero-buy-in departed must be skipped and anonymous seats kept apart, got %+v", rows)
+		t.Fatalf("zero-buy-in departed and a seated player with no hands yet must be skipped, anonymous seats kept apart, got %+v", rows)
 	}
 	if rows[0].Net != 50 || rows[1].Net != -50 {
 		t.Fatalf("unexpected nets: %+v", rows)
@@ -284,5 +290,34 @@ func TestSessionRecordPersistedOnLeaveAndSettle(t *testing.T) {
 	}
 	if tbl.sessionID == firstID {
 		t.Fatalf("a new session must get a new id after settlement")
+	}
+}
+
+// A player (or bot) who sat down and left before any hand was dealt is not a
+// result: the departed snapshot carries a buy-in but zero hands, and must not
+// appear on the scoreboard. A stint with hands played still does.
+func TestSettlementRowsSkipDepartedWithoutHands(t *testing.T) {
+	tbl, _ := botTable(t)
+	human := seat(t, tbl, "acc-h", 1, false)
+	seat(t, tbl, "acc-b", 2, false) // stays, so the room never empties/resets
+	bot, err := tbl.addBot(0)
+	if err != nil {
+		t.Fatalf("add bot: %v", err)
+	}
+	if _, err := tbl.removeBot(bot.uuid); err != nil {
+		t.Fatalf("remove bot: %v", err)
+	}
+	// Nobody has played a hand yet: the board is empty (the removed bot, and
+	// the two seated humans alike).
+	if rows := settlementRows(tbl.game.GenerateOmniView()); len(rows) != 0 {
+		t.Fatalf("no hands played: nobody is on the board yet, got %+v", rows)
+	}
+
+	// A departed player who did play stays on the board with their result.
+	setChips(t, tbl, human, 150, 200) // implies a hand played
+	tbl.evictPlayer(human)
+	rows := settlementRows(tbl.game.GenerateOmniView())
+	if len(rows) != 1 || rows[0].UUID != "acc-h" || rows[0].Net != -50 || rows[0].BuyIn != 200 {
+		t.Fatalf("only the departed player with hands is listed, with their result; got %+v", rows)
 	}
 }

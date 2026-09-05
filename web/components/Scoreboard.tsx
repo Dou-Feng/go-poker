@@ -12,8 +12,16 @@ export type ScoreRow = {
   uuid: string;
   avatar: string;
   avatarImage: boolean;
+  /** Total bought in over the session (every stint). */
   buyIn: number;
+  /**
+   * Chips on the table right now (0 for a player who has left). A departed
+   * stint's stack was cashed out to the wallet, so it must never be added
+   * here — it only contributes to `net`.
+   */
   stack: number;
+  /** Session result: sum over stints of (stack − buy-in). */
+  net: number;
 };
 
 type scoreboardProps = {
@@ -40,7 +48,7 @@ export default function Scoreboard({
   onClose,
 }: scoreboardProps) {
   const { t } = useTranslation();
-  const netOf = (r: ScoreRow) => r.stack - r.buyIn;
+  const netOf = (r: ScoreRow) => r.net;
   // Ranked by net; equal nets share a rank (1, 1, 3 …).
   const ranked = [...rows].sort((a, b) => netOf(b) - netOf(a));
 

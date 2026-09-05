@@ -22,7 +22,9 @@ export default function Settlement() {
     avatarImage: p.avatarImage,
     buyIn: p.buyIn,
     // The server sends buy-in and net; chips at the end is their sum.
+    // Everyone has cashed out at settlement: final chips = buy-in + net.
     stack: p.buyIn + p.net,
+    net: p.net,
   }));
 
   return (

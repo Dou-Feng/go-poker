@@ -157,7 +157,8 @@ export default function Profile() {
                 {isFriend ? "✓" : <PlusIcon className="h-4 w-4" />}
               </button>
             )}
-            {otherUuid && voiceState.supported && (
+            {/* Local voice mute only makes sense inside a room. */}
+            {otherUuid && voiceState.supported && appState.table && (
               <button
                 onClick={() => voice.toggleMutePeer(otherUuid)}
                 title={peerMuted ? t("unmuteMicFor") : t("muteMicFor")}

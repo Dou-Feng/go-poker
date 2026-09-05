@@ -27,6 +27,7 @@ export default function SessionBoard() {
     avatarImage: p.avatarImage,
     buyIn: p.buyIn,
     stack: p.buyIn + p.net,
+    net: p.net,
   }));
 
   const select = (key: string) => {

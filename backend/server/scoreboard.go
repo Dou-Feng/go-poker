@@ -143,12 +143,23 @@ func sessionPlayers(view *poker.GameView) []SessionPlayer {
 	}
 	for i := range view.DepartedPlayers {
 		p := &view.DepartedPlayers[i]
-		if p.TotalBuyIn == 0 {
+		// A stint without a single hand (sat down and left, a bot added and
+		// removed before the deal, a queued seat never dealt in) changed no
+		// chips and is not a result: skip it, exactly as the history does.
+		if p.TotalBuyIn == 0 || p.Stats.HandsPlayed == 0 {
 			continue
 		}
 		addOrMerge(p.AccountUUID, p.UUID, p.Username, p.Avatar, p.AvatarImage, p.Bot, p.TotalBuyIn, p.Stack, p.Stats)
 	}
-	return rows
+	// An account that has not played a single hand yet (just sat down, a bot
+	// just added) has no result and is not on the board.
+	played := rows[:0]
+	for _, r := range rows {
+		if r.Stats.HandsPlayed > 0 {
+			played = append(played, r)
+		}
+	}
+	return played
 }
 
 // settlementRows is the settlement screen's view of the roster.
