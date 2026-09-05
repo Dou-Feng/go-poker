@@ -1,4 +1,4 @@
-import React, { useContext, useState } from "react";
+import React, { useContext, useEffect, useRef, useState } from "react";
 import { useSocket } from "../hooks/useSocket";
 import { AppContext } from "../providers/AppStore";
 import Footer from "./Footer";
@@ -18,6 +18,16 @@ export default function Register() {
   const [password, setPassword] = useState("");
   const [avatar, setAvatar] = useState(AVATARS[0]);
   const { t, tError } = useTranslation();
+
+  // Both forms stay mounted and stacked in the same grid cell so the block
+  // keeps a constant height (the register form's) when switching modes —
+  // the logo never moves. Focus the active form's first field on switch,
+  // replacing per-input autoFocus (which only fires on mount).
+  const registerField = useRef<HTMLInputElement>(null);
+  const loginField = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    (mode === "register" ? registerField : loginField).current?.focus();
+  }, [mode]);
 
   const submit = () => {
     if (!socket) {
@@ -43,9 +53,7 @@ export default function Register() {
         <Settings />
       </div>
       <div className="flex flex-grow flex-col items-center justify-center px-4">
-        <h1 className="mb-10 type-display text-5xl">
-          {t("title")}
-        </h1>
+        <h1 className="type-display mb-10 text-5xl">{t("title")}</h1>
         <div className="flex flex-col items-center gap-2">
           <div className="mb-2 flex flex-row gap-1 rounded-md bg-card p-1">
             <button
@@ -70,10 +78,15 @@ export default function Register() {
             </button>
           </div>
 
-          {mode === "register" ? (
-            <>
+          <div className="grid">
+            <div
+              className={`col-start-1 row-start-1 flex flex-col items-center gap-2 ${
+                mode === "register" ? "" : "invisible"
+              }`}
+              aria-hidden={mode !== "register"}
+            >
               <input
-                autoFocus
+                ref={registerField}
                 className="w-64 rounded-sm bg-floor py-2 pl-4 text-ink focus:outline-none"
                 type="text"
                 value={username}
@@ -119,11 +132,15 @@ export default function Register() {
               >
                 {t("signUp")}
               </button>
-            </>
-          ) : (
-            <>
+            </div>
+            <div
+              className={`col-start-1 row-start-1 flex flex-col items-center gap-2 ${
+                mode === "login" ? "" : "invisible"
+              }`}
+              aria-hidden={mode !== "login"}
+            >
               <input
-                autoFocus
+                ref={loginField}
                 className="w-64 rounded-sm bg-floor py-2 pl-4 text-ink focus:outline-none"
                 type="text"
                 value={identifier}
@@ -151,14 +168,14 @@ export default function Register() {
               >
                 {t("logIn")}
               </button>
-            </>
-          )}
+            </div>
+          </div>
 
-          {appState.authError && (
-            <p className="mt-2 text-sm text-rose-400">
-              {tError(appState.authError)}
-            </p>
-          )}
+          {/* Fixed-height slot: the error message appearing/disappearing
+              must not re-center (and jump) the whole block. */}
+          <p className="mt-2 h-5 text-sm text-rose-400">
+            {appState.authError ? tError(appState.authError) : ""}
+          </p>
         </div>
       </div>
       <Footer />

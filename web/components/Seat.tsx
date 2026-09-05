@@ -84,7 +84,7 @@ function active(player: Player, game: Game) {
       "bg-tablehi text-ink ": !winner && !game.betting,
     },
 
-    "rounded-xl flex flex-row justify-start items-center z-2"
+    "rounded-xl border border-muted/30 flex flex-row justify-start items-center z-2"
   );
 }
 
@@ -297,8 +297,9 @@ export default function Seat({ player, id, visualId, reveal }: seatProps) {
   if (!game || running) {
     return (
       <div>
-        <button className="m-1 h-16 w-32 rounded-2xl bg-floor p-2 text-muted opacity-20 sm:m-4 sm:h-20 sm:w-56">
-          <h2 className="text-3xl sm:text-4xl">{id}</h2>
+        <button className="m-1 h-16 w-32 rounded-2xl border border-muted/40 bg-transparent p-2 text-muted opacity-20 sm:m-4 sm:h-20 sm:w-56">
+          <p className="text-3xl sm:text-4xl">{t("open")}</p>
+          <h2 className="text-xs opacity-70 sm:text-base">{id}</h2>
         </button>
       </div>
     );
@@ -329,11 +330,11 @@ export default function Seat({ player, id, visualId, reveal }: seatProps) {
     return (
       <div>
         <button
-          className="m-1 h-16 w-32 rounded-2xl bg-floor p-2 text-ink sm:m-4 sm:h-20 sm:w-56"
+          className="m-1 h-16 w-32 rounded-2xl border border-muted/40 bg-transparent p-2 text-ink transition-colors hover:bg-card sm:m-4 sm:h-20 sm:w-56"
           onClick={handleClick}
         >
-          <h2 className="text-3xl sm:text-4xl">{id}</h2>
-          <p className="text-xs opacity-70 sm:text-base">{t("open")}</p>
+          <p className="text-3xl sm:text-4xl">{t("open")}</p>
+          <h2 className="text-xs opacity-70 sm:text-base">{id}</h2>
         </button>
       </div>
     );
@@ -341,8 +342,9 @@ export default function Seat({ player, id, visualId, reveal }: seatProps) {
 
   return (
     <div>
-      <button className="m-1 h-16 w-32 rounded-2xl bg-floor p-2 text-muted opacity-20 sm:m-4 sm:h-20 sm:w-56">
-        <h2 className="text-3xl sm:text-4xl">{id}</h2>
+      <button className="m-1 h-16 w-32 rounded-2xl border border-muted/40 bg-transparent p-2 text-muted opacity-20 sm:m-4 sm:h-20 sm:w-56">
+        <p className="text-3xl sm:text-4xl">{t("open")}</p>
+        <h2 className="text-xs opacity-70 sm:text-base">{id}</h2>
       </button>
     </div>
   );

@@ -170,7 +170,7 @@ export default function Lobby() {
   };
 
   return (
-    <div className="app-screen flex flex-col overflow-hidden bg-lobby">
+    <div className="app-screen room-wallpaper flex flex-col overflow-hidden bg-lobby">
       <div className="flex w-full flex-row items-center justify-between px-4 py-2">
         <div className="flex flex-row items-center gap-3">
           <button onClick={viewSelf} className="text-3xl" title={t("myStats")}>
@@ -209,20 +209,14 @@ export default function Lobby() {
             <FiClock size="1rem" />
           </button>
           <Settings />
-          <button
-            onClick={logout}
-            title={t("logout")}
-            className="btn btn-icon"
-          >
+          <button onClick={logout} title={t("logout")} className="btn btn-icon">
             <FiLogOut size="1rem" />
           </button>
         </div>
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col items-center px-4">
-        <h1 className="mb-6 mt-4 type-display text-4xl">
-          {t("lobby")}
-        </h1>
+        <h1 className="type-display mb-6 mt-4 text-4xl">{t("lobby")}</h1>
 
         <div className="mb-4 flex w-full max-w-md flex-row items-center justify-between">
           <button
@@ -255,9 +249,7 @@ export default function Lobby() {
                     <p className="text-ink">
                       {room.name}
                       {room.locked && (
-                        <span className="ml-2 type-label">
-                          🔒
-                        </span>
+                        <span className="type-label ml-2">🔒</span>
                       )}
                     </p>
                     <p className="type-caption">
@@ -309,9 +301,7 @@ export default function Lobby() {
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
               <div className="flex max-h-[85vh] w-full max-w-md flex-col gap-3 overflow-y-auto rounded-lg bg-card p-6 shadow-2xl">
                 <div className="flex flex-row items-center justify-between">
-                  <p className="type-heading">
-                    {t("newRoom")}
-                  </p>
+                  <p className="type-heading">{t("newRoom")}</p>
                   <button
                     onClick={() => setShowCreate(false)}
                     className="text-muted hover:text-ink"
@@ -322,7 +312,7 @@ export default function Lobby() {
 
                 <div className="flex flex-row items-center gap-2">
                   <input
-                    className="flex-1 rounded-sm bg-floor py-2 pl-4 text-ink focus:outline-none"
+                    className="flex-1 rounded-sm border border-muted/30 bg-transparent py-2 pl-4 text-ink focus:outline-none"
                     type="text"
                     value={newRoom}
                     placeholder={t("newRoomName")}
@@ -330,7 +320,7 @@ export default function Lobby() {
                     onChange={(e) => setNewRoom(e.target.value)}
                   />
                   <input
-                    className="w-32 rounded-sm bg-floor py-2 pl-4 text-ink focus:outline-none"
+                    className="w-32 rounded-sm border border-muted/30 bg-transparent py-2 pl-4 text-ink focus:outline-none"
                     type="password"
                     value={newPassword}
                     placeholder={t("password")}
@@ -348,7 +338,7 @@ export default function Lobby() {
                     inputMode="numeric"
                     value={sb}
                     onChange={(e) => setSb(e.target.value)}
-                    className="w-20 flex-1 rounded-sm bg-cardhi px-2 py-1 text-ink focus:outline-none"
+                    className="w-20 flex-1 rounded-sm border border-muted/30 bg-transparent px-2 py-1 text-ink focus:outline-none"
                   />
                   <span className="text-muted">/</span>
                   <input
@@ -356,20 +346,18 @@ export default function Lobby() {
                     inputMode="numeric"
                     value={bb}
                     onChange={(e) => setBb(e.target.value)}
-                    className="w-20 flex-1 rounded-sm bg-cardhi px-2 py-1 text-ink focus:outline-none"
+                    className="w-20 flex-1 rounded-sm border border-muted/30 bg-transparent px-2 py-1 text-ink focus:outline-none"
                   />
                 </div>
 
                 <div className="flex flex-row items-center gap-2 rounded-sm bg-floor px-3 py-2 text-xs">
-                  <span className="w-16 shrink-0 text-muted">
-                    {t("buyIn")}
-                  </span>
+                  <span className="w-16 shrink-0 text-muted">{t("buyIn")}</span>
                   <input
                     type="text"
                     inputMode="numeric"
                     value={buyIn}
                     onChange={(e) => setBuyIn(e.target.value)}
-                    className="flex-1 rounded-sm bg-cardhi px-2 py-1 text-ink focus:outline-none"
+                    className="flex-1 rounded-sm border border-muted/30 bg-transparent px-2 py-1 text-ink focus:outline-none"
                   />
                 </div>
 
@@ -382,7 +370,7 @@ export default function Lobby() {
                     inputMode="numeric"
                     value={maxBuy}
                     onChange={(e) => setMaxBuy(e.target.value)}
-                    className="flex-1 rounded-sm bg-cardhi px-2 py-1 text-ink focus:outline-none"
+                    className="flex-1 rounded-sm border border-muted/30 bg-transparent px-2 py-1 text-ink focus:outline-none"
                   />
                 </div>
 
@@ -395,20 +383,18 @@ export default function Lobby() {
                     inputMode="numeric"
                     value={maxPlayers}
                     onChange={(e) => setMaxPlayers(e.target.value)}
-                    className="flex-1 rounded-sm bg-cardhi px-2 py-1 text-ink focus:outline-none"
+                    className="flex-1 rounded-sm border border-muted/30 bg-transparent px-2 py-1 text-ink focus:outline-none"
                   />
                 </div>
 
                 <div className="flex flex-row items-center gap-2 rounded-sm bg-floor px-3 py-2 text-xs">
-                  <span className="w-16 shrink-0 text-muted">
-                    {t("hands")}
-                  </span>
+                  <span className="w-16 shrink-0 text-muted">{t("hands")}</span>
                   <input
                     type="text"
                     inputMode="numeric"
                     value={handsLimit}
                     onChange={(e) => setHandsLimit(e.target.value)}
-                    className="flex-1 rounded-sm bg-cardhi px-2 py-1 text-ink focus:outline-none"
+                    className="flex-1 rounded-sm border border-muted/30 bg-transparent px-2 py-1 text-ink focus:outline-none"
                   />
                   <span className="shrink-0 text-muted">
                     0 = {t("unlimited")}
@@ -422,10 +408,7 @@ export default function Lobby() {
                   >
                     {t("cancel")}
                   </button>
-                  <button
-                    onClick={create}
-                    className="btn btn-primary"
-                  >
+                  <button onClick={create} className="btn btn-primary">
                     {t("create")}
                   </button>
                 </div>
@@ -436,9 +419,7 @@ export default function Lobby() {
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
               <div className="w-full max-w-md rounded-lg bg-card p-6 shadow-2xl">
                 <div className="mb-4 flex flex-row items-center justify-between">
-                  <p className="type-heading">
-                    {t("friends")}
-                  </p>
+                  <p className="type-heading">{t("friends")}</p>
                   <button
                     onClick={() => setShowFriends(false)}
                     className="text-muted hover:text-ink"
@@ -464,9 +445,7 @@ export default function Lobby() {
                   </button>
                 </div>
                 {appState.friends.length === 0 && (
-                  <p className="mt-3 type-label">
-                    {t("noFriends")}
-                  </p>
+                  <p className="type-label mt-3">{t("noFriends")}</p>
                 )}
                 <div className="mt-2 flex flex-col gap-2">
                   {appState.friends.map((f) => (

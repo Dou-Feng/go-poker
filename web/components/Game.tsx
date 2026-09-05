@@ -46,7 +46,7 @@ export default function Game() {
   }, [me]);
 
   return (
-    <div className="app-screen relative w-screen overflow-hidden bg-floor">
+    <div className="app-screen room-wallpaper relative w-screen overflow-hidden bg-floor">
       <div className="flex h-full w-full items-start justify-center">
         <Table />
       </div>
@@ -76,9 +76,7 @@ export default function Game() {
       )}
       {appState.table && (
         <div className="pointer-events-none absolute bottom-44 left-0 z-10 px-2 sm:bottom-48">
-          <p className="text-sm font-medium text-muted">
-            {appState.table}
-          </p>
+          <p className="text-sm font-medium text-muted">{appState.table}</p>
         </div>
       )}
       <Rebuy />
@@ -119,10 +117,7 @@ export default function Game() {
         </div>
       </div>
       <div className="absolute left-0 top-0 z-10 flex flex-row items-center">
-        <button
-          onClick={handleLeave}
-          className="btn btn-danger m-2"
-        >
+        <button onClick={handleLeave} className="btn btn-danger m-2">
           {t("leave")}
         </button>
         {me && showVotes && (
@@ -141,11 +136,10 @@ export default function Game() {
         {me && game && (
           <div className="inline-flex w-20 flex-row items-center justify-between rounded-md bg-card/90 px-2.5 py-1 text-sm text-amber-300">
             <Chip className="h-4 w-4" />
-            <span className="type-num leading-none">
-              {me.stack}
-            </span>
+            <span className="type-num leading-none">{me.stack}</span>
           </div>
         )}
+        <Settings />
       </div>
       <div className="absolute top-0 right-0 z-10 hidden flex-col items-end gap-2 p-2 sm:flex">
         <GameInfo />
@@ -153,9 +147,7 @@ export default function Game() {
         {me && game && (
           <div className="inline-flex w-20 flex-row items-center justify-between rounded-md bg-card/90 px-2.5 py-1 text-sm text-amber-300 shadow">
             <Chip className="h-4 w-4" />
-            <span className="type-num leading-none">
-              {me.stack}
-            </span>
+            <span className="type-num leading-none">{me.stack}</span>
           </div>
         )}
         <Settings />

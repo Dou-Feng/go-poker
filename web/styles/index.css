@@ -47,9 +47,9 @@ body {
   overscroll-behavior: none;
 }
 
-/* Brand black: every screen grows out of this color. The login screen adds
-   the doodle wallpaper on top of it; the lobby and the game room paint their
-   own ladder steps over it (see tailwind.config.js). */
+/* Brand black: every screen grows out of this color. The login screen and
+   the in-app screens (lobby, game room) add their doodle wallpapers on top
+   of it (see tailwind.config.js). */
 body {
   background-color: #0e1319;
 }
@@ -79,6 +79,50 @@ body {
   .login-wallpaper {
     background-image: url("/bg-1672.webp");
   }
+}
+
+/* In-app wallpaper (lobby + game room): same doodle family, same variant
+   scheme as the login wallpaper — portrait / small landscape / large
+   landscape, and the browser downloads only the file it matches. */
+.room-wallpaper {
+  background-image: url("/bg-room-1100.webp");
+  background-position: center;
+  background-size: cover;
+  background-repeat: no-repeat;
+}
+
+/* Portrait screens (phones, iPad portrait): dedicated portrait wallpaper. */
+@media (orientation: portrait) {
+  .room-wallpaper {
+    background-image: url("/bg-room-portrait.webp");
+  }
+}
+
+/* Large landscape screens: full-size landscape wallpaper. */
+@media (min-width: 700px) and (orientation: landscape) {
+  .room-wallpaper {
+    background-image: url("/bg-room-1672.webp");
+  }
+}
+
+/* Poker-table materials (UE-style material, not a pasted image): the table
+   geometry — an oval felt inside a constant-thickness rail — comes from CSS
+   shape (rounded-full + padding) and keeps resizing with the viewport, while
+   the texture has a fixed pixel density and tiles: a bigger table reveals
+   more material, it never stretches it. background-size is the density knob;
+   768px keeps the felt under one tile at its max (~720px) render width. */
+.felt-material {
+  background-color: #1a4a33; /* felt base while the texture loads */
+  background-image: url("/table-felt.webp");
+  background-repeat: repeat;
+  background-size: 768px;
+}
+
+.rail-material {
+  background-color: #4a3320; /* wood base while the texture loads */
+  background-image: url("/table-edge.webp");
+  background-repeat: repeat;
+  background-size: 768px;
 }
 
 /* Full-screen pages: use the dynamic viewport height so mobile browsers

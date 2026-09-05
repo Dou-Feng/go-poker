@@ -19,7 +19,7 @@ export default function RoomStats() {
       <button
         onClick={() => setShow(true)}
         title={t("roomStats")}
-        className="inline-flex flex-row items-center gap-1.5 rounded-sm border border-muted/40 px-3 py-1.5 text-sm font-semibold text-ink hover:bg-floor"
+        className="btn btn-ghost"
       >
         <FiBarChart2 size="1rem" />
         {t("roomStats")}
@@ -29,13 +29,8 @@ export default function RoomStats() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
           <div className="w-full max-w-md rounded-lg bg-card p-6 shadow-2xl">
             <div className="mb-4 flex flex-row items-center justify-between">
-              <p className="type-heading">
-                {t("roomStats")}
-              </p>
-              <button
-                onClick={() => setShow(false)}
-                className="btn btn-text"
-              >
+              <p className="type-heading">{t("roomStats")}</p>
+              <button onClick={() => setShow(false)} className="btn btn-text">
                 ✕
               </button>
             </div>
@@ -44,7 +39,7 @@ export default function RoomStats() {
               <p className="type-label">{t("noPlayers")}</p>
             )}
 
-            <div className="mb-2 flex flex-row items-center justify-between px-3 font-mono type-caption">
+            <div className="type-caption mb-2 flex flex-row items-center justify-between px-3 font-mono">
               <span>{t("player")}</span>
               <div className="flex flex-row items-center gap-2">
                 <span className="w-12 text-right">{t("buyInLabel")}</span>

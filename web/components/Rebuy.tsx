@@ -40,7 +40,7 @@ export default function Rebuy() {
   };
 
   return (
-    <div className="pointer-events-auto absolute bottom-64 right-2 z-30 flex flex-col items-end gap-1 sm:bottom-72">
+    <div className="pointer-events-auto absolute bottom-64 right-2 z-30 flex flex-col items-end gap-1 sm:bottom-[17rem]">
       {show && (
         <div className="rounded-lg border border-muted/30 bg-tablehi/95 p-2 shadow-lg">
           <div className="flex flex-row items-center gap-2">
@@ -52,7 +52,7 @@ export default function Rebuy() {
             >
               −
             </button>
-            <span className="min-w-16 text-center type-num text-lg text-amber-300">
+            <span className="min-w-16 type-num text-center text-lg text-amber-300">
               {amount}
             </span>
             <button
@@ -78,7 +78,7 @@ export default function Rebuy() {
           setAmount(0);
           setShow((s) => !s);
         }}
-        className="inline-flex flex-row items-center gap-1.5 rounded-sm border border-muted/40 bg-tablehi/80 px-3 py-1.5 text-sm font-semibold text-ink hover:bg-floor"
+        className="btn btn-ghost"
       >
         <PlusIcon className="h-4 w-4" />
         {t("rebuy")}
