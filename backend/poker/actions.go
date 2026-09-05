@@ -321,8 +321,10 @@ func deal(g *Game, pn uint, data uint) error {
 
 		g.actionNum = g.utgNum
 
-		for i := 0; i < 3; i++ {
-			g.deck.Shuffle()
+		// eval.Deck.Shuffle resets to the full deck before shuffling, so the
+		// old triple-shuffle loop was equivalent to a single shuffle.
+		if err := g.shuffleDeck(); err != nil {
+			return err
 		}
 
 		for i, p := range g.players {
