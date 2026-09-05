@@ -170,7 +170,7 @@ export default function Lobby() {
   };
 
   return (
-    <div className="app-screen flex flex-col overflow-hidden">
+    <div className="app-screen flex flex-col overflow-hidden bg-lobby">
       <div className="flex w-full flex-row items-center justify-between px-4 py-2">
         <div className="flex flex-row items-center gap-3">
           <button onClick={viewSelf} className="text-3xl" title={t("myStats")}>
@@ -185,14 +185,14 @@ export default function Lobby() {
           </button>
           <div className="flex flex-col items-center gap-1">
             <WalletButton onOpen={() => setShowRecharge(true)} />
-            <p className="text-sm text-white">{appState.username}</p>
+            <p className="text-sm text-ink">{appState.username}</p>
           </div>
         </div>
         <div className="flex flex-row items-center gap-2">
           <button
             onClick={() => setShowFriends(true)}
             title={t("friends")}
-            className="rounded-sm border border-neutral-600 px-2 py-1 text-xs text-neutral-400 hover:text-neutral-200"
+            className="btn btn-icon"
           >
             <FiUsers size="1rem" />
           </button>
@@ -204,7 +204,7 @@ export default function Lobby() {
               }
             }}
             title={t("history")}
-            className="rounded-sm border border-neutral-600 px-2 py-1 text-xs text-neutral-400 hover:text-neutral-200"
+            className="btn btn-icon"
           >
             <FiClock size="1rem" />
           </button>
@@ -212,7 +212,7 @@ export default function Lobby() {
           <button
             onClick={logout}
             title={t("logout")}
-            className="rounded-sm border border-neutral-600 px-2 py-1 text-xs text-neutral-400 hover:text-neutral-200"
+            className="btn btn-icon"
           >
             <FiLogOut size="1rem" />
           </button>
@@ -220,20 +220,20 @@ export default function Lobby() {
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col items-center px-4">
-        <h1 className="mb-6 mt-4 text-4xl font-semibold text-white">
+        <h1 className="mb-6 mt-4 type-display text-4xl">
           {t("lobby")}
         </h1>
 
         <div className="mb-4 flex w-full max-w-md flex-row items-center justify-between">
           <button
             onClick={() => socket && listTables(socket)}
-            className="rounded-sm border border-neutral-600 px-4 py-1.5 text-sm text-neutral-300 hover:bg-neutral-700"
+            className="btn btn-ghost"
           >
             {t("refresh")}
           </button>
           <button
             onClick={() => setShowCreate(true)}
-            className="rounded-sm bg-cyan-900 px-4 py-1.5 text-sm text-white hover:bg-cyan-800"
+            className="btn btn-primary"
           >
             {t("newRoom")}
           </button>
@@ -241,26 +241,26 @@ export default function Lobby() {
 
         <div className="flex min-h-0 w-full max-w-md flex-1 flex-col gap-4 overflow-y-auto pb-4">
           <div className="flex flex-col gap-2">
-            <p className="text-sm text-neutral-500">{t("rooms")}</p>
+            <p className="type-label">{t("rooms")}</p>
             {appState.tables.length === 0 && (
-              <p className="text-sm text-neutral-600">{t("noRooms")}</p>
+              <p className="text-sm text-muted/60">{t("noRooms")}</p>
             )}
             {appState.tables.map((room) => (
               <div
                 key={room.name}
-                className="flex flex-col rounded-sm bg-neutral-800 px-4 py-3"
+                className="flex flex-col rounded-sm bg-card px-4 py-3"
               >
                 <div className="flex flex-row items-center justify-between">
                   <div className="flex flex-col">
-                    <p className="text-white">
+                    <p className="text-ink">
                       {room.name}
                       {room.locked && (
-                        <span className="ml-2 text-sm text-neutral-500">
+                        <span className="ml-2 type-label">
                           🔒
                         </span>
                       )}
                     </p>
-                    <p className="text-xs text-neutral-500">
+                    <p className="type-caption">
                       {room.players} {t("players")}
                       {" · "}
                       {room.spectators} {t("watching")}
@@ -269,7 +269,7 @@ export default function Lobby() {
                   </div>
                   <button
                     onClick={() => onJoinClick(room)}
-                    className="rounded-sm bg-neutral-700 px-4 py-1.5 text-white hover:bg-neutral-600"
+                    className="btn btn-secondary"
                   >
                     {t("join")}
                   </button>
@@ -278,7 +278,7 @@ export default function Lobby() {
                   <div className="mt-2 flex flex-row items-center gap-2">
                     <input
                       autoFocus
-                      className="flex-1 rounded-sm bg-neutral-700 py-1.5 pl-3 text-white focus:outline-none"
+                      className="flex-1 rounded-sm bg-floor py-1.5 pl-3 text-ink focus:outline-none"
                       type="password"
                       value={joinPassword}
                       placeholder={t("roomPassword")}
@@ -296,7 +296,7 @@ export default function Lobby() {
                         setJoinTarget(null);
                         setJoinPassword("");
                       }}
-                      className="text-xs text-neutral-500 hover:text-neutral-300"
+                      className="type-caption hover:text-ink"
                     >
                       {t("cancel")}
                     </button>
@@ -307,14 +307,14 @@ export default function Lobby() {
           </div>
           {showCreate && (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-              <div className="flex max-h-[85vh] w-full max-w-md flex-col gap-3 overflow-y-auto rounded-lg bg-zinc-800 p-6 shadow-2xl">
+              <div className="flex max-h-[85vh] w-full max-w-md flex-col gap-3 overflow-y-auto rounded-lg bg-card p-6 shadow-2xl">
                 <div className="flex flex-row items-center justify-between">
-                  <p className="text-lg font-semibold text-white">
+                  <p className="type-heading">
                     {t("newRoom")}
                   </p>
                   <button
                     onClick={() => setShowCreate(false)}
-                    className="text-neutral-400 hover:text-white"
+                    className="text-muted hover:text-ink"
                   >
                     ✕
                   </button>
@@ -322,7 +322,7 @@ export default function Lobby() {
 
                 <div className="flex flex-row items-center gap-2">
                   <input
-                    className="flex-1 rounded-sm bg-neutral-700 py-2 pl-4 text-white focus:outline-none"
+                    className="flex-1 rounded-sm bg-floor py-2 pl-4 text-ink focus:outline-none"
                     type="text"
                     value={newRoom}
                     placeholder={t("newRoomName")}
@@ -330,7 +330,7 @@ export default function Lobby() {
                     onChange={(e) => setNewRoom(e.target.value)}
                   />
                   <input
-                    className="w-32 rounded-sm bg-neutral-700 py-2 pl-4 text-white focus:outline-none"
+                    className="w-32 rounded-sm bg-floor py-2 pl-4 text-ink focus:outline-none"
                     type="password"
                     value={newPassword}
                     placeholder={t("password")}
@@ -339,8 +339,8 @@ export default function Lobby() {
                   />
                 </div>
 
-                <div className="flex flex-row items-center gap-2 rounded-sm bg-neutral-700 px-3 py-2 text-xs">
-                  <span className="w-16 shrink-0 text-neutral-400">
+                <div className="flex flex-row items-center gap-2 rounded-sm bg-floor px-3 py-2 text-xs">
+                  <span className="w-16 shrink-0 text-muted">
                     {t("blinds")}
                   </span>
                   <input
@@ -348,20 +348,20 @@ export default function Lobby() {
                     inputMode="numeric"
                     value={sb}
                     onChange={(e) => setSb(e.target.value)}
-                    className="w-20 flex-1 rounded-sm bg-neutral-600 px-2 py-1 text-white focus:outline-none"
+                    className="w-20 flex-1 rounded-sm bg-cardhi px-2 py-1 text-ink focus:outline-none"
                   />
-                  <span className="text-neutral-400">/</span>
+                  <span className="text-muted">/</span>
                   <input
                     type="text"
                     inputMode="numeric"
                     value={bb}
                     onChange={(e) => setBb(e.target.value)}
-                    className="w-20 flex-1 rounded-sm bg-neutral-600 px-2 py-1 text-white focus:outline-none"
+                    className="w-20 flex-1 rounded-sm bg-cardhi px-2 py-1 text-ink focus:outline-none"
                   />
                 </div>
 
-                <div className="flex flex-row items-center gap-2 rounded-sm bg-neutral-700 px-3 py-2 text-xs">
-                  <span className="w-16 shrink-0 text-neutral-400">
+                <div className="flex flex-row items-center gap-2 rounded-sm bg-floor px-3 py-2 text-xs">
+                  <span className="w-16 shrink-0 text-muted">
                     {t("buyIn")}
                   </span>
                   <input
@@ -369,12 +369,12 @@ export default function Lobby() {
                     inputMode="numeric"
                     value={buyIn}
                     onChange={(e) => setBuyIn(e.target.value)}
-                    className="flex-1 rounded-sm bg-neutral-600 px-2 py-1 text-white focus:outline-none"
+                    className="flex-1 rounded-sm bg-cardhi px-2 py-1 text-ink focus:outline-none"
                   />
                 </div>
 
-                <div className="flex flex-row items-center gap-2 rounded-sm bg-neutral-700 px-3 py-2 text-xs">
-                  <span className="w-16 shrink-0 text-neutral-400">
+                <div className="flex flex-row items-center gap-2 rounded-sm bg-floor px-3 py-2 text-xs">
+                  <span className="w-16 shrink-0 text-muted">
                     {t("maxBuy")}
                   </span>
                   <input
@@ -382,12 +382,12 @@ export default function Lobby() {
                     inputMode="numeric"
                     value={maxBuy}
                     onChange={(e) => setMaxBuy(e.target.value)}
-                    className="flex-1 rounded-sm bg-neutral-600 px-2 py-1 text-white focus:outline-none"
+                    className="flex-1 rounded-sm bg-cardhi px-2 py-1 text-ink focus:outline-none"
                   />
                 </div>
 
-                <div className="flex flex-row items-center gap-2 rounded-sm bg-neutral-700 px-3 py-2 text-xs">
-                  <span className="w-16 shrink-0 text-neutral-400">
+                <div className="flex flex-row items-center gap-2 rounded-sm bg-floor px-3 py-2 text-xs">
+                  <span className="w-16 shrink-0 text-muted">
                     {t("maxPlayers")}
                   </span>
                   <input
@@ -395,12 +395,12 @@ export default function Lobby() {
                     inputMode="numeric"
                     value={maxPlayers}
                     onChange={(e) => setMaxPlayers(e.target.value)}
-                    className="flex-1 rounded-sm bg-neutral-600 px-2 py-1 text-white focus:outline-none"
+                    className="flex-1 rounded-sm bg-cardhi px-2 py-1 text-ink focus:outline-none"
                   />
                 </div>
 
-                <div className="flex flex-row items-center gap-2 rounded-sm bg-neutral-700 px-3 py-2 text-xs">
-                  <span className="w-16 shrink-0 text-neutral-400">
+                <div className="flex flex-row items-center gap-2 rounded-sm bg-floor px-3 py-2 text-xs">
+                  <span className="w-16 shrink-0 text-muted">
                     {t("hands")}
                   </span>
                   <input
@@ -408,9 +408,9 @@ export default function Lobby() {
                     inputMode="numeric"
                     value={handsLimit}
                     onChange={(e) => setHandsLimit(e.target.value)}
-                    className="flex-1 rounded-sm bg-neutral-600 px-2 py-1 text-white focus:outline-none"
+                    className="flex-1 rounded-sm bg-cardhi px-2 py-1 text-ink focus:outline-none"
                   />
-                  <span className="shrink-0 text-neutral-500">
+                  <span className="shrink-0 text-muted">
                     0 = {t("unlimited")}
                   </span>
                 </div>
@@ -418,13 +418,13 @@ export default function Lobby() {
                 <div className="mt-2 flex flex-row justify-end gap-2">
                   <button
                     onClick={() => setShowCreate(false)}
-                    className="rounded-sm border border-neutral-600 px-4 py-2 text-sm text-neutral-300 hover:bg-neutral-700"
+                    className="btn btn-ghost"
                   >
                     {t("cancel")}
                   </button>
                   <button
                     onClick={create}
-                    className="rounded-sm bg-cyan-900 px-4 py-2 text-sm text-white hover:bg-cyan-800"
+                    className="btn btn-primary"
                   >
                     {t("create")}
                   </button>
@@ -434,21 +434,21 @@ export default function Lobby() {
           )}
           {showFriends && (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-              <div className="w-full max-w-md rounded-lg bg-zinc-800 p-6 shadow-2xl">
+              <div className="w-full max-w-md rounded-lg bg-card p-6 shadow-2xl">
                 <div className="mb-4 flex flex-row items-center justify-between">
-                  <p className="text-lg font-semibold text-white">
+                  <p className="type-heading">
                     {t("friends")}
                   </p>
                   <button
                     onClick={() => setShowFriends(false)}
-                    className="text-neutral-400 hover:text-white"
+                    className="text-muted hover:text-ink"
                   >
                     ✕
                   </button>
                 </div>
                 <div className="flex flex-row items-center gap-2">
                   <input
-                    className="flex-1 rounded-sm bg-neutral-700 py-2 pl-4 text-white focus:outline-none"
+                    className="flex-1 rounded-sm bg-floor py-2 pl-4 text-ink focus:outline-none"
                     type="text"
                     value={friendUuid}
                     placeholder={t("friendUuid")}
@@ -458,13 +458,13 @@ export default function Lobby() {
                   <button
                     onClick={onAddFriend}
                     disabled={friendUuid == ""}
-                    className="rounded-sm bg-neutral-600 px-4 py-2 text-white hover:bg-neutral-500 disabled:opacity-40"
+                    className="btn btn-secondary"
                   >
                     {t("add")}
                   </button>
                 </div>
                 {appState.friends.length === 0 && (
-                  <p className="mt-3 text-sm text-neutral-500">
+                  <p className="mt-3 type-label">
                     {t("noFriends")}
                   </p>
                 )}
@@ -472,7 +472,7 @@ export default function Lobby() {
                   {appState.friends.map((f) => (
                     <div
                       key={f.uuid}
-                      className="flex flex-row items-center justify-between rounded-sm bg-neutral-700 px-4 py-2"
+                      className="flex flex-row items-center justify-between rounded-sm bg-floor px-4 py-2"
                     >
                       <div className="flex flex-row items-center gap-2">
                         <Avatar
@@ -482,11 +482,11 @@ export default function Lobby() {
                           hasImage={f.avatarImage}
                           size={24}
                         />
-                        <p className="text-white">{f.username}</p>
+                        <p className="text-ink">{f.username}</p>
                       </div>
                       <button
                         onClick={() => socket && getUser(socket, f.uuid)}
-                        className="text-xs text-neutral-400 hover:text-neutral-200"
+                        className="type-caption hover:text-ink"
                       >
                         {t("viewStats")}
                       </button>

@@ -105,12 +105,12 @@ export default function Recharge({ onClose }: RechargeProps) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-      <div className="w-full max-w-sm rounded-lg bg-zinc-800 p-6 shadow-2xl">
+      <div className="w-full max-w-sm rounded-lg bg-card p-6 shadow-2xl">
         <div className="mb-5 flex flex-row items-center justify-between">
-          <p className="text-lg font-semibold text-white">{t("recharge")}</p>
+          <p className="type-heading">{t("recharge")}</p>
           <button
             onClick={onClose}
-            className="rounded-sm px-2 py-1 text-neutral-400 hover:bg-zinc-700 hover:text-white"
+            className="btn btn-text"
           >
             ✕
           </button>
@@ -120,10 +120,10 @@ export default function Recharge({ onClose }: RechargeProps) {
             <button
               key={amount}
               onClick={() => topUp(amount)}
-              className="flex flex-col items-center gap-2 rounded-lg bg-neutral-700 p-3 hover:bg-neutral-600"
+              className="flex flex-col items-center gap-2 rounded-lg bg-floor p-3 hover:bg-cardhi"
             >
               <GemIcon fraction={fraction} />
-              <p className="text-xs font-medium text-neutral-200">{amount}</p>
+              <p className="text-xs font-medium text-ink">{amount}</p>
             </button>
           ))}
         </div>

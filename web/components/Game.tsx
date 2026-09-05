@@ -46,12 +46,12 @@ export default function Game() {
   }, [me]);
 
   return (
-    <div className="app-screen relative w-screen overflow-hidden">
+    <div className="app-screen relative w-screen overflow-hidden bg-floor">
       <div className="flex h-full w-full items-start justify-center">
         <Table />
       </div>
       {game && (
-        <div className="absolute left-1/2 top-0 z-50 flex -translate-x-1/2 flex-row items-center gap-2 rounded-b-lg bg-zinc-900/90 px-4 py-1.5">
+        <div className="absolute left-1/2 top-0 z-50 flex -translate-x-1/2 flex-row items-center gap-2 rounded-b-lg bg-tablehi/90 px-4 py-1.5">
           {showVotes && (
             <div className="flex flex-row items-center gap-1.5">
               {game.players.map((p) => (
@@ -59,13 +59,13 @@ export default function Game() {
                   {game.settleVotes.includes(p.username) ? (
                     <FiCheckCircle className="text-emerald-400" />
                   ) : (
-                    <FiCircle className="text-neutral-500" />
+                    <FiCircle className="text-muted" />
                   )}
                 </span>
               ))}
             </div>
           )}
-          <span className="whitespace-nowrap text-sm font-medium text-neutral-200">
+          <span className="whitespace-nowrap text-sm font-medium text-ink">
             {t("hands")}{" "}
             {game.config.handsLimit > 0
               ? Math.min(game.handsPlayed + 1, game.config.handsLimit)
@@ -76,7 +76,7 @@ export default function Game() {
       )}
       {appState.table && (
         <div className="pointer-events-none absolute bottom-44 left-0 z-10 px-2 sm:bottom-48">
-          <p className="text-sm font-medium text-neutral-400">
+          <p className="text-sm font-medium text-muted">
             {appState.table}
           </p>
         </div>
@@ -91,10 +91,10 @@ export default function Game() {
             setReservedSpectate(!reservedSpectate);
             spectate(socket);
           }}
-          className={`absolute bottom-52 right-2 z-30 inline-flex flex-row items-center gap-1.5 rounded-sm border px-3 py-1.5 text-sm font-semibold sm:bottom-56 ${
+          className={`btn absolute bottom-52 right-2 z-30 sm:bottom-56 ${
             reservedSpectate
-              ? "border-amber-500 bg-amber-600 text-white hover:bg-amber-500"
-              : "border-neutral-500 text-neutral-300 hover:bg-neutral-700"
+              ? "btn-accent border border-amber-500"
+              : "btn-ghost"
           }`}
         >
           {reservedSpectate ? (
@@ -121,17 +121,15 @@ export default function Game() {
       <div className="absolute left-0 top-0 z-10 flex flex-row items-center">
         <button
           onClick={handleLeave}
-          className="m-2 rounded-sm border border-rose-600 px-3 py-1.5 text-sm font-semibold text-rose-500 hover:bg-rose-600 hover:text-white"
+          className="btn btn-danger m-2"
         >
           {t("leave")}
         </button>
         {me && showVotes && (
           <button
             onClick={() => socket && voteSettle(socket)}
-            className={`my-2 mr-2 rounded-sm border px-3 py-1.5 text-sm font-semibold ${
-              myVoted
-                ? "border-neutral-500 bg-zinc-700 text-white hover:bg-zinc-600"
-                : "border-rose-600 text-rose-500 hover:bg-rose-600 hover:text-white"
+            className={`btn my-2 mr-2 ${
+              myVoted ? "btn-secondary border-muted/40" : "btn-danger"
             }`}
           >
             {t("voteSettle")}
@@ -141,9 +139,9 @@ export default function Game() {
       <div className="absolute top-0 right-0 z-10 flex flex-col items-end gap-1 p-2 sm:hidden">
         <Wallet />
         {me && game && (
-          <div className="inline-flex w-20 flex-row items-center justify-between rounded-md bg-zinc-800/90 px-2.5 py-1 text-sm text-amber-300">
+          <div className="inline-flex w-20 flex-row items-center justify-between rounded-md bg-card/90 px-2.5 py-1 text-sm text-amber-300">
             <Chip className="h-4 w-4" />
-            <span className="font-mono font-semibold leading-none">
+            <span className="type-num leading-none">
               {me.stack}
             </span>
           </div>
@@ -153,9 +151,9 @@ export default function Game() {
         <GameInfo />
         <Wallet />
         {me && game && (
-          <div className="inline-flex w-20 flex-row items-center justify-between rounded-md bg-zinc-800/90 px-2.5 py-1 text-sm text-amber-300 shadow">
+          <div className="inline-flex w-20 flex-row items-center justify-between rounded-md bg-card/90 px-2.5 py-1 text-sm text-amber-300 shadow">
             <Chip className="h-4 w-4" />
-            <span className="font-mono font-semibold leading-none">
+            <span className="type-num leading-none">
               {me.stack}
             </span>
           </div>

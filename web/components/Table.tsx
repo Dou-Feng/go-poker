@@ -280,8 +280,8 @@ export default function Table() {
     <div className="relative flex h-full w-full items-start justify-center">
       {(winners.length > 0 || forfeited) && (
         <div className="pointer-events-none absolute inset-0 z-30 flex items-center justify-center">
-          <div className="animate-winner-pop rounded-2xl border-2 border-amber-300 bg-zinc-900/90 px-8 py-4 text-center shadow-2xl">
-            <p className="text-lg font-semibold text-neutral-300">
+          <div className="animate-winner-pop rounded-2xl border-2 border-amber-300 bg-tablehi/90 px-8 py-4 text-center shadow-2xl">
+            <p className="type-heading">
               {forfeited ? t("chipsForfeited") : t("winner")}
             </p>
             {winners.map((w) => (
@@ -311,19 +311,19 @@ export default function Table() {
                   <button
                     onClick={() => socket && queueNext(socket)}
                     className={`text-sm font-medium sm:text-base ${
-                      queued ? "text-amber-300" : "text-white hover:underline"
+                      queued ? "text-amber-300" : "text-ink hover:underline"
                     }`}
                   >
                     {queued ? t("queuedNextHand") : t("joinNextHand")}
                   </button>
                 ) : (
-                  <p className="text-sm font-medium text-white sm:text-base">
+                  <p className="text-sm font-medium text-ink sm:text-base">
                     {t("pickSeat")}
                   </p>
                 )
               ) : (
                 <>
-                  <p className="text-sm font-medium text-white sm:text-base">
+                  <p className="text-sm font-medium text-ink sm:text-base">
                     {t("clickReadyButton")}
                   </p>
                 </>

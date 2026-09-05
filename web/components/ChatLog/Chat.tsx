@@ -55,7 +55,7 @@ export default function Chat() {
     <div className="flex h-full w-full grow flex-col overflow-auto">
       <div
         ref={scrollRef}
-        className="mb-2 h-full overflow-auto bg-zinc-800 p-2"
+        className="mb-2 h-full overflow-auto bg-card p-2"
       >
         {appState.messages.map((message, index) => (
           <ChatMessage
@@ -66,9 +66,9 @@ export default function Chat() {
           />
         ))}
       </div>
-      <div className="flex w-full flex-row justify-between text-neutral-400">
+      <div className="flex w-full flex-row justify-between text-muted">
         <input
-          className="w-full bg-zinc-800 p-2 text-neutral-400 placeholder-neutral-600"
+          className="w-full bg-card p-2 text-muted placeholder-muted/60"
           id="input"
           type="text"
           value={inputValue}
@@ -77,7 +77,7 @@ export default function Chat() {
           ref={messageRef}
         ></input>
         <button
-          className=" bg-zinc-800 px-4 text-neutral-400"
+          className=" bg-card px-4 text-muted"
           onClick={handleClick}
         >
           <FiSend />

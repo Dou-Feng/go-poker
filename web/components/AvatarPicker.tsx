@@ -69,13 +69,13 @@ export default function AvatarPicker({ onClose }: AvatarPickerProps) {
           key={a}
           onClick={() => onChangeAvatar(a)}
           className={`rounded-md p-1 text-2xl ${
-            appState.avatar === a ? "bg-zinc-600" : "hover:bg-zinc-700"
+            appState.avatar === a ? "bg-cardhi" : "hover:bg-floor"
           }`}
         >
           {a}
         </button>
       ))}
-      <label className="ml-2 cursor-pointer rounded-sm border border-neutral-600 px-2 py-1 text-xs text-neutral-400 hover:text-neutral-200">
+      <label className="ml-2 cursor-pointer rounded-sm border border-muted/30 px-2 py-1 type-caption hover:text-ink">
         {t("uploadImage")}
         <input
           type="file"

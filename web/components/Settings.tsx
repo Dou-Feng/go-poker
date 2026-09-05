@@ -11,8 +11,8 @@ export default function Settings() {
   const optionButton = (active: boolean) =>
     `rounded-sm px-3 py-1 text-sm ${
       active
-        ? "bg-cyan-900 text-white"
-        : "bg-neutral-700 text-neutral-300 hover:bg-neutral-600"
+        ? "bg-cyan-900 text-ink"
+        : "bg-floor text-ink hover:bg-cardhi"
     }`;
 
   const applyVolume = (v: number) => {
@@ -25,28 +25,28 @@ export default function Settings() {
       <button
         onClick={() => setOpen(true)}
         title={t("settings")}
-        className="rounded-sm border border-neutral-600 px-2 py-1 text-xs text-neutral-400 hover:text-neutral-200"
+        className="btn btn-icon"
       >
         <FiSettings size="1rem" />
       </button>
 
       {open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-          <div className="w-full max-w-xs rounded-lg bg-zinc-800 p-5 shadow-2xl">
+          <div className="w-full max-w-xs rounded-lg bg-card p-5 shadow-2xl">
             <div className="mb-4 flex flex-row items-center justify-between">
-              <p className="text-lg font-semibold text-white">
+              <p className="type-heading">
                 {t("settings")}
               </p>
               <button
                 onClick={() => setOpen(false)}
-                className="rounded-sm px-2 py-1 text-neutral-400 hover:bg-zinc-700 hover:text-white"
+                className="btn btn-text"
               >
                 ✕
               </button>
             </div>
 
             <div className="flex flex-col gap-2">
-              <p className="text-xs text-neutral-400">{t("language")}</p>
+              <p className="type-caption">{t("language")}</p>
               <div className="flex flex-row gap-2">
                 <button
                   onClick={() => setLanguage("en")}
@@ -65,8 +65,8 @@ export default function Settings() {
 
             <div className="mt-4 flex flex-col gap-2">
               <div className="flex flex-row items-center justify-between">
-                <p className="text-xs text-neutral-400">{t("sfx")}</p>
-                <p className="font-mono text-xs text-neutral-500">{volume}%</p>
+                <p className="type-caption">{t("sfx")}</p>
+                <p className="font-mono type-caption">{volume}%</p>
               </div>
               <div className="flex flex-row items-center gap-2">
                 <input
@@ -78,14 +78,14 @@ export default function Settings() {
                   onChange={(e) => applyVolume(Number(e.target.value))}
                   onPointerUp={() => playSfx("click")}
                   onKeyUp={() => playSfx("click")}
-                  className="h-1.5 w-full cursor-pointer appearance-none rounded-full bg-neutral-600 accent-cyan-700"
+                  className="h-1.5 w-full cursor-pointer appearance-none rounded-full bg-cardhi accent-cyan-700"
                 />
                 <button
                   onClick={() => {
                     applyVolume(volume === 0 ? 50 : 0);
                   }}
                   title={t("sfx")}
-                  className="rounded-sm border border-neutral-600 px-2 py-0.5 text-xs text-neutral-400 hover:text-neutral-200"
+                  className="btn btn-icon"
                 >
                   {volume === 0 ? "🔇" : "🔊"}
                 </button>

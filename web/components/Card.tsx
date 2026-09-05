@@ -96,7 +96,7 @@ function color(suit: string) {
 export default function Card({ card, placeholder, folded, hidden }: cardProps) {
   if (placeholder) {
     return (
-      <div className="flex h-14 w-9 items-center justify-center rounded-md bg-green-900 opacity-20 sm:h-24 sm:w-16"></div>
+      <div className="flex h-14 w-9 items-center justify-center rounded-md bg-cardhi opacity-40 sm:h-24 sm:w-16"></div>
     );
   }
 

@@ -38,22 +38,22 @@ export default function Register() {
   };
 
   return (
-    <div className="flex min-h-screen flex-col">
+    <div className="login-wallpaper flex min-h-screen flex-col">
       <div className="flex w-full justify-end px-4 py-2">
         <Settings />
       </div>
       <div className="flex flex-grow flex-col items-center justify-center px-4">
-        <h1 className="mb-10 text-5xl font-semibold text-white">
+        <h1 className="mb-10 type-display text-5xl">
           {t("title")}
         </h1>
         <div className="flex flex-col items-center gap-2">
-          <div className="mb-2 flex flex-row gap-1 rounded-md bg-neutral-800 p-1">
+          <div className="mb-2 flex flex-row gap-1 rounded-md bg-card p-1">
             <button
               onClick={() => setMode("register")}
               className={`rounded-sm px-4 py-1 text-sm ${
                 mode === "register"
-                  ? "bg-cyan-900 text-white"
-                  : "text-neutral-300 hover:text-white"
+                  ? "bg-cyan-900 text-ink"
+                  : "text-ink hover:text-ink"
               }`}
             >
               {t("signUp")}
@@ -62,8 +62,8 @@ export default function Register() {
               onClick={() => setMode("login")}
               className={`rounded-sm px-4 py-1 text-sm ${
                 mode === "login"
-                  ? "bg-cyan-900 text-white"
-                  : "text-neutral-300 hover:text-white"
+                  ? "bg-cyan-900 text-ink"
+                  : "text-ink hover:text-ink"
               }`}
             >
               {t("logIn")}
@@ -74,7 +74,7 @@ export default function Register() {
             <>
               <input
                 autoFocus
-                className="w-64 rounded-sm bg-neutral-700 py-2 pl-4 text-white focus:outline-none"
+                className="w-64 rounded-sm bg-floor py-2 pl-4 text-ink focus:outline-none"
                 type="text"
                 value={username}
                 placeholder={t("username")}
@@ -82,16 +82,16 @@ export default function Register() {
                 onChange={(e) => setUsername(e.target.value)}
               />
               <input
-                className="w-64 rounded-sm bg-neutral-700 py-2 pl-4 text-white focus:outline-none"
+                className="w-64 rounded-sm bg-floor py-2 pl-4 text-ink focus:outline-none"
                 type="text"
                 value={uuid}
                 placeholder={t("uuid")}
                 maxLength={32}
                 onChange={(e) => setUuid(e.target.value)}
               />
-              <p className="text-xs text-neutral-400">{t("uuidHint")}</p>
+              <p className="type-caption">{t("uuidHint")}</p>
               <input
-                className="w-64 rounded-sm bg-neutral-700 py-2 pl-4 text-white focus:outline-none"
+                className="w-64 rounded-sm bg-floor py-2 pl-4 text-ink focus:outline-none"
                 type="password"
                 value={password}
                 placeholder={t("password")}
@@ -105,7 +105,7 @@ export default function Register() {
                     type="button"
                     onClick={() => setAvatar(a)}
                     className={`rounded-md p-1 text-2xl ${
-                      avatar === a ? "bg-zinc-600" : "hover:bg-zinc-700"
+                      avatar === a ? "bg-cardhi" : "hover:bg-floor"
                     }`}
                   >
                     {a}
@@ -115,7 +115,7 @@ export default function Register() {
               <button
                 disabled={username == "" || uuid == "" || password == ""}
                 onClick={submit}
-                className="rounded-sm bg-cyan-900 px-5 py-2 text-white hover:bg-cyan-800 disabled:cursor-not-allowed disabled:opacity-40"
+                className="btn btn-primary"
               >
                 {t("signUp")}
               </button>
@@ -124,7 +124,7 @@ export default function Register() {
             <>
               <input
                 autoFocus
-                className="w-64 rounded-sm bg-neutral-700 py-2 pl-4 text-white focus:outline-none"
+                className="w-64 rounded-sm bg-floor py-2 pl-4 text-ink focus:outline-none"
                 type="text"
                 value={identifier}
                 placeholder={t("identifier")}
@@ -132,7 +132,7 @@ export default function Register() {
                 onChange={(e) => setIdentifier(e.target.value)}
               />
               <input
-                className="w-64 rounded-sm bg-neutral-700 py-2 pl-4 text-white focus:outline-none"
+                className="w-64 rounded-sm bg-floor py-2 pl-4 text-ink focus:outline-none"
                 type="password"
                 value={password}
                 placeholder={t("password")}
@@ -147,7 +147,7 @@ export default function Register() {
               <button
                 disabled={identifier == "" || password == ""}
                 onClick={submit}
-                className="rounded-sm border border-neutral-600 px-5 py-2 text-neutral-200 hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-40"
+                className="btn btn-ghost"
               >
                 {t("logIn")}
               </button>

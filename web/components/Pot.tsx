@@ -17,7 +17,7 @@ export default function Pot() {
 
   return (
     <div className="flex flex-col">
-      <p className="flex h-10 w-24 flex-col items-center justify-center rounded-3xl bg-green-900 text-2xl font-semibold text-white">
+      <p className="flex h-10 w-24 flex-col items-center justify-center rounded-3xl bg-tablehi text-2xl font-semibold text-ink">
         {total}
       </p>
     </div>

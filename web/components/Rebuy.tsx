@@ -42,24 +42,24 @@ export default function Rebuy() {
   return (
     <div className="pointer-events-auto absolute bottom-64 right-2 z-30 flex flex-col items-end gap-1 sm:bottom-72">
       {show && (
-        <div className="rounded-lg border border-zinc-600 bg-zinc-900/95 p-2 shadow-lg">
+        <div className="rounded-lg border border-muted/30 bg-tablehi/95 p-2 shadow-lg">
           <div className="flex flex-row items-center gap-2">
             <button
               onClick={decrement}
               disabled={amount <= 0}
               aria-label="-"
-              className="h-9 w-9 rounded-md bg-zinc-700 text-xl font-bold text-white hover:bg-zinc-600 disabled:opacity-40"
+              className="btn btn-secondary h-9 w-9 rounded-md px-0 text-xl font-bold"
             >
               −
             </button>
-            <span className="min-w-16 text-center font-mono text-lg font-semibold text-amber-300">
+            <span className="min-w-16 text-center type-num text-lg text-amber-300">
               {amount}
             </span>
             <button
               onClick={increment}
               disabled={amount >= remaining}
               aria-label="+"
-              className="h-9 w-9 rounded-md bg-zinc-700 text-xl font-bold text-white hover:bg-zinc-600 disabled:opacity-40"
+              className="btn btn-secondary h-9 w-9 rounded-md px-0 text-xl font-bold"
             >
               +
             </button>
@@ -67,7 +67,7 @@ export default function Rebuy() {
           <button
             onClick={handleRebuy}
             disabled={amount <= 0}
-            className="mt-2 w-full rounded-md bg-amber-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-amber-500 disabled:opacity-50"
+            className="btn btn-accent mt-2 w-full"
           >
             {t("rebuy")}
           </button>
@@ -78,7 +78,7 @@ export default function Rebuy() {
           setAmount(0);
           setShow((s) => !s);
         }}
-        className="inline-flex flex-row items-center gap-1.5 rounded-sm border border-neutral-500 bg-zinc-900/80 px-3 py-1.5 text-sm font-semibold text-neutral-300 hover:bg-neutral-700"
+        className="inline-flex flex-row items-center gap-1.5 rounded-sm border border-muted/40 bg-tablehi/80 px-3 py-1.5 text-sm font-semibold text-ink hover:bg-floor"
       >
         <PlusIcon className="h-4 w-4" />
         {t("rebuy")}

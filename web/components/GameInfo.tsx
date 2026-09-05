@@ -7,7 +7,7 @@ export default function GameInfo() {
   const { t } = useTranslation();
 
   return (
-    <div className="invisible p-4 text-right text-zinc-600 sm:visible">
+    <div className="invisible p-4 text-right text-muted sm:visible">
       {appState.game && (
         <p>
           {appState.game.config.sb}/{appState.game.config.bb}{" "}

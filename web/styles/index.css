@@ -2,7 +2,8 @@
 @tailwind components;
 @tailwind utilities;
 
-/* 方正兰亭黑：仅用于中文字符，英文与数字沿用默认字体。 */
+/* FZLanTingHei: used only for CJK glyphs; Latin text and digits fall back to
+   the default fonts below. */
 @font-face {
   font-family: "FZLanTingHei";
   src: url("/fonts/FZLTTHJW.TTF") format("truetype");
@@ -12,7 +13,8 @@
   unicode-range: U+2000-206F, U+3000-303F, U+3400-4DBF, U+4E00-9FFF, U+FF00-FFEF;
 }
 
-/* Nunito：圆润的英文字体（含数字），半正式观感。latin / latin-ext 两个子集。 */
+/* Nunito: rounded Latin face (digits included), semi-formal feel.
+   latin / latin-ext subsets. */
 @font-face {
   font-family: "Nunito";
   src: url("/fonts/nunito-latin.woff2") format("woff2");
@@ -45,13 +47,134 @@ body {
   overscroll-behavior: none;
 }
 
-/* 全屏页面：使用动态视口高度，避免手机端整页滚动 */
+/* Brand black: every screen grows out of this color. The login screen adds
+   the doodle wallpaper on top of it; the lobby and the game room paint their
+   own ladder steps over it (see tailwind.config.js). */
+body {
+  background-color: #0e1319;
+}
+
+/* Login-screen wallpaper: dark poker doodle art; landscape and portrait
+   design sources live in assets-src/, compressed here as WebP variants.
+   cover on every orientation: portrait loads the 9:19.5 phone-ratio variant
+   (virtually no cropping), small landscape screens load the 1100px variant,
+   and landscape viewports >=700px load the full-size one — the browser only
+   downloads the file it matches. */
+.login-wallpaper {
+  background-image: url("/bg-1100.webp");
+  background-position: center;
+  background-size: cover;
+  background-repeat: no-repeat;
+}
+
+/* Portrait screens (phones, iPad portrait): dedicated portrait wallpaper. */
+@media (orientation: portrait) {
+  .login-wallpaper {
+    background-image: url("/bg-portrait.webp");
+  }
+}
+
+/* Large landscape screens: full-size landscape wallpaper. */
+@media (min-width: 700px) and (orientation: landscape) {
+  .login-wallpaper {
+    background-image: url("/bg-1672.webp");
+  }
+}
+
+/* Full-screen pages: use the dynamic viewport height so mobile browsers
+   don't scroll the whole page. */
 .app-screen {
   height: 100vh;
   height: 100dvh;
 }
 
-/* 隐藏数字输入框的上下调节箭头 */
+/* ---- Buttons ----
+   One semantic button system instead of per-component class soup. Compose
+   `btn` (base) with exactly one variant; tweak size/width with utilities
+   (`w-full`, `py-2`, `text-xs`...) — utilities override this layer, so
+   one-offs stay possible. Game action keys (call/fold/raise) are their own
+   component (InputButton) and are intentionally not part of this system. */
+@layer components {
+  .btn {
+    @apply inline-flex items-center justify-center gap-1.5 rounded-sm px-4 py-1.5 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40;
+  }
+
+  /* Primary call-to-action (create room, sign up). */
+  .btn-primary {
+    @apply bg-cyan-900 text-ink hover:bg-cyan-800;
+  }
+
+  /* Confirming actions (ready, save). */
+  .btn-confirm {
+    @apply bg-emerald-600 font-semibold text-ink hover:bg-emerald-500;
+  }
+
+  /* Chip-purchase actions (recharge, rebuy quick add). */
+  .btn-accent {
+    @apply bg-amber-600 font-semibold text-ink hover:bg-amber-500;
+  }
+
+  /* Flat button on a card or modal. */
+  .btn-secondary {
+    @apply bg-floor text-ink hover:bg-cardhi;
+  }
+
+  /* Bordered quiet button. */
+  .btn-ghost {
+    @apply border border-muted/30 text-ink hover:bg-floor;
+  }
+
+  /* Destructive action (leave table, vote to settle). */
+  .btn-danger {
+    @apply border border-rose-600 font-semibold text-rose-500 hover:bg-rose-600 hover:text-ink;
+  }
+
+  /* Borderless quiet control inside a card or modal header. */
+  .btn-text {
+    @apply px-2 py-1 text-muted hover:bg-floor hover:text-ink;
+  }
+
+  /* Small square icon button (top-bar tools). */
+  .btn-icon {
+    @apply border border-muted/30 px-2 py-1 text-xs text-muted hover:text-ink;
+  }
+}
+
+/* ---- Typography ----
+   Six semantic text roles. Body text needs no class — `text-ink` /
+   `text-muted` on the element are the system. Card faces, seat markers and
+   other game-canvas numbers stay raw utilities on purpose. Size is part of
+   the class except where noted; override with utilities when a specific
+   layout needs it. */
+@layer components {
+  /* Page h1 (Lobby, login). Size stays a utility: text-4xl / text-5xl. */
+  .type-display {
+    @apply font-semibold text-ink;
+  }
+
+  /* Modal and panel titles. */
+  .type-heading {
+    @apply text-lg font-semibold text-ink;
+  }
+
+  /* Secondary label ("rooms", "N players"). */
+  .type-label {
+    @apply text-sm text-muted;
+  }
+
+  /* Small hint (uuid hint, timestamps). */
+  .type-caption {
+    @apply text-xs text-muted;
+  }
+
+  /* Chip/stack amounts; pair with text-amber-300 for money.
+     Size stays a utility. */
+  .type-num {
+    @apply font-mono font-semibold tabular-nums;
+  }
+}
+
+/* Hide the spinner arrows on number inputs. */
 input[type="number"]::-webkit-outer-spin-button,
 input[type="number"]::-webkit-inner-spin-button {
   -webkit-appearance: none;

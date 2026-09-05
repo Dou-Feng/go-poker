@@ -229,9 +229,9 @@ export default function TableFx({ game, maxPlayers }: props) {
           key={t.id}
           className={classNames(
             "animate-fx-tag absolute z-40 whitespace-nowrap rounded-md px-2 py-0.5 text-xs font-bold sm:text-sm",
-            t.tone === "fold" && "bg-red-600 text-white",
-            t.tone === "action" && "bg-amber-500 text-zinc-900",
-            t.tone === "check" && "bg-zinc-600 text-neutral-200"
+            t.tone === "fold" && "bg-red-600 text-ink",
+            t.tone === "action" && "bg-amber-500 text-brand",
+            t.tone === "check" && "bg-cardhi text-ink"
           )}
           style={{ left: `${t.x}%`, top: `${t.y - 14}%` }}
         >

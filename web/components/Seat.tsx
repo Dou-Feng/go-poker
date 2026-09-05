@@ -70,18 +70,18 @@ function active(player: Player, game: Game) {
   return classNames(
     {
       // betting and player's turn
-      "animate-active-pulse shadow-[0px_0px_40px_2px_rgba(255,255,255,255.3)] bg-neutral-100 text-zinc-900":
+      "animate-active-pulse shadow-[0px_0px_40px_2px_rgba(255,255,255,255.3)] bg-ink text-brand":
         action && game.betting,
 
       // betting and not player's turn
-      "bg-zinc-900 text-neutral-100": !action && game.betting,
+      "bg-tablehi text-ink": !action && game.betting,
 
       // betting over and winner
-      "shadow-[0px_0px_60px_20px_rgba(100,98,92,255.3)] bg-amber-200 text-zinc-900":
+      "shadow-[0px_0px_60px_20px_rgba(100,98,92,255.3)] bg-amber-200 text-brand":
         winner && !game.betting,
 
       // betting over and not winner
-      "bg-zinc-900 text-neutral-100 ": !winner && !game.betting,
+      "bg-tablehi text-ink ": !winner && !game.betting,
     },
 
     "rounded-xl flex flex-row justify-start items-center z-2"
@@ -190,12 +190,12 @@ export default function Seat({ player, id, visualId, reveal }: seatProps) {
                 size={44}
               />
               <div className="flex min-w-0 flex-col justify-center leading-tight">
-                <p className="truncate text-base font-medium text-white sm:text-lg">
+                <p className="truncate text-base font-medium text-ink sm:text-lg">
                   {player.username}
                 </p>
                 <div className="flex flex-row items-center gap-1">
                   <Chip className="h-4 w-4 sm:h-5 sm:w-5" />
-                  <p className="font-mono text-base font-semibold text-amber-300 sm:text-lg">
+                  <p className="type-num text-base text-amber-300 sm:text-lg">
                     {player.stack}
                   </p>
                 </div>
@@ -204,7 +204,7 @@ export default function Seat({ player, id, visualId, reveal }: seatProps) {
           )}
           {!running && player.ready && (
             <div className="absolute inset-0 z-10 flex items-center justify-center rounded-xl bg-black/50">
-              <p className="text-base font-semibold text-white/90 sm:text-xl">
+              <p className="text-base font-semibold text-ink/90 sm:text-xl">
                 {t("ready")}
               </p>
             </div>
@@ -219,18 +219,18 @@ export default function Seat({ player, id, visualId, reveal }: seatProps) {
                   showHand(socket);
                 }
               }}
-              className="mt-1 w-full rounded-sm bg-amber-600 py-1 text-xs font-bold text-white hover:bg-amber-500 sm:text-sm"
+              className="btn btn-accent mt-1 w-full py-1 text-xs font-bold sm:text-sm"
             >
               {t("showCards")}
             </button>
           ) : (
             <div className="mt-1 flex w-full flex-row items-center justify-between px-1 sm:px-2">
-              <p className="truncate pr-1 text-base font-medium text-white sm:text-lg">
+              <p className="truncate pr-1 text-base font-medium text-ink sm:text-lg">
                 {player.username}
               </p>
               <div className="flex flex-row items-center gap-1">
                 <Chip className="h-4 w-4 sm:h-5 sm:w-5" />
-                <p className="font-mono text-base font-semibold text-amber-300 sm:text-lg">
+                <p className="type-num text-base text-amber-300 sm:text-lg">
                   {player.stack}
                 </p>
               </div>
@@ -252,10 +252,8 @@ export default function Seat({ player, id, visualId, reveal }: seatProps) {
               }
             }}
             className={classNames(
-              "mt-1 w-full rounded-sm py-1 text-xs font-bold sm:text-sm",
-              player.ready
-                ? "bg-zinc-700 text-neutral-200 hover:bg-zinc-600"
-                : "bg-emerald-600 text-white hover:bg-emerald-500"
+              "btn mt-1 w-full py-1 text-xs font-bold sm:text-sm",
+              player.ready ? "btn-secondary" : "btn-confirm"
             )}
           >
             {player.ready ? t("cancelReady") : t("ready")}
@@ -270,7 +268,7 @@ export default function Seat({ player, id, visualId, reveal }: seatProps) {
           {player.bet !== 0 && (
             <p
               key={player.bet}
-              className="animate-chip-pop flex h-6 w-9 items-center justify-center rounded-3xl bg-amber-300 text-sm font-semibold text-zinc-900 sm:h-8 sm:w-12 sm:text-xl"
+              className="animate-chip-pop flex h-6 w-9 items-center justify-center rounded-3xl bg-amber-300 text-sm font-semibold text-brand sm:h-8 sm:w-12 sm:text-xl"
             >
               {player.bet}
             </p>
@@ -281,7 +279,7 @@ export default function Seat({ player, id, visualId, reveal }: seatProps) {
           {running && player.bestHand && (reveal || player.revealed) && (
             <p
               className={classNames(
-                "animate-fade-in max-w-28 sm:max-w-36 truncate rounded-3xl bg-zinc-900/90 px-2 text-xs font-semibold text-amber-300 sm:text-sm",
+                "animate-fade-in max-w-28 sm:max-w-36 truncate rounded-3xl bg-tablehi/90 px-2 text-xs font-semibold text-amber-300 sm:text-sm",
                 // Match the chip's side of the seat so it never overlaps
                 // the hole cards.
                 (visualId ?? id) === 3 ? "flex-col items-start" : "flex-row"
@@ -299,7 +297,7 @@ export default function Seat({ player, id, visualId, reveal }: seatProps) {
   if (!game || running) {
     return (
       <div>
-        <button className="m-1 h-16 w-32 rounded-2xl bg-neutral-700 p-2 text-neutral-400 opacity-20 sm:m-4 sm:h-20 sm:w-56">
+        <button className="m-1 h-16 w-32 rounded-2xl bg-floor p-2 text-muted opacity-20 sm:m-4 sm:h-20 sm:w-56">
           <h2 className="text-3xl sm:text-4xl">{id}</h2>
         </button>
       </div>
@@ -331,7 +329,7 @@ export default function Seat({ player, id, visualId, reveal }: seatProps) {
     return (
       <div>
         <button
-          className="m-1 h-16 w-32 rounded-2xl bg-neutral-700 p-2 text-neutral-100 sm:m-4 sm:h-20 sm:w-56"
+          className="m-1 h-16 w-32 rounded-2xl bg-floor p-2 text-ink sm:m-4 sm:h-20 sm:w-56"
           onClick={handleClick}
         >
           <h2 className="text-3xl sm:text-4xl">{id}</h2>
@@ -343,7 +341,7 @@ export default function Seat({ player, id, visualId, reveal }: seatProps) {
 
   return (
     <div>
-      <button className="m-1 h-16 w-32 rounded-2xl bg-neutral-700 p-2 text-neutral-400 opacity-20 sm:m-4 sm:h-20 sm:w-56">
+      <button className="m-1 h-16 w-32 rounded-2xl bg-floor p-2 text-muted opacity-20 sm:m-4 sm:h-20 sm:w-56">
         <h2 className="text-3xl sm:text-4xl">{id}</h2>
       </button>
     </div>

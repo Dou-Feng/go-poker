@@ -19,7 +19,7 @@ export default function RoomStats() {
       <button
         onClick={() => setShow(true)}
         title={t("roomStats")}
-        className="inline-flex flex-row items-center gap-1.5 rounded-sm border border-neutral-500 px-3 py-1.5 text-sm font-semibold text-neutral-300 hover:bg-neutral-700"
+        className="inline-flex flex-row items-center gap-1.5 rounded-sm border border-muted/40 px-3 py-1.5 text-sm font-semibold text-ink hover:bg-floor"
       >
         <FiBarChart2 size="1rem" />
         {t("roomStats")}
@@ -27,24 +27,24 @@ export default function RoomStats() {
 
       {show && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-          <div className="w-full max-w-md rounded-lg bg-zinc-800 p-6 shadow-2xl">
+          <div className="w-full max-w-md rounded-lg bg-card p-6 shadow-2xl">
             <div className="mb-4 flex flex-row items-center justify-between">
-              <p className="text-lg font-semibold text-white">
+              <p className="type-heading">
                 {t("roomStats")}
               </p>
               <button
                 onClick={() => setShow(false)}
-                className="rounded-sm px-2 py-1 text-neutral-400 hover:bg-zinc-700 hover:text-white"
+                className="btn btn-text"
               >
                 ✕
               </button>
             </div>
 
             {players.length === 0 && (
-              <p className="text-sm text-neutral-500">{t("noPlayers")}</p>
+              <p className="type-label">{t("noPlayers")}</p>
             )}
 
-            <div className="mb-2 flex flex-row items-center justify-between px-3 font-mono text-xs text-neutral-500">
+            <div className="mb-2 flex flex-row items-center justify-between px-3 font-mono type-caption">
               <span>{t("player")}</span>
               <div className="flex flex-row items-center gap-2">
                 <span className="w-12 text-right">{t("buyInLabel")}</span>
@@ -59,7 +59,7 @@ export default function RoomStats() {
                 return (
                   <div
                     key={p.uuid}
-                    className="flex flex-row items-center justify-between rounded-md bg-neutral-700 px-3 py-2"
+                    className="flex flex-row items-center justify-between rounded-md bg-floor px-3 py-2"
                   >
                     <div className="flex min-w-0 flex-row items-center gap-2">
                       <Avatar
@@ -69,13 +69,13 @@ export default function RoomStats() {
                         hasImage={p.avatarImage}
                         size={28}
                       />
-                      <span className="truncate text-white">{p.username}</span>
+                      <span className="truncate text-ink">{p.username}</span>
                     </div>
                     <div className="flex flex-row items-center gap-2 font-mono text-sm">
-                      <span className="w-12 text-right text-neutral-400">
+                      <span className="w-12 text-right text-muted">
                         {p.totalBuyIn}
                       </span>
-                      <span className="w-12 text-right text-neutral-200">
+                      <span className="w-12 text-right text-ink">
                         {p.stack}
                       </span>
                       <span

@@ -40,25 +40,25 @@ export default function History({ onClose }: HistoryProps) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-      <div className="flex h-full max-h-[80vh] w-full max-w-md flex-col rounded-lg bg-zinc-800 shadow-2xl">
-        <div className="flex flex-row items-center justify-between border-b border-zinc-700 px-4 py-3">
-          <p className="text-sm font-semibold text-white">{t("history")}</p>
+      <div className="flex h-full max-h-[80vh] w-full max-w-md flex-col rounded-lg bg-card shadow-2xl">
+        <div className="flex flex-row items-center justify-between border-b border-muted/30 px-4 py-3">
+          <p className="text-sm font-semibold text-ink">{t("history")}</p>
           <button
             onClick={onClose}
-            className="rounded-sm px-2 py-1 text-neutral-400 hover:bg-zinc-700 hover:text-white"
+            className="btn btn-text"
           >
             ✕
           </button>
         </div>
         <div className="flex flex-1 flex-col gap-2 overflow-y-auto p-4">
           {records.length === 0 && (
-            <p className="text-sm text-neutral-600">{t("noHistory")}</p>
+            <p className="text-sm text-muted/60">{t("noHistory")}</p>
           )}
           {records.map((rec, i) => (
             <button
               key={i}
               onClick={() => viewSession(rec)}
-              className="flex flex-row items-center justify-between rounded-sm bg-neutral-800 px-4 py-2 text-left hover:bg-neutral-700"
+              className="flex flex-row items-center justify-between rounded-sm bg-card px-4 py-2 text-left hover:bg-floor"
             >
               <div className="flex flex-row items-center gap-3">
                 <Avatar
@@ -69,8 +69,8 @@ export default function History({ onClose }: HistoryProps) {
                   size={28}
                 />
                 <div className="flex flex-col">
-                  <p className="text-white">{rec.username}</p>
-                  <p className="text-xs text-neutral-500">
+                  <p className="text-ink">{rec.username}</p>
+                  <p className="type-caption">
                     {rec.room} · {formatTime(rec.time)}
                   </p>
                 </div>
@@ -84,7 +84,7 @@ export default function History({ onClose }: HistoryProps) {
                   {rec.net >= 0 ? "+" : ""}
                   {rec.net}
                 </p>
-                <p className="text-xs text-neutral-500">
+                <p className="type-caption">
                   {t("handsPlayed")}: {rec.stats.handsPlayed}
                 </p>
               </div>

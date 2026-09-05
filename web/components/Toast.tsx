@@ -23,7 +23,7 @@ export default function Toast() {
 
   return (
     <div className="pointer-events-none fixed bottom-6 left-1/2 z-[70] -translate-x-1/2">
-      <div className="rounded-lg bg-rose-600 px-5 py-2.5 text-sm font-medium text-white shadow-xl">
+      <div className="rounded-lg bg-rose-600 px-5 py-2.5 text-sm font-medium text-ink shadow-xl">
         {tError(message)}
       </div>
     </div>

@@ -26,9 +26,9 @@ const POSITION_KEYS: TranslationKey[] = [
 
 function StatRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex flex-row items-center justify-between border-b border-zinc-700 py-1">
-      <p className="text-sm text-neutral-400">{label}</p>
-      <p className="text-sm font-semibold text-white">{value}</p>
+    <div className="flex flex-row items-center justify-between border-b border-muted/30 py-1">
+      <p className="type-label">{label}</p>
+      <p className="text-sm font-semibold text-ink">{value}</p>
     </div>
   );
 }
@@ -64,7 +64,7 @@ export default function Profile() {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-      <div className="w-full max-w-sm rounded-lg bg-zinc-800 p-6 shadow-2xl">
+      <div className="w-full max-w-sm rounded-lg bg-card p-6 shadow-2xl">
         <div className="mb-4 flex flex-row items-center justify-between">
           <div className="flex flex-row items-center gap-3">
             <button
@@ -92,18 +92,18 @@ export default function Profile() {
               />
             </button>
             <div>
-              <p className="text-lg font-semibold text-white">
+              <p className="type-heading">
                 {profile.username}
               </p>
               {isSession && (
-                <p className="text-sm text-neutral-500">
+                <p className="type-label">
                   {t("buyInLabel")}: {profile.buyIn} · {t("net")}:{" "}
                   {profile.net !== undefined && profile.net >= 0 ? "+" : ""}
                   {profile.net}
                 </p>
               )}
               {!isSession && profile.chips > 0 && (
-                <p className="text-sm text-neutral-500">
+                <p className="type-label">
                   {t("chips")}: {profile.chips}
                 </p>
               )}
@@ -114,7 +114,7 @@ export default function Profile() {
                     setCopied(true);
                     window.setTimeout(() => setCopied(false), 1200);
                   }}
-                  className="flex flex-row items-center gap-1 font-mono text-xs text-neutral-500 hover:text-neutral-300"
+                  className="flex flex-row items-center gap-1 font-mono type-caption hover:text-ink"
                   title={profile.uuid}
                 >
                   <span className="max-w-[180px] truncate">
@@ -130,7 +130,7 @@ export default function Profile() {
               setShowPicker(false);
               dispatch({ type: "setProfile", payload: null });
             }}
-            className="rounded-sm px-2 py-1 text-neutral-400 hover:bg-zinc-700 hover:text-white"
+            className="btn btn-text"
           >
             ✕
           </button>
@@ -145,7 +145,7 @@ export default function Profile() {
                   value={newUsername}
                   onChange={(e) => setNewUsername(e.target.value)}
                   placeholder={t("newUsername")}
-                  className="min-w-0 flex-1 rounded-md bg-zinc-700 px-2 py-1.5 text-sm text-white outline-none"
+                  className="min-w-0 flex-1 rounded-md bg-floor px-2 py-1.5 text-sm text-ink outline-none"
                 />
                 <button
                   onClick={() => {
@@ -155,7 +155,7 @@ export default function Profile() {
                     setShowChangeUsername(false);
                     setNewUsername("");
                   }}
-                  className="rounded-md bg-emerald-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-emerald-500"
+                  className="btn btn-confirm"
                 >
                   {t("change")}
                 </button>
@@ -164,7 +164,7 @@ export default function Profile() {
                     setShowChangeUsername(false);
                     setNewUsername("");
                   }}
-                  className="rounded-md bg-zinc-700 px-2 py-1.5 text-sm text-neutral-300 hover:bg-zinc-600"
+                  className="btn btn-secondary"
                 >
                   ✕
                 </button>
@@ -172,7 +172,7 @@ export default function Profile() {
             ) : (
               <button
                 onClick={() => setShowChangeUsername(true)}
-                className="w-full rounded-md bg-zinc-700 px-3 py-1.5 text-sm font-medium text-neutral-200 hover:bg-zinc-600"
+                className="btn btn-secondary w-full"
               >
                 {t("changeUsername")}
               </button>
@@ -215,7 +215,7 @@ export default function Profile() {
           <StatRow label={t("raises")} value={String(stats?.raises ?? 0)} />
         </div>
 
-        <p className="mb-1 mt-3 text-xs font-semibold uppercase tracking-wide text-neutral-500">
+        <p className="mb-1 mt-3 text-xs font-semibold uppercase tracking-wide text-muted">
           {t("vpipByPosition")}
         </p>
         <div className="flex flex-col">

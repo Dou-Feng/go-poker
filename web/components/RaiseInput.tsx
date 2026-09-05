@@ -15,7 +15,7 @@ type raiseProps = {
 };
 function button() {
   return classNames(
-    "mx-0.5 my-1 rounded-xl border border-2 border-zinc-600 bg-zinc-800 px-3 py-2 text-base text-neutral-200 hover:bg-zinc-600 font-normal sm:px-4 sm:py-2 sm:text-lg"
+    "mx-0.5 my-1 rounded-xl border border-2 border-muted/30 bg-card px-3 py-2 text-base text-ink hover:bg-cardhi font-normal sm:px-4 sm:py-2 sm:text-lg"
   );
 }
 
@@ -76,8 +76,8 @@ export default function RaiseInput({ showRaise, setShowRaise }: raiseProps) {
   };
 
   return (
-    <div className="pointer-events-auto flex w-full flex-row flex-wrap items-center justify-center gap-1 rounded-2xl bg-zinc-900/80 p-2 shadow-lg sm:p-6">
-      <div className="mx-1 flex flex-col items-center justify-center rounded-sm border border-2 border-zinc-600 bg-zinc-900/90 px-2">
+    <div className="pointer-events-auto flex w-full flex-row flex-wrap items-center justify-center gap-1 rounded-2xl bg-tablehi/80 p-2 shadow-lg sm:p-6">
+      <div className="mx-1 flex flex-col items-center justify-center rounded-sm border border-2 border-muted/30 bg-tablehi/90 px-2">
         <div className="my-1 flex items-center justify-center gap-1.5 text-xl font-semibold text-amber-300 sm:text-2xl">
           <Chip className="h-5 w-5 sm:h-6 sm:w-6" />
           <span className="font-mono leading-none">{inputValue}</span>
