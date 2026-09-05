@@ -11,6 +11,8 @@ Backend (Go 1.24, module `github.com/evanofslack/go-poker`, run from `backend/`)
 ```bash
 go run ./cmd/go-poker            # needs REDIS_URL; godotenv reads .env from the *working directory*, so export it or copy the root .env into backend/
 go test ./...                    # poker: engine tests; server: table eviction/reconnect tests (no Redis needed)
+# End-to-end socket scenarios (server/e2e_test.go) need a throwaway Redis and are skipped without REDIS_URL:
+../.tools/redis/bin/redis-server --port 6390 --save "" --appendonly no --daemonize yes && REDIS_URL=redis://127.0.0.1:6390 go test ./server -run TestE2E -v
 go test ./poker -run 'TestAllInCallForLessThanFullAmount' -v   # single test
 go test ./server -run 'TestOfflineTimeout' -v                  # offline-eviction suite
 go vet ./...
@@ -57,6 +59,7 @@ Port gotcha: in hot mode the ports are swapped relative to `make start` (backend
 ### Server: hub → table → client (`backend/server`)
 
 - `Hub` owns the Redis client, the set of live `table`s, and an in-memory reservation of account UUIDs registered since boot.
+- **Never write to another client's `send` channel directly.** The hub closes it when the socket goes away while the table may still hold the client; use `Client.trySend` (non-blocking, no-op once closed) and `Client.closeSend` (idempotent). A client's own handlers may still `c.send <-` for replies to itself.
 - Each `table` runs its own goroutine (`table.run`) with register/unregister/broadcast channels. **Every broadcast is published to a Redis channel named after the table and re-consumed by the same process** before being fanned out to clients, which is why Redis is required locally.
 - `Client.processEvents` (`client.go`) is the single dispatch switch over the `action` field; handlers live in `events.go`, request/response struct shapes in `messages.go`. Add a new message by touching all three plus `web/actions/actions.ts` and `web/providers/WebSocket.tsx`.
 - **Client-driven advancement**: the server never uses timers to advance a hand. The frontend (`web/components/Table.tsx`) elects one "runout driver" (first non-left player) whose browser sends `deal-game` after the showdown/runout animation delays. If that client is gone, the table stalls until another `deal-game` arrives.

@@ -324,10 +324,9 @@ func (t *table) broadcastToClients(message []byte) {
 				continue
 			}
 		}
-		select {
-		case client.send <- out:
-		default:
-			close(client.send)
+		if !client.trySend(out) {
+			// Queue full (or connection already gone): drop the client.
+			client.closeSend()
 			delete(t.clients, client)
 		}
 	}
@@ -824,7 +823,7 @@ func (t *table) clearClientUUID(uuid string) {
 	for client := range t.clients {
 		if client.uuid == uuid {
 			client.uuid = ""
-			client.send <- createUpdatedPlayerUUID(client)
+			client.trySend(createUpdatedPlayerUUID(client))
 		}
 	}
 }

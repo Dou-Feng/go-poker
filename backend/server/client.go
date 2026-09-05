@@ -6,6 +6,7 @@ import (
 	"log"
 	"log/slog"
 	"net/http"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -65,6 +66,42 @@ type Client struct {
 	// kick carries a close request that writePump must honor before shutting
 	// down the socket (writePump is the only goroutine allowed to write).
 	kick chan kickRequest
+
+	// sendMu guards sendClosed. The hub closes `send` when a connection goes
+	// away, but the table may still hold the client for a moment and try to
+	// fan a message out to it; sending on a closed channel panics the whole
+	// process, so every cross-client send goes through trySend and every
+	// close through closeSend.
+	sendMu     sync.Mutex
+	sendClosed bool
+}
+
+// trySend queues a message for the peer without blocking. It reports false
+// when the queue is full or the connection has already been closed.
+func (c *Client) trySend(msg []byte) bool {
+	c.sendMu.Lock()
+	defer c.sendMu.Unlock()
+	if c.sendClosed || c.send == nil {
+		return false
+	}
+	select {
+	case c.send <- msg:
+		return true
+	default:
+		return false
+	}
+}
+
+// closeSend closes the outbound queue exactly once; writePump then sends the
+// close frame. Safe to call from any goroutine and more than once.
+func (c *Client) closeSend() {
+	c.sendMu.Lock()
+	defer c.sendMu.Unlock()
+	if c.sendClosed || c.send == nil {
+		return
+	}
+	c.sendClosed = true
+	close(c.send)
 }
 
 func newClient(conn *websocket.Conn, hub *Hub) *Client {

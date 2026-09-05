@@ -391,6 +391,17 @@ export default function Table() {
         }
       }}
     >
+      {/* A pinned (tap-opened) board view closes on a tap anywhere: this
+          transparent backdrop covers the whole room, so a second tap on the
+          felt is never required (small phones may have no reachable felt
+          left under the popup). The held variant needs no backdrop. */}
+      {pinned && game && (
+        <div
+          className="absolute inset-0 z-40"
+          onClick={() => setPinned(false)}
+          aria-label={t("close")}
+        />
+      )}
       {showBoardView && game && (
         <div
           className={classNames(
@@ -402,11 +413,20 @@ export default function Table() {
             "absolute inset-x-0 top-28 z-40 flex items-start justify-center sm:top-24",
             // While held the popup is see-through to pointer events so the
             // release is always caught by the table; when pinned, a tap on
-            // it closes it.
+            // it (or the backdrop) closes it.
             pinned ? "pointer-events-auto" : "pointer-events-none"
           )}
           onClick={() => setPinned(false)}
         >
+          {pinned && (
+            <button
+              onClick={() => setPinned(false)}
+              className="btn btn-text absolute right-3 -top-1 z-50 text-base"
+              aria-label={t("close")}
+            >
+              ✕
+            </button>
+          )}
           {peekPlayer ? (
             // Held on a seat: that player's cards, large. Hidden unless the
             // viewer owns them or they are shown down / voluntarily revealed

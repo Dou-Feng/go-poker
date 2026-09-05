@@ -223,3 +223,31 @@ func TestVoiceSignalDropsWhenPeerQueueFull(t *testing.T) {
 		t.Fatalf("queue must be untouched when full")
 	}
 }
+
+// A client whose connection the hub has already torn down (send channel
+// closed) may still be in the table's client set for a moment. Relaying to it
+// must be a no-op, never a panic: this exact race (two players disconnecting
+// together, the leave announcement of one reaching the closed queue of the
+// other) took the whole process down.
+func TestVoiceRelaySkipsClosedClients(t *testing.T) {
+	tbl, cs := voiceRoom(t, "acc-a", "acc-b", "acc-c")
+	a, b, c := cs[0], cs[1], cs[2]
+
+	b.closeSend()
+	b.closeSend() // idempotent
+
+	// Must not panic; c still gets the announcement.
+	tbl.unregisterClient(a)
+	got := recvVoice(t, c)
+	if got.From != "acc-a" || got.Kind != "leave" {
+		t.Fatalf("expected leave from acc-a, got %+v", got)
+	}
+	if b.trySend([]byte(`{}`)) {
+		t.Fatalf("trySend on a closed client must report false")
+	}
+
+	// The other cross-client paths share the guard.
+	tbl.notifyAccount("acc-b", createError("x"))
+	tbl.clearClientUUID("")
+	tbl.broadcastToClients([]byte(`{"action":"new-log"}`))
+}

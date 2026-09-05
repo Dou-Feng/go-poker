@@ -154,10 +154,8 @@ func (t *table) notifyAccount(account string, msg []byte) {
 		if c.accountUUID != account {
 			continue
 		}
-		select {
-		case c.send <- msg:
-		default:
-			slog.Default().Warn("Drop notice, client queue full", "account", account)
+		if !c.trySend(msg) {
+			slog.Default().Warn("Drop notice, client queue full or closed", "account", account)
 		}
 	}
 }

@@ -77,13 +77,11 @@ func (t *table) relayVoice(from *Client, sig voiceSignal) {
 		if sig.To != "" && client.accountUUID != sig.To {
 			continue
 		}
-		select {
-		case client.send <- out:
-		default:
-			// A client whose outbound queue is full is not going to keep up
-			// with real-time signalling anyway; dropping is safer than
-			// blocking the caller (the reader goroutine of another client).
-			slog.Default().Warn("Drop voice signal, client queue full", "account", client.accountUUID)
+		// A client whose outbound queue is full (or already closed) is not
+		// going to keep up with real-time signalling anyway; dropping is
+		// safer than blocking the caller (another client's reader goroutine).
+		if !client.trySend(out) {
+			slog.Default().Warn("Drop voice signal, client queue full or closed", "account", client.accountUUID)
 		}
 	}
 }

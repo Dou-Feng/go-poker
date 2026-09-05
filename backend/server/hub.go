@@ -83,16 +83,14 @@ func (h *Hub) unregisterClient(client *Client) {
 	if _, ok := h.clients[client]; ok {
 		delete(h.clients, client)
 		h.forgetSession(client)
-		close(client.send)
+		client.closeSend()
 	}
 }
 
 func (h *Hub) broadcastToClients(message []byte) {
 	for client := range h.clients {
-		select {
-		case client.send <- message:
-		default:
-			close(client.send)
+		if !client.trySend(message) {
+			client.closeSend()
 			delete(h.clients, client)
 		}
 	}
