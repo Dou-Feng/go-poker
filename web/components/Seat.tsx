@@ -39,7 +39,7 @@ const HAND_KEYS: Record<string, TranslationKey> = {
   "high card": "hand_high_card",
 };
 
-function useHandLabel() {
+export function useHandLabel() {
   const { t } = useTranslation();
   return (hand: string) => {
     const key = HAND_KEYS[hand];

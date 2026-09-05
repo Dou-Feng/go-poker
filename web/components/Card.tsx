@@ -89,9 +89,16 @@ function color(suit: string) {
       "text-green-700": suit == "C",
       "text-black": suit == "S",
     },
-    "rounded-md border border-zinc-100 shadow-2xl bg-white pt-0.5 px-1 text-2xl font-normal w-9 h-14 sm:pt-1 sm:px-2.5 sm:text-5xl sm:w-16 sm:h-24 flex items-center justify-start flex-col"
+    // Phone size is 36x56px: rank (text-base, 20px line) + suit (text-xl,
+    // 25px line) + top padding must stay under 56px or the suit glyph spills
+    // past the card's bottom edge. Desktop (64x96px) has room for the larger
+    // faces.
+    "rounded-md border border-zinc-100 shadow-2xl bg-white pt-0.5 px-1 text-xl leading-tight font-normal w-9 h-14 sm:pt-1 sm:px-2.5 sm:text-5xl sm:leading-normal sm:w-16 sm:h-24 flex items-center justify-start flex-col overflow-hidden"
   );
 }
+
+const rankClass =
+  "flex w-full items-start justify-start text-base leading-tight font-semibold sm:text-3xl sm:leading-normal";
 
 export default function Card({ card, placeholder, folded, hidden }: cardProps) {
   if (placeholder) {
@@ -128,26 +135,14 @@ export default function Card({ card, placeholder, folded, hidden }: cardProps) {
   if (folded) {
     return (
       <div className={classNames(color(c.suit), "animate-deal-in")}>
-        <div
-          className={
-            "flex w-full items-start justify-start text-xl font-semibold opacity-40 sm:text-3xl"
-          }
-        >
-          {c.rank}
-        </div>
+        <div className={classNames(rankClass, "opacity-40")}>{c.rank}</div>
         <div className="opacity-40">{getSuitChar(c.suit)}</div>
       </div>
     );
   }
   return (
     <div className={classNames(color(c.suit), "animate-deal-in")}>
-      <div
-        className={
-          "flex w-full items-start justify-start text-xl font-semibold sm:text-3xl"
-        }
-      >
-        {c.rank}
-      </div>
+      <div className={rankClass}>{c.rank}</div>
       <div>{getSuitChar(c.suit)}</div>
     </div>
   );

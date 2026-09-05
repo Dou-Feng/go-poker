@@ -1,11 +1,17 @@
 import { useContext, useState } from "react";
 import { FiBarChart2 } from "react-icons/fi";
+import classNames from "classnames";
 import { AppContext } from "../providers/AppStore";
 import { useTranslation } from "../hooks/useTranslation";
 import Avatar from "./Avatar";
 import Portal from "./Portal";
 
-export default function RoomStats() {
+type roomStatsProps = {
+  /** Extra classes for the trigger button. */
+  className?: string;
+};
+
+export default function RoomStats({ className }: roomStatsProps) {
   const { appState } = useContext(AppContext);
   const { t } = useTranslation();
   const [show, setShow] = useState(false);
@@ -20,7 +26,7 @@ export default function RoomStats() {
       <button
         onClick={() => setShow(true)}
         title={t("roomStats")}
-        className="btn btn-ghost"
+        className={classNames("btn btn-ghost", className)}
       >
         <FiBarChart2 size="1rem" />
         {t("roomStats")}

@@ -1,6 +1,8 @@
-import Seat from "./Seat";
+import Seat, { useHandLabel } from "./Seat";
 import Felt from "./Felt";
+import Card from "./Card";
 import TableFx from "./TableFx";
+import classNames from "classnames";
 import { Game as GameType, Player } from "../interfaces";
 import { AppContext } from "../providers/AppStore";
 import { sendLog, dealGame, queueNext } from "../actions/actions";
@@ -141,6 +143,75 @@ export default function Table() {
   const mountedRef = useRef(true);
   const lastStageRef = useRef<number>(-1);
 
+  // Board view popup: the felt is small on a phone and a neighbouring seat can
+  // overlap the player's own hole cards, so the community cards (and the
+  // player's hole cards when seated) can be shown enlarged in the centre.
+  // Two ways to open it: hold a finger / the mouse button anywhere on the
+  // table (shown while held; the delay keeps ordinary taps on seats and
+  // buttons unaffected), or tap the felt itself to pin it open until the
+  // next tap.
+  const [peeking, setPeeking] = useState(false);
+  const [pinned, setPinned] = useState(false);
+  const peekTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Set when a hold produced the popup, so the click that follows the
+  // release does not also toggle the pinned state.
+  const heldRef = useRef(false);
+  const myCards =
+    !!game?.running && !!me && me.cards.length > 0 && me.cards[0] !== "?"
+      ? me.cards
+      : [];
+  const canPeek = !!game?.running;
+  // A hold that starts on an occupied seat enlarges that player's cards
+  // instead of the board (face down until they are revealed, exactly as at
+  // the table). The seat wrapper carries the player's position in a data
+  // attribute so the pointer target can be resolved without extra handlers.
+  const [peekSeat, setPeekSeat] = useState<number | null>(null);
+  const startPeek = (e: React.PointerEvent<HTMLElement>) => {
+    if (!canPeek || peekTimerRef.current) {
+      return;
+    }
+    const target = e.target as HTMLElement | null;
+    const seatEl = target?.closest?.(
+      "[data-seat-position]"
+    ) as HTMLElement | null;
+    const seatPos = seatEl ? Number(seatEl.dataset.seatPosition) : NaN;
+    heldRef.current = false;
+    peekTimerRef.current = setTimeout(() => {
+      peekTimerRef.current = null;
+      heldRef.current = true;
+      setPeekSeat(Number.isFinite(seatPos) ? seatPos : null);
+      setPeeking(true);
+    }, 220);
+  };
+  const peekPlayer =
+    peeking && peekSeat !== null
+      ? game?.players.find((p) => p.position === peekSeat) ?? null
+      : null;
+  const handLabel = useHandLabel();
+  const endPeek = () => {
+    if (peekTimerRef.current) {
+      clearTimeout(peekTimerRef.current);
+      peekTimerRef.current = null;
+    }
+    setPeeking(false);
+  };
+  const toggleBoardView = () => {
+    if (heldRef.current) {
+      heldRef.current = false;
+      return;
+    }
+    if (canPeek) {
+      setPinned((p) => !p);
+    }
+  };
+  useEffect(() => {
+    if (!canPeek) {
+      endPeek();
+      setPinned(false);
+    }
+  }, [canPeek]);
+  const showBoardView = !!game && (peeking || pinned);
+
   const maxPlayers = game?.config.maxPlayers ?? 6;
 
   // Once the game is running, rotate the table so the current player's seat
@@ -277,7 +348,119 @@ export default function Table() {
   }, []);
 
   return (
-    <div className="relative flex h-full w-full items-start justify-center">
+    <div
+      className="relative flex h-full w-full select-none items-start justify-center"
+      style={{ WebkitTouchCallout: "none" } as React.CSSProperties}
+      onPointerDown={startPeek}
+      onPointerUp={endPeek}
+      onPointerCancel={endPeek}
+      onPointerLeave={endPeek}
+      onContextMenu={(e) => {
+        // A long press must not open the browser's context menu on phones.
+        if (canPeek) {
+          e.preventDefault();
+        }
+      }}
+    >
+      {showBoardView && game && (
+        <div
+          className={classNames(
+            // Anchored to the top of the table, not the centre: the finger
+            // that is holding the table would otherwise cover the popup.
+            "absolute inset-x-0 top-2 z-40 flex items-start justify-center sm:top-6",
+            // While held the popup is see-through to pointer events so the
+            // release is always caught by the table; when pinned, a tap on
+            // it closes it.
+            pinned ? "pointer-events-auto" : "pointer-events-none"
+          )}
+          onClick={() => setPinned(false)}
+        >
+          {peekPlayer ? (
+            // Held on a seat: that player's cards, large. Hidden unless the
+            // viewer owns them or they are shown down / voluntarily revealed
+            // — the server never sends the real values otherwise.
+            <div className="animate-fade-in flex flex-col items-center gap-2 rounded-2xl border border-amber-300/60 bg-black/75 px-5 py-3 shadow-2xl sm:px-6 sm:py-4">
+              <p className="max-w-[16rem] truncate text-base font-semibold text-ink sm:text-lg">
+                {peekPlayer.username}
+              </p>
+              <div className="flex flex-row items-center">
+                {(peekPlayer.cards.length > 0
+                  ? peekPlayer.cards
+                  : ["?", "?"]
+                ).map((c, i) => {
+                  const isMineCard = peekPlayer.uuid === appState.clientID;
+                  const shown =
+                    isMineCard ||
+                    peekPlayer.revealed ||
+                    revealedPositions.includes(peekPlayer.position);
+                  return (
+                    <div
+                      key={`seatpeek-${i}-${c}`}
+                      className="origin-center scale-[1.75] sm:scale-125"
+                      style={{ margin: "22px 16px" }}
+                    >
+                      <Card
+                        card={c}
+                        placeholder={false}
+                        folded={!peekPlayer.in}
+                        hidden={!shown}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+              {peekPlayer.bestHand &&
+                (peekPlayer.revealed ||
+                  revealedPositions.includes(peekPlayer.position)) && (
+                  <p className="text-sm font-semibold text-amber-300">
+                    {handLabel(peekPlayer.bestHand)}
+                  </p>
+                )}
+            </div>
+          ) : (
+            <div className="animate-fade-in flex flex-col items-center gap-2 rounded-2xl border border-amber-300/60 bg-black/75 px-4 py-3 shadow-2xl sm:px-6 sm:py-4">
+              {/* Community cards: five slots, placeholders for undealt streets. */}
+              <div className="flex flex-row items-center">
+                {[0, 1, 2, 3, 4].map((n) => {
+                  const c = game.communityCards[n];
+                  return (
+                    <div
+                      key={`board-${n}-${c ?? "x"}`}
+                      className="origin-center scale-150 sm:scale-125"
+                      style={{ margin: "14px 11px" }}
+                    >
+                      <Card
+                        card={c || "placeholder"}
+                        placeholder={!c}
+                        folded={false}
+                        hidden={false}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+              {myCards.length > 0 && me && (
+                <div className="flex flex-row items-center border-t border-amber-300/30 pt-2">
+                  {myCards.map((c, i) => (
+                    <div
+                      key={`peek-${i}-${c}`}
+                      className="origin-center scale-[1.75] sm:scale-125"
+                      style={{ margin: "22px 16px" }}
+                    >
+                      <Card
+                        card={c}
+                        placeholder={false}
+                        folded={!me.in}
+                        hidden={false}
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
       {(winners.length > 0 || forfeited) && (
         <div className="pointer-events-none absolute inset-0 z-30 flex items-center justify-center">
           <div className="animate-winner-pop rounded-2xl border-2 border-amber-300 bg-tablehi/90 px-8 py-4 text-center shadow-2xl">
@@ -297,8 +480,14 @@ export default function Table() {
       )}
       <div className="relative mt-10 h-2/3 w-full max-w-screen-xl sm:mt-28 sm:h-3/5">
         <div
-          className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2"
+          className={classNames(
+            "absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2",
+            canPeek && "cursor-pointer"
+          )}
           style={{ width: "56%", height: "50%" }}
+          onClick={toggleBoardView}
+          role={canPeek ? "button" : undefined}
+          aria-label={canPeek ? t("boardView") : undefined}
         >
           <Felt />
         </div>
@@ -334,11 +523,25 @@ export default function Table() {
         {seats.map((player, i) => {
           const visualIndex = (i - seatRotation + maxPlayers) % maxPlayers;
           const pos = seatPosition(visualIndex, maxPlayers);
+          // The player's own seat is stacked above the neighbours so its
+          // hole cards are never hidden by an overlapping seat on narrow
+          // screens.
+          const isMine = !!player && player.uuid === appState.clientID;
+          // Once a hand is running the other players' seats are drawn a
+          // little smaller (their cards are face down anyway), leaving more
+          // room for the board and the player's own seat. Scaling about the
+          // centre keeps the seat anchored where TableFx expects it.
+          const shrink = !!game?.running && !!player && !isMine;
           return (
             <div
               key={i}
-              className="absolute -translate-x-1/2 -translate-y-1/2"
+              className={classNames(
+                "absolute -translate-x-1/2 -translate-y-1/2 transition-transform duration-300",
+                isMine && "z-10",
+                shrink && "scale-[0.82] sm:scale-90"
+              )}
               style={{ left: pos.left, top: pos.top }}
+              data-seat-position={player ? player.position : undefined}
             >
               <Seat
                 player={player}

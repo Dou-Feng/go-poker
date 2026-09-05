@@ -4,8 +4,16 @@ import { useSocket } from "../hooks/useSocket";
 import { useTranslation } from "../hooks/useTranslation";
 import { rebuy } from "../actions/actions";
 import PlusIcon from "./PlusIcon";
+import classNames from "classnames";
 
-export default function Rebuy() {
+type rebuyProps = {
+  /** Extra classes for the trigger button (the menu stretches it). */
+  className?: string;
+};
+
+// Rebuy control: a trigger button plus a +/- amount panel that opens above
+// it. Positioning is left to the parent (it lives inside RoomMenu).
+export default function Rebuy({ className }: rebuyProps) {
   const socket = useSocket();
   const { appState } = useContext(AppContext);
   const { t } = useTranslation();
@@ -40,7 +48,7 @@ export default function Rebuy() {
   };
 
   return (
-    <div className="pointer-events-auto absolute bottom-64 right-2 z-30 flex flex-col items-end gap-1 sm:bottom-[17rem]">
+    <div className="relative flex flex-col items-stretch gap-1">
       {show && (
         <div className="rounded-lg border border-muted/30 bg-tablehi/95 p-2 shadow-lg">
           <div className="flex flex-row items-center gap-2">
@@ -78,7 +86,7 @@ export default function Rebuy() {
           setAmount(0);
           setShow((s) => !s);
         }}
-        className="btn btn-ghost"
+        className={classNames("btn btn-ghost justify-start", className)}
       >
         <PlusIcon className="h-4 w-4" />
         {t("rebuy")}

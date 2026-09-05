@@ -1,20 +1,18 @@
-import { useContext, useState, useEffect } from "react";
+import { useContext, useEffect } from "react";
 import ChatLog from "./ChatLog";
 import Chip from "./Chip";
-import EyeIcon from "./EyeIcon";
 import GameInfo from "./GameInfo";
 import Input from "./Input";
 import Table from "./Table";
 import Wallet from "./Wallet";
 import Settlement from "./Settlement";
 import Settings from "./Settings";
-import RoomStats from "./RoomStats";
-import Rebuy from "./Rebuy";
+import RoomMenu from "./RoomMenu";
 import VoiceControls from "./VoiceControls";
 import { AppContext } from "../providers/AppStore";
 import { useSocket } from "../hooks/useSocket";
 import { useTranslation } from "../hooks/useTranslation";
-import { leaveTable, voteSettle, spectate } from "../actions/actions";
+import { leaveTable, voteSettle } from "../actions/actions";
 import { clearSession } from "../lib/session";
 import { voice } from "../lib/voice";
 import { FiCheckCircle, FiCircle } from "react-icons/fi";
@@ -54,14 +52,6 @@ export default function Game() {
   const showVotes = !!game && (game.running || game.handsPlayed > 0);
   const myVoted = !!game && game.settleVotes.includes(appState.username ?? "");
 
-  // Whether the player has reserved to spectate once the current hand ends.
-  const [reservedSpectate, setReservedSpectate] = useState(false);
-  useEffect(() => {
-    if (!me) {
-      setReservedSpectate(false);
-    }
-  }, [me]);
-
   return (
     <div className="app-screen room-wallpaper relative w-screen overflow-hidden bg-floor">
       <div className="flex h-full w-full items-start justify-center">
@@ -91,40 +81,9 @@ export default function Game() {
           </span>
         </div>
       )}
-      {appState.table && (
-        <div className="pointer-events-none absolute bottom-44 left-0 z-10 px-2 sm:bottom-48">
-          <p className="text-sm font-medium text-muted">{appState.table}</p>
-        </div>
-      )}
-      <Rebuy />
-      {me && game && (
-        <button
-          onClick={() => {
-            if (!socket) {
-              return;
-            }
-            setReservedSpectate(!reservedSpectate);
-            spectate(socket);
-          }}
-          className={`btn absolute bottom-52 right-2 z-30 sm:bottom-56 ${
-            reservedSpectate
-              ? "btn-accent border border-amber-500"
-              : "btn-ghost"
-          }`}
-        >
-          {reservedSpectate ? (
-            <span className="flex h-4 w-4 items-center justify-center leading-none">
-              ✓
-            </span>
-          ) : (
-            <EyeIcon className="h-4 w-4" />
-          )}
-          {t("spectate")}
-        </button>
-      )}
-      <div className="absolute bottom-40 right-2 z-30 sm:bottom-44">
-        <RoomStats />
-      </div>
+      {/* Secondary controls (rebuy / spectate / stats) live behind the "..."
+          button; the room name sits in the chat tab row. */}
+      <RoomMenu />
       <div className="absolute inset-x-0 bottom-0 z-10 flex flex-col sm:block">
         <div className="w-full sm:pointer-events-none sm:absolute sm:inset-x-0 sm:bottom-0 sm:z-20">
           <Input />
