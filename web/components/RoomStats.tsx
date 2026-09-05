@@ -16,10 +16,41 @@ export default function RoomStats({ className }: roomStatsProps) {
   const { t } = useTranslation();
   const [show, setShow] = useState(false);
 
-  const players = [
+  // One row per account: a player who left and sat down again has a departed
+  // snapshot and a live seat, so buy-ins and stacks are summed per account.
+  type row = {
+    key: string;
+    username: string;
+    accountUuid: string;
+    avatar: string;
+    avatarImage: boolean;
+    totalBuyIn: number;
+    stack: number;
+  };
+  const players: row[] = [];
+  const index = new Map<string, number>();
+  for (const p of [
     ...(appState.game?.players ?? []),
     ...(appState.game?.departedPlayers ?? []),
-  ];
+  ]) {
+    const key = p.accountUuid || "seat:" + p.uuid;
+    const i = index.get(key);
+    if (i !== undefined) {
+      players[i].totalBuyIn += p.totalBuyIn;
+      players[i].stack += p.stack;
+      continue;
+    }
+    index.set(key, players.length);
+    players.push({
+      key,
+      username: p.username,
+      accountUuid: p.accountUuid,
+      avatar: p.avatar,
+      avatarImage: p.avatarImage,
+      totalBuyIn: p.totalBuyIn,
+      stack: p.stack,
+    });
+  }
 
   return (
     <>
@@ -61,7 +92,7 @@ export default function RoomStats({ className }: roomStatsProps) {
                   const net = p.stack - p.totalBuyIn;
                   return (
                     <div
-                      key={p.uuid}
+                      key={p.key}
                       className="flex flex-row items-center justify-between rounded-md bg-floor px-3 py-2"
                     >
                       <div className="flex min-w-0 flex-row items-center gap-2">

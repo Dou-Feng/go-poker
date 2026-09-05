@@ -36,10 +36,13 @@ export default function Lobby() {
   const [showRecharge, setShowRecharge] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
   const [showFriends, setShowFriends] = useState(false);
-  const [sb, setSb] = useState("1");
-  const [bb, setBb] = useState("2");
+  const [sb, setSb] = useState("5");
+  const [bb, setBb] = useState("10");
   const [buyIn, setBuyIn] = useState("200");
   const [maxBuy, setMaxBuy] = useState("600");
+  // 锦标赛: cap each player's total buy-ins (maxBuy); busted players with no
+  // buy-ins left are benched. Off by default = unlimited rebuys.
+  const [tournament, setTournament] = useState(false);
   const [maxPlayers, setMaxPlayers] = useState("6");
   const [handsLimit, setHandsLimit] = useState("20");
   const { t } = useTranslation();
@@ -120,10 +123,13 @@ export default function Lobby() {
     const buyInNum = parseNumber(buyIn, 200, 1);
     createTable(socket, name, {
       password: newPassword || undefined,
-      sb: parseNumber(sb, 1, 1),
-      bb: parseNumber(bb, 2, 2),
+      sb: parseNumber(sb, 5, 1),
+      bb: parseNumber(bb, 10, 2),
       buyIn: buyInNum,
-      maxBuy: parseNumber(maxBuy, Math.max(600, buyInNum), buyInNum),
+      maxBuy: tournament
+        ? parseNumber(maxBuy, Math.max(600, buyInNum), buyInNum)
+        : 0,
+      tournament,
       maxPlayers: parseNumber(maxPlayers, 6, 2, 8),
       handsLimit: parseNumber(handsLimit, 20, 0),
     });
@@ -251,6 +257,14 @@ export default function Lobby() {
                       {room.locked && (
                         <span className="type-label ml-2">🔒</span>
                       )}
+                      {room.tournament && (
+                        <span
+                          className="ml-2 rounded-sm bg-amber-600/20 px-1.5 py-0.5 text-xs text-amber-300"
+                          title={t("tournamentHint")}
+                        >
+                          {t("tournament")}
+                        </span>
+                      )}
                     </p>
                     <p className="type-caption">
                       {room.players} {t("players")}
@@ -361,18 +375,31 @@ export default function Lobby() {
                   />
                 </div>
 
-                <div className="flex flex-row items-center gap-2 rounded-sm bg-floor px-3 py-2 text-xs">
-                  <span className="w-16 shrink-0 text-muted">
-                    {t("maxBuy")}
-                  </span>
+                <label className="flex cursor-pointer flex-row items-center gap-2 rounded-sm bg-floor px-3 py-2 text-xs">
                   <input
-                    type="text"
-                    inputMode="numeric"
-                    value={maxBuy}
-                    onChange={(e) => setMaxBuy(e.target.value)}
-                    className="flex-1 rounded-sm border border-muted/30 bg-transparent px-2 py-1 text-ink focus:outline-none"
+                    type="checkbox"
+                    checked={tournament}
+                    onChange={(e) => setTournament(e.target.checked)}
+                    className="h-4 w-4 accent-cyan-700"
                   />
-                </div>
+                  <span className="text-ink">{t("tournament")}</span>
+                  <span className="text-muted">— {t("tournamentHint")}</span>
+                </label>
+
+                {tournament && (
+                  <div className="flex flex-row items-center gap-2 rounded-sm bg-floor px-3 py-2 text-xs">
+                    <span className="w-16 shrink-0 text-muted">
+                      {t("maxBuy")}
+                    </span>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      value={maxBuy}
+                      onChange={(e) => setMaxBuy(e.target.value)}
+                      className="flex-1 rounded-sm border border-muted/30 bg-transparent px-2 py-1 text-ink focus:outline-none"
+                    />
+                  </div>
+                )}
 
                 <div className="flex flex-row items-center gap-2 rounded-sm bg-floor px-3 py-2 text-xs">
                   <span className="w-16 shrink-0 text-muted">

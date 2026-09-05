@@ -44,6 +44,7 @@ export type TableInfo = {
   running: boolean;
   spectators: number;
   locked: boolean;
+  tournament: boolean;
 };
 
 export type PlayerStats = {

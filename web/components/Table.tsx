@@ -9,6 +9,7 @@ import { sendLog, dealGame, queueNext } from "../actions/actions";
 import { useSocket } from "../hooks/useSocket";
 import { useTranslation } from "../hooks/useTranslation";
 import { playSfx } from "../lib/sfx";
+import { bestHandName } from "../lib/handEval";
 import { useContext, useState, useEffect, useRef } from "react";
 
 // The backend's GameStage enum values. 1..5 are NotReady, PreFlop..River;
@@ -188,6 +189,13 @@ export default function Table() {
       ? game?.players.find((p) => p.position === peekSeat) ?? null
       : null;
   const handLabel = useHandLabel();
+  // Current best hand for the viewer's own cards, from whatever is visible
+  // (2 hole cards preflop … 7 cards on the river). The server names hands
+  // only at showdown; this fills the gap for the popup.
+  const myBestHand =
+    myCards.length > 0
+      ? bestHandName([...myCards, ...(game?.communityCards ?? [])])
+      : null;
   const endPeek = () => {
     if (peekTimerRef.current) {
       clearTimeout(peekTimerRef.current);
@@ -433,13 +441,20 @@ export default function Table() {
                   );
                 })}
               </div>
-              {peekPlayer.bestHand &&
+              {peekPlayer.uuid === appState.clientID && myBestHand ? (
+                // Own seat: live evaluation of the current hand.
+                <p className="text-sm font-semibold text-amber-300">
+                  {handLabel(myBestHand)}
+                </p>
+              ) : (
+                peekPlayer.bestHand &&
                 (peekPlayer.revealed ||
                   revealedPositions.includes(peekPlayer.position)) && (
                   <p className="text-sm font-semibold text-amber-300">
                     {handLabel(peekPlayer.bestHand)}
                   </p>
-                )}
+                )
+              )}
             </div>
           ) : (
             <div className="animate-fade-in flex flex-col items-center gap-2 rounded-2xl border border-amber-300/60 bg-black/75 px-4 py-3 shadow-2xl sm:px-6 sm:py-4">
@@ -464,21 +479,28 @@ export default function Table() {
                 })}
               </div>
               {myCards.length > 0 && me && (
-                <div className="flex flex-row items-center border-t border-amber-300/30 pt-2">
-                  {myCards.map((c, i) => (
-                    <div
-                      key={`peek-${i}-${c}`}
-                      className="origin-center scale-[1.75] sm:scale-125"
-                      style={{ margin: "22px 16px" }}
-                    >
-                      <Card
-                        card={c}
-                        placeholder={false}
-                        folded={!me.in}
-                        hidden={false}
-                      />
-                    </div>
-                  ))}
+                <div className="flex flex-col items-center border-t border-amber-300/30 pt-2">
+                  <div className="flex flex-row items-center">
+                    {myCards.map((c, i) => (
+                      <div
+                        key={`peek-${i}-${c}`}
+                        className="origin-center scale-[1.75] sm:scale-125"
+                        style={{ margin: "22px 16px" }}
+                      >
+                        <Card
+                          card={c}
+                          placeholder={false}
+                          folded={!me.in}
+                          hidden={false}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                  {myBestHand && (
+                    <p className="text-sm font-semibold text-amber-300">
+                      {handLabel(myBestHand)}
+                    </p>
+                  )}
                 </div>
               )}
             </div>

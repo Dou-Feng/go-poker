@@ -374,7 +374,39 @@ func handleListTables(c *Client) {
 	c.send <- createTableList(c.hub.listTables())
 }
 
-func handleCreateTable(c *Client, tablename string, password string, sb uint, bb uint, buyIn uint, maxBuy uint, maxPlayers uint, handsLimit uint) {
+// roomConfig is a create-table request with defaults applied. Tournament
+// decides whether a buy-in cap exists at all: off means MaxBuy 0 (unlimited
+// rebuys, nobody is benched); on means MaxBuy as requested, defaulting to two
+// buy-ins and never less than one.
+type roomConfig struct {
+	sb, bb, buyIn, maxBuy, maxPlayers, handsLimit uint
+}
+
+func normalizeRoomConfig(sb, bb, buyIn, maxBuy, maxPlayers, handsLimit uint, tournament bool) roomConfig {
+	if sb == 0 {
+		sb = 5
+	}
+	if bb == 0 {
+		bb = 10
+	}
+	if buyIn == 0 {
+		buyIn = 200
+	}
+	if maxPlayers == 0 {
+		maxPlayers = 6
+	}
+	switch {
+	case !tournament:
+		maxBuy = 0
+	case maxBuy == 0:
+		maxBuy = buyIn * 2
+	case maxBuy < buyIn:
+		maxBuy = buyIn
+	}
+	return roomConfig{sb, bb, buyIn, maxBuy, maxPlayers, handsLimit}
+}
+
+func handleCreateTable(c *Client, tablename string, password string, sb uint, bb uint, buyIn uint, maxBuy uint, maxPlayers uint, handsLimit uint, tournament bool) {
 	table, created, err := c.hub.createTableIfAbsent(tablename, password)
 	if err != nil {
 		c.send <- createResult(actionCreateResult, false, err.Error(), "")
@@ -385,22 +417,8 @@ func handleCreateTable(c *Client, tablename string, password string, sb uint, bb
 		return
 	}
 
-	if sb == 0 {
-		sb = 1
-	}
-	if bb == 0 {
-		bb = 2
-	}
-	if buyIn == 0 {
-		buyIn = 200
-	}
-	if maxBuy == 0 {
-		maxBuy = buyIn * 2
-	}
-	if maxPlayers == 0 {
-		maxPlayers = 6
-	}
-	poker.Configure(table.game, sb, bb, buyIn, maxBuy, maxPlayers, handsLimit)
+	cfg := normalizeRoomConfig(sb, bb, buyIn, maxBuy, maxPlayers, handsLimit, tournament)
+	poker.Configure(table.game, cfg.sb, cfg.bb, cfg.buyIn, cfg.maxBuy, cfg.maxPlayers, cfg.handsLimit)
 
 	c.table = table
 	table.register <- c
@@ -474,6 +492,13 @@ func handleTakeSeat(c *Client, username string, seatID uint, buyIn uint) {
 		amount = buyIn
 	}
 
+	// The room's max buy-in applies to the account for the whole session, so
+	// a player who busted out cannot re-sit for a fresh stack.
+	if !c.table.canBuyIn(c.accountUUID, amount) {
+		c.send <- createError(msgNoBuyInsLeft)
+		return
+	}
+
 	// Deduct the buy-in from the user's account balance before seating.
 	user, err := loadUser(c.hub.rdb, c.accountUUID)
 	if err != nil {
@@ -509,6 +534,8 @@ func handleTakeSeat(c *Client, username string, seatID uint, buyIn uint) {
 	err = poker.BuyIn(c.table.game, position, amount)
 	if err != nil {
 		slog.Default().Warn("Buy in", "error", err)
+	} else {
+		c.table.ledger.add(c.accountUUID, amount)
 	}
 
 	err = poker.SetSeatID(c.table.game, position, seatID)
@@ -545,8 +572,13 @@ func handleRebuy(c *Client, amount uint) {
 	}
 
 	// Refuse a rebuy that would push the player past the room's maximum
-	// buy-in cap, instead of silently draining their wallet.
+	// buy-in cap, instead of silently draining their wallet. Both the seat's
+	// own total and the account's session total (across re-seats) apply.
 	if view.Config.MaxBuy != 0 && view.Players[position].TotalBuyIn+amount > view.Config.MaxBuy {
+		c.send <- createError("max buy-in reached")
+		return
+	}
+	if !c.table.canBuyIn(c.accountUUID, amount) {
 		c.send <- createError("max buy-in reached")
 		return
 	}
@@ -568,6 +600,8 @@ func handleRebuy(c *Client, amount uint) {
 
 	if err := poker.BuyIn(c.table.game, uint(position), amount); err != nil {
 		slog.Default().Warn("Rebuy", "error", err)
+	} else {
+		c.table.ledger.add(c.accountUUID, amount)
 	}
 	// Buying in never changes the player's ready state: they stay not-ready
 	// and must explicitly tap their avatar to get ready.
@@ -626,6 +660,8 @@ func handleUndoRebuy(c *Client) {
 
 	if err := poker.UndoBuyIn(c.table.game, uint(position), amount); err != nil {
 		slog.Default().Warn("Undo buy in", "error", err)
+	} else {
+		c.table.ledger.sub(c.accountUUID, amount)
 	}
 
 	c.table.broadcastGame()
@@ -702,6 +738,10 @@ func handleQueueNext(c *Client) {
 		c.send <- createError("amount must be positive")
 		return
 	}
+	if !c.table.canBuyIn(c.accountUUID, view.Config.BuyIn) {
+		c.send <- createError(msgNoBuyInsLeft)
+		return
+	}
 	user, err := loadUser(c.hub.rdb, c.accountUUID)
 	if err != nil {
 		c.send <- createError("could not load user")
@@ -776,6 +816,7 @@ func autoStartIfReady(t *table) bool {
 
 func handleResetGame(c *Client) {
 	c.table.game.Reset()
+	c.table.resetSession()
 	c.table.broadcastGame()
 }
 

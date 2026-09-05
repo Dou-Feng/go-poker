@@ -54,13 +54,16 @@ type table struct {
 	settleAfterHand bool
 	settled         bool
 	settleMu        sync.Mutex
+	// ledger totals each account's buy-ins across the whole room session so
+	// MaxBuy cannot be dodged by leaving and re-sitting (see scoreboard.go).
+	ledger *sessionLedger
 }
 
 // newTable creates a new table
 func newTable(name string, redisClient *redis.Client, hub *Hub) *table {
 	game := poker.NewGame()
-	// Apply the default room config (SB 1 / BB 2, 6 players, buy-in 200 x2).
-	poker.Configure(game, 1, 2, 200, 400, 6, 0)
+	// Apply the default room config (SB 5 / BB 10, 6 players, buy-in 200 x2).
+	poker.Configure(game, 5, 10, 200, 400, 6, 0)
 	return &table{
 		name:          name,
 		rdb:           redisClient,
@@ -75,6 +78,7 @@ func newTable(name string, redisClient *redis.Client, hub *Hub) *table {
 		offlineAfter:  offlineTimeout,
 		waiting:       make(map[*Client]bool),
 		settleVotes:   make(map[string]bool),
+		ledger:        newSessionLedger(),
 	}
 }
 
@@ -246,6 +250,7 @@ func (t *table) evictPlayer(playerUUID string) (string, bool) {
 	remaining := t.game.GenerateOmniView()
 	if len(remaining.Players) == 0 {
 		t.game.Reset()
+		t.resetSession()
 	} else if remaining.Stage == poker.NotReady {
 		poker.Pause(t.game)
 	}
@@ -371,6 +376,7 @@ func (t *table) info() tableInfo {
 		Running:    view.Running,
 		Spectators: spectators,
 		Locked:     t.password != "",
+		Tournament: view.Config.MaxBuy > 0,
 	}
 }
 
@@ -467,6 +473,11 @@ func (t *table) seatQueuedClient(c *Client) (bool, error) {
 	if amount == 0 {
 		return false, errors.New("amount must be positive")
 	}
+	// The account's buy-ins for the whole session count, not just this seat.
+	if !t.canBuyIn(c.accountUUID, amount) {
+		c.send <- createError(msgNoBuyInsLeft)
+		return false, errors.New(msgNoBuyInsLeft)
+	}
 
 	user, err := loadUser(t.rdb, c.accountUUID)
 	if err != nil {
@@ -511,6 +522,8 @@ func (t *table) seatQueuedClient(c *Client) (bool, error) {
 	}
 	if err := poker.BuyIn(t.game, position, amount); err != nil {
 		slog.Default().Warn("Buy in", "error", err)
+	} else {
+		t.ledger.add(c.accountUUID, amount)
 	}
 	// Ready before SetSeatID re-sorts players, so the position index stays
 	// valid. Blinds are recomputed when the next hand is dealt.
@@ -592,36 +605,11 @@ func (t *table) settle() {
 
 	view := t.game.GenerateOmniView()
 
-	results := make([]settlementPlayer, 0, len(view.Players))
-	for _, p := range view.Players {
-		results = append(results, settlementPlayer{
-			Username:    p.Username,
-			UUID:        p.AccountUUID,
-			Avatar:      p.Avatar,
-			AvatarImage: p.AvatarImage,
-			BuyIn:       p.TotalBuyIn,
-			Net:         int(p.Stack) - int(p.TotalBuyIn),
-		})
-	}
-
-	// Departed players already had their session flushed when they left, so
-	// they are only added to the display (not settled again). Without them
-	// the nets would not sum to zero: chips they lost (or won) before leaving
-	// stayed on the table and are reflected in the seated players' nets.
-	for _, p := range view.DepartedPlayers {
-		if p.TotalBuyIn == 0 {
-			// Never bought in (e.g. queued seat never dealt in): skip.
-			continue
-		}
-		results = append(results, settlementPlayer{
-			Username:    p.Username,
-			UUID:        p.AccountUUID,
-			Avatar:      p.Avatar,
-			AvatarImage: p.AvatarImage,
-			BuyIn:       p.TotalBuyIn,
-			Net:         int(p.Stack) - int(p.TotalBuyIn),
-		})
-	}
+	// One row per account. Departed players already had their session flushed
+	// when they left, so they are only added to the display (not settled
+	// again); without them the nets would not sum to zero. A player who left
+	// and sat down again is merged into a single row (see settlementRows).
+	results := settlementRows(view)
 
 	biggestWinner := ""
 	for _, p := range view.Players {
@@ -645,6 +633,7 @@ func (t *table) settle() {
 
 	t.broadcast <- createSettlement(results, biggestWinner, view.BiggestPotAmt)
 	t.game.Reset()
+	t.resetSession()
 	t.broadcast <- createUpdatedGameBytes(t)
 }
 
@@ -754,6 +743,7 @@ func (t *table) applySpectate(c *Client) bool {
 
 	if len(t.game.GenerateOmniView().Players) == 0 {
 		t.game.Reset()
+		t.resetSession()
 	} else {
 		// A seated player moved to the spectator side between hands: put the
 		// room back into the ready phase (clearing the previous hand's result)
@@ -819,6 +809,10 @@ func (t *table) autoSpectateBusted() {
 		if err := poker.RemovePlayer(t.game, uint(pos)); err != nil {
 			slog.Default().Warn("Auto spectate remove", "error", err)
 		}
+		// Tell the player why they are suddenly watching; the ledger keeps
+		// them from taking a seat again this session (no buy-ins left).
+		t.notifyAccount(p.AccountUUID, createError(msgBustedOut))
+		t.broadcast <- createNewLog(fmt.Sprintf("%s is out of chips and moves to the spectators", p.Username))
 	}
 }
 

@@ -171,6 +171,10 @@ type createTable struct {
 	MaxBuy     uint   `json:"maxBuy"`
 	MaxPlayers uint   `json:"maxPlayers"`
 	HandsLimit uint   `json:"handsLimit"`
+	// Tournament enables the per-account buy-in cap (MaxBuy, defaulting to
+	// two buy-ins): players who bust with no buy-ins left are benched. Off
+	// (the default) means unlimited rebuys.
+	Tournament bool `json:"tournament"`
 }
 
 type addChips struct {
@@ -321,6 +325,7 @@ type tableInfo struct {
 	Running    bool   `json:"running"`
 	Spectators int    `json:"spectators"`
 	Locked     bool   `json:"locked"`
+	Tournament bool   `json:"tournament"` // buy-in cap in force
 }
 
 type tableList struct {

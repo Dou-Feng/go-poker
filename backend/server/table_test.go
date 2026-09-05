@@ -46,6 +46,9 @@ func newTestTable(t *testing.T) (*table, *flushRecorder) {
 	t.Helper()
 	rec := &flushRecorder{}
 	tbl := newTable("test-room", nil, nil)
+	// Pin the room config the tests' chip arithmetic assumes (blinds 1/2,
+	// buy-in 200, cap 400) instead of inheriting the production defaults.
+	poker.Configure(tbl.game, 1, 2, 200, 400, 6, 0)
 	tbl.flush = rec.flush
 	tbl.offlineAfter = 30 * time.Millisecond
 	t.Cleanup(tbl.shutdown)
