@@ -1,8 +1,6 @@
 package server
 
 import (
-	"crypto/rand"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -149,13 +147,16 @@ func isBotAccount(account string) bool {
 
 // newBotClient builds a socketless client whose outbound queue is discarded.
 func newBotClient(hub *Hub, name string) *Client {
-	buf := make([]byte, 4)
-	_, _ = rand.Read(buf)
 	c := &Client{
-		hub:         hub,
-		send:        make(chan []byte, 64),
-		kick:        make(chan kickRequest, 1),
-		accountUUID: botAccountPrefix + hex.EncodeToString(buf),
+		hub:  hub,
+		send: make(chan []byte, 64),
+		kick: make(chan kickRequest, 1),
+		// The account derives from the name, so "Bot Ace" is the same
+		// account every time it is (re)added to a table: its departed
+		// snapshots and its new seat merge into one scoreboard row and one
+		// buy-in ledger entry, instead of one row per add/remove cycle.
+		// Bots only ever exist inside one table, so names are unique enough.
+		accountUUID: botAccount(name),
 		username:    name,
 		isBot:       true,
 	}
@@ -190,19 +191,35 @@ func (t *table) humanCount() int {
 	return n
 }
 
-// botName picks a name not already used at the table.
+// botAccount is the stable account id of a bot name ("Bot Ace" → "bot-ace").
+func botAccount(name string) string {
+	return botAccountPrefix + strings.ToLower(strings.ReplaceAll(strings.TrimPrefix(name, "Bot "), " ", "-"))
+}
+
+// botName picks a name that is not in use at the table and, in a tournament
+// room, whose account still has buy-ins left (a bot that busted out and was
+// removed keeps its ledger entry under its name).
 func (t *table) botName() string {
 	used := map[string]bool{}
 	for _, b := range t.botClients() {
 		used[b.username] = true
 	}
+	buyIn := t.game.GenerateOmniView().Config.BuyIn
+	if buyIn == 0 {
+		buyIn = 200
+	}
 	for _, n := range botNames {
 		name := "Bot " + n
-		if !used[name] {
+		if !used[name] && t.canBuyIn(botAccount(name), buyIn) {
 			return name
 		}
 	}
-	return fmt.Sprintf("Bot %d", len(used)+1)
+	for i := len(botNames) + 1; ; i++ {
+		name := fmt.Sprintf("Bot %d", i)
+		if !used[name] && t.canBuyIn(botAccount(name), buyIn) {
+			return name
+		}
+	}
 }
 
 // addBot seats a new bot between hands at seatID (0 = first free seat). The

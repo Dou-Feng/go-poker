@@ -4,6 +4,7 @@ import { AppContext } from "../providers/AppStore";
 import { diffTableActions } from "../lib/tableFx";
 import { subscribeFx } from "../lib/fxBus";
 import classNames from "classnames";
+import Chip, { ChipTone, chipToneFor } from "./Chip";
 
 // Geometry mirroring Table.tsx's seat layout (percent within the table
 // container). Pot centre sits a little above the very centre.
@@ -60,20 +61,25 @@ function FlyChip({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chip.id]);
 
+  // The flying piece is the game's chip, coloured by the amount in play
+  // (`chip.color` carries the denomination tone), spinning slightly as it
+  // travels; alternate chips spin the other way.
+  const spin = chip.id % 2 ? 160 : -160;
   return (
     <div
-      className={classNames(
-        "absolute h-4 w-4 rounded-full shadow-md ring-1 ring-black/40 sm:h-6 sm:w-6",
-        chip.color
-      )}
+      className="absolute h-5 w-5 drop-shadow-md sm:h-7 sm:w-7"
       style={{
         left: `${phase === "start" ? chip.x1 : chip.x2}%`,
         top: `${phase === "start" ? chip.y1 : chip.y2}%`,
-        transform: "translate(-50%, -50%)",
-        transition: `left ${chip.ms}ms ease-in, top ${chip.ms}ms ease-in`,
-        opacity: phase === "end" ? 0.85 : 0.2,
+        transform: `translate(-50%, -50%) rotate(${
+          phase === "end" ? spin : 0
+        }deg)`,
+        transition: `left ${chip.ms}ms ease-in, top ${chip.ms}ms ease-in, transform ${chip.ms}ms linear`,
+        opacity: phase === "end" ? 0.95 : 0.2,
       }}
-    />
+    >
+      <Chip className="h-full w-full" tone={chip.color as ChipTone} />
+    </div>
   );
 }
 
@@ -141,14 +147,16 @@ export default function TableFx({ game, maxPlayers }: props) {
         const slot = seatSlot(players, num);
         if (slot === null) continue;
         const seat = seatXY(slot, maxPlayersRef.current);
-        // A few chips stream from the pot to each winner.
+        // A few chips stream from the pot to each winner, coloured by the
+        // size of the pot they carry.
+        const tone = chipToneFor(pot.amount);
         for (let i = 0; i < 4; i++) {
           flyBetween(
             POT_X + (Math.random() - 0.5) * 10,
             POT_Y + (Math.random() - 0.5) * 10,
             seat.x,
             seat.y,
-            i % 2 ? "bg-amber-300" : "bg-amber-500",
+            tone,
             i * 90
           );
         }
@@ -175,9 +183,10 @@ export default function TableFx({ game, maxPlayers }: props) {
           // A short stream of chips flies from the bettor's seat to the pot,
           // with a "+amount" label popping above the seat.
           betAnimated = true;
-          flyBetween(seat.x, seat.y, POT_X, POT_Y, "bg-amber-400", 0, 550);
-          flyBetween(seat.x, seat.y, POT_X, POT_Y, "bg-amber-500", 140, 550);
-          flyBetween(seat.x, seat.y, POT_X, POT_Y, "bg-amber-300", 280, 550);
+          const tone = chipToneFor(ev.amount);
+          flyBetween(seat.x, seat.y, POT_X, POT_Y, tone, 0, 550);
+          flyBetween(seat.x, seat.y, POT_X, POT_Y, tone, 140, 550);
+          flyBetween(seat.x, seat.y, POT_X, POT_Y, tone, 280, 550);
           const id = fxSeq++;
           const done = window.setTimeout(() => dropTag(id), 900);
           setTags((t) => [

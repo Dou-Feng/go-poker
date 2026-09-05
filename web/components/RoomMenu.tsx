@@ -1,4 +1,4 @@
-import { useContext, useEffect, useState } from "react";
+import { useContext, useEffect, useRef, useState } from "react";
 import { FiCheck, FiCpu, FiMoreHorizontal, FiX } from "react-icons/fi";
 import classNames from "classnames";
 import { AppContext } from "../providers/AppStore";
@@ -19,6 +19,38 @@ export default function RoomMenu() {
   const socket = useSocket();
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
+  // Closing plays a short fade-out before the panel unmounts.
+  const [closing, setClosing] = useState(false);
+  const menuRef = useRef<HTMLDivElement | null>(null);
+  const close = () => {
+    if (!open || closing) {
+      return;
+    }
+    setClosing(true);
+    window.setTimeout(() => {
+      setClosing(false);
+      setOpen(false);
+    }, 160);
+  };
+
+  // Tap anywhere outside the menu (seats, felt, other buttons) and it fades
+  // away, so it never has to be dismissed explicitly before acting.
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+    const onPointerDown = (e: PointerEvent) => {
+      const el = menuRef.current;
+      if (el && e.target instanceof Node && !el.contains(e.target)) {
+        close();
+      }
+    };
+    document.addEventListener("pointerdown", onPointerDown, true);
+    return () =>
+      document.removeEventListener("pointerdown", onPointerDown, true);
+    // close() reads the latest state via closure each time the effect runs.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, closing]);
   // Whether the player has reserved to spectate once the current hand ends.
   const [reservedSpectate, setReservedSpectate] = useState(false);
 
@@ -42,10 +74,18 @@ export default function RoomMenu() {
   const botCount = game.players.filter((p) => p.bot).length;
 
   return (
-    <div className="absolute bottom-28 right-2 z-40 flex flex-col items-end gap-1 sm:bottom-32">
+    <div
+      ref={menuRef}
+      className="absolute bottom-28 right-2 z-40 flex flex-col items-end gap-1 sm:bottom-32"
+    >
       {open && (
-        <div className="flex flex-col items-stretch gap-1 rounded-lg border border-muted/30 bg-tablehi/95 p-1.5 shadow-lg">
-          {me && <Rebuy className="w-full" />}
+        <div
+          className={classNames(
+            "flex flex-col items-stretch gap-1 rounded-lg border border-muted/30 bg-tablehi/95 p-1.5 shadow-lg",
+            closing ? "animate-fade-out" : "animate-fade-in"
+          )}
+        >
+          {me && <Rebuy className="w-full justify-center" />}
           {me && (
             <button
               onClick={() => {
@@ -56,7 +96,7 @@ export default function RoomMenu() {
                 spectate(socket);
               }}
               className={classNames(
-                "btn w-full justify-start",
+                "btn w-full justify-center",
                 reservedSpectate
                   ? "btn-accent border border-amber-500"
                   : "btn-ghost"
@@ -72,7 +112,7 @@ export default function RoomMenu() {
               {t("spectate")}
             </button>
           )}
-          <RoomStats className="w-full justify-start" />
+          <RoomStats className="w-full justify-center" />
           {isHost && (
             <button
               onClick={() =>
@@ -88,21 +128,21 @@ export default function RoomMenu() {
               }
               aria-pressed={botMode}
               className={classNames(
-                "btn w-full justify-start",
+                "btn w-full justify-center",
                 botMode ? "btn-confirm" : "btn-ghost"
               )}
             >
               {botMode ? <FiCheck size="1rem" /> : <FiCpu size="1rem" />}
               {botMode ? t("botModeDone") : t("addBot")}
               {botCount > 0 && !botMode && (
-                <span className="type-caption ml-auto">🤖 {botCount}</span>
+                <span className="type-caption">🤖 {botCount}</span>
               )}
             </button>
           )}
         </div>
       )}
       <button
-        onClick={() => setOpen((o) => !o)}
+        onClick={() => (open ? close() : setOpen(true))}
         aria-expanded={open}
         title={t("more")}
         className={classNames(

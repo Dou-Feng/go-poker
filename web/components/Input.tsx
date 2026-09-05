@@ -75,66 +75,46 @@ export default function Input() {
     playerRaise(socket, player.stack);
   };
 
-  if (action) {
-    if (showRaise) {
-      return <RaiseInput setShowRaise={setShowRaise} showRaise={showRaise} />;
-    }
-    return (
-      <div className="pointer-events-auto flex w-full justify-center p-2 pb-4 sm:p-6">
-        <div className="flex flex-row flex-wrap items-center justify-center gap-1 rounded-2xl border-2 border-amber-300 bg-tablehi/80 p-2 shadow-lg sm:p-3">
-          <InputButton
-            action={() => handleCallOrCheck(appState.username)}
-            title={canCheck ? t("check") : t("call") + " (" + callAmount + ")"}
-            disabled={false}
-          />
-          {!callOnly && (
-            <InputButton
-              action={() => setShowRaise(!showRaise)}
-              title={t("bet")}
-              disabled={false}
-            />
-          )}
-          {!callOnly && (
-            <InputButton
-              action={() => handleAllIn(appState.username)}
-              title={t("allIn")}
-              disabled={false}
-            />
-          )}
-          <InputButton
-            action={() => handleFold(appState.username)}
-            title={t("fold")}
-            disabled={false}
-            danger
-          />
-        </div>
-      </div>
-    );
+  // The action bar exists only on the player's own turn; otherwise nothing is
+  // drawn (the glowing seat already shows whose turn it is).
+  if (!action) {
+    return null;
   }
-
+  if (showRaise) {
+    return <RaiseInput setShowRaise={setShowRaise} showRaise={showRaise} />;
+  }
   return (
-    <div className="pointer-events-auto flex w-full flex-row flex-wrap items-center justify-center gap-1 p-2 pb-4 sm:p-6">
-      <InputButton
-        action={() => handleCallOrCheck(appState.username)}
-        title={canCheck ? t("check") : t("call") + " (" + callAmount + ")"}
-        disabled={true}
-      />
-      <InputButton
-        action={() => setShowRaise(!showRaise)}
-        title={t("bet")}
-        disabled={true}
-      />
-      <InputButton
-        action={() => handleAllIn(appState.username)}
-        title={t("allIn")}
-        disabled={true}
-      />
-      <InputButton
-        action={() => handleFold(appState.username)}
-        title={t("fold")}
-        disabled={true}
-        danger
-      />
+    <div className="pointer-events-auto flex w-full justify-center p-2 pb-4 sm:p-6">
+      <div className="animate-fade-in flex flex-row flex-wrap items-center justify-center gap-1.5 rounded-xl border border-muted/30 bg-tablehi/95 p-2 shadow-lg ring-1 ring-amber-300/50 sm:gap-2 sm:p-3">
+        <InputButton
+          action={() => handleCallOrCheck(appState.username)}
+          title={canCheck ? t("check") : t("call") + " " + callAmount}
+          disabled={false}
+          variant="call"
+        />
+        {!callOnly && (
+          <InputButton
+            action={() => setShowRaise(!showRaise)}
+            title={t("bet")}
+            disabled={false}
+            variant="bet"
+          />
+        )}
+        {!callOnly && (
+          <InputButton
+            action={() => handleAllIn(appState.username)}
+            title={t("allIn")}
+            disabled={false}
+            variant="allin"
+          />
+        )}
+        <InputButton
+          action={() => handleFold(appState.username)}
+          title={t("fold")}
+          disabled={false}
+          variant="fold"
+        />
+      </div>
     </div>
   );
 }

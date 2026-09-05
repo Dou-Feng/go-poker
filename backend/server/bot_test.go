@@ -441,3 +441,56 @@ func TestBotIdentityCannotBeForged(t *testing.T) {
 		}
 	}
 }
+
+// Removing a bot and adding one again reuses the name and therefore the same
+// account, so the scoreboard shows a single "Bot Ace" row with both stints
+// merged rather than one row per add/remove cycle. In a tournament room a
+// name whose buy-ins are used up is skipped for the next name.
+func TestReaddedBotMergesIntoOneScoreboardRow(t *testing.T) {
+	tbl, _ := botTable(t)
+	seat(t, tbl, "acc-h", 1, false)
+
+	bot, err := tbl.addBot(0)
+	if err != nil {
+		t.Fatalf("add: %v", err)
+	}
+	// The bot loses half its stack, then the host removes it.
+	setChips(t, tbl, bot.uuid, 100, 200)
+	if _, err := tbl.removeBot(bot.uuid); err != nil {
+		t.Fatalf("remove: %v", err)
+	}
+	again, err := tbl.addBot(0)
+	if err != nil {
+		t.Fatalf("re-add: %v", err)
+	}
+	if again.username != "Bot Ace" || again.accountUUID != bot.accountUUID {
+		t.Fatalf("re-added bot must reuse name and account: %q %q", again.username, again.accountUUID)
+	}
+
+	rows := settlementRows(tbl.game.GenerateOmniView())
+	aces := 0
+	for _, r := range rows {
+		if r.Username == "Bot Ace" {
+			aces++
+			if r.BuyIn != 400 || r.Net != -100 {
+				t.Fatalf("both stints must merge (400 in, 100 lost so far): %+v", r)
+			}
+		}
+	}
+	if aces != 1 {
+		t.Fatalf("want exactly one Bot Ace row, got %d in %+v", aces, rows)
+	}
+
+	// Tournament cap (default 400) is now used up for "Bot Ace" after its two
+	// buy-ins: remove it and the next bot gets the next name instead.
+	if _, err := tbl.removeBot(again.uuid); err != nil {
+		t.Fatalf("remove again: %v", err)
+	}
+	next, err := tbl.addBot(0)
+	if err != nil {
+		t.Fatalf("add next: %v", err)
+	}
+	if next.username != "Bot Bella" {
+		t.Fatalf("exhausted name must be skipped, got %q", next.username)
+	}
+}

@@ -199,6 +199,38 @@ body {
   .btn-icon {
     @apply border border-muted/30 px-2 py-1 text-xs text-muted hover:text-ink;
   }
+
+  /* ---- Game action keys (call / bet / all-in / fold) ----
+     Same surface ladder and radius as `btn`, but a taller touch target and
+     one filled colour per action. Only shown on the player's turn. */
+  .action-key {
+    @apply inline-flex min-w-[4.5rem] items-center justify-center rounded-md px-3 py-2.5 text-sm font-semibold text-ink shadow transition-colors disabled:cursor-not-allowed disabled:opacity-40 sm:min-w-[6rem] sm:px-4 sm:py-3 sm:text-base;
+  }
+
+  /* Check / call: the safe, confirming move. */
+  .action-key-call {
+    @apply bg-emerald-600 hover:bg-emerald-500;
+  }
+
+  /* Bet / raise: primary brand accent. */
+  .action-key-bet {
+    @apply bg-cyan-800 hover:bg-cyan-700;
+  }
+
+  /* All-in: chip amber, like the money surfaces. */
+  .action-key-allin {
+    @apply bg-amber-600 hover:bg-amber-500;
+  }
+
+  /* Fold: destructive, outlined so it never looks like the default choice. */
+  .action-key-fold {
+    @apply border border-rose-600 bg-transparent text-rose-400 hover:bg-rose-600 hover:text-ink;
+  }
+
+  /* Secondary key inside the raise panel (close). */
+  .action-key-neutral {
+    @apply bg-floor text-muted hover:bg-cardhi hover:text-ink;
+  }
 }
 
 /* ---- Typography ----
@@ -312,6 +344,21 @@ input[type="number"] {
 
 .animate-winner-pop {
   animation: winner-pop 0.5s ease-out;
+}
+
+@keyframes fade-out {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+.animate-fade-out {
+  animation: fade-out 0.16s ease-in forwards;
 }
 
 .animate-fade-in {

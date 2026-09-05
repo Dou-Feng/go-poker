@@ -13,10 +13,9 @@ type raiseProps = {
   showRaise: boolean;
   setShowRaise: React.Dispatch<React.SetStateAction<boolean>>;
 };
+// Quick-amount chips (min / ½ pot / ¾ pot / pot): flat toolbar buttons.
 function button() {
-  return classNames(
-    "mx-0.5 my-1 rounded-xl border border-2 border-muted/30 bg-card px-3 py-2 text-base text-ink hover:bg-cardhi font-normal sm:px-4 sm:py-2 sm:text-lg"
-  );
+  return classNames("btn btn-secondary px-2.5 py-1 text-xs sm:text-sm");
 }
 
 export default function RaiseInput({ showRaise, setShowRaise }: raiseProps) {
@@ -76,71 +75,78 @@ export default function RaiseInput({ showRaise, setShowRaise }: raiseProps) {
   };
 
   return (
-    <div className="pointer-events-auto flex w-full flex-row flex-wrap items-center justify-center gap-1 rounded-2xl bg-tablehi/80 p-2 shadow-lg sm:p-6">
-      <div className="mx-1 flex flex-col items-center justify-center rounded-sm border border-2 border-muted/30 bg-tablehi/90 px-2">
-        <div className="my-1 flex items-center justify-center gap-1.5 text-xl font-semibold text-amber-300 sm:text-2xl">
-          <Chip className="h-5 w-5 sm:h-6 sm:w-6" />
-          <span className="font-mono leading-none">{inputValue}</span>
+    <div className="pointer-events-auto flex w-full justify-center p-2 pb-4 sm:p-6">
+      <div className="animate-fade-in flex flex-row flex-wrap items-center justify-center gap-2 rounded-xl border border-muted/30 bg-tablehi/95 p-2 shadow-lg ring-1 ring-amber-300/50 sm:gap-3 sm:p-3">
+        <div className="flex flex-col items-center justify-center gap-1.5 rounded-lg bg-card px-3 py-2">
+          <div className="flex items-center justify-center gap-1.5 text-xl font-semibold text-amber-300 sm:text-2xl">
+            <Chip className="h-5 w-5 sm:h-6 sm:w-6" amount={inputValue} />
+            <span className="type-num leading-none">{inputValue}</span>
+          </div>
+          <div className="flex flex-row flex-wrap items-center justify-center gap-1">
+            <button
+              className={button()}
+              onClick={() =>
+                setInputValue(betValidator(minRaise, minRaise, allInTotal))
+              }
+            >
+              {t("min")}
+            </button>
+            <button
+              className={button()}
+              onClick={() =>
+                setInputValue(betValidator(half, minRaise, allInTotal))
+              }
+            >
+              {t("halfPot")}
+            </button>
+            <button
+              className={button()}
+              onClick={() =>
+                setInputValue(betValidator(threeQuarter, minRaise, allInTotal))
+              }
+            >
+              {t("threeQuarterPot")}
+            </button>
+            <button
+              className={button()}
+              onClick={() =>
+                setInputValue(betValidator(full, minRaise, allInTotal))
+              }
+            >
+              {t("pot")}
+            </button>
+          </div>
+          <div className="w-44 pb-1 sm:w-72">
+            <Slider
+              value={inputValue}
+              onChange={setInputValue}
+              min={minRaise}
+              max={allInTotal}
+              step={1}
+              color="cyan"
+              showLabelOnHover={false}
+              size="md"
+              radius="xl"
+            />
+          </div>
         </div>
-        <div className="flex flex-row flex-wrap items-center justify-center">
-          <button
-            className={button()}
-            onClick={() =>
-              setInputValue(betValidator(minRaise, minRaise, allInTotal))
+        <div className="flex flex-col gap-1.5">
+          <InputButton
+            action={() =>
+              handleRaise(appState.username, inputValue - currentBet)
             }
-          >
-            {t("min")}
-          </button>
-          <button
-            className={button()}
-            onClick={() =>
-              setInputValue(betValidator(half, minRaise, allInTotal))
-            }
-          >
-            {t("halfPot")}
-          </button>
-          <button
-            className={button()}
-            onClick={() =>
-              setInputValue(betValidator(threeQuarter, minRaise, allInTotal))
-            }
-          >
-            {t("threeQuarterPot")}
-          </button>
-          <button
-            className={button()}
-            onClick={() =>
-              setInputValue(betValidator(full, minRaise, allInTotal))
-            }
-          >
-            {t("pot")}
-          </button>
-        </div>
-        <div className="w-40 pb-2 sm:w-72">
-          <Slider
-            value={inputValue}
-            onChange={setInputValue}
-            min={minRaise}
-            max={allInTotal}
-            step={1}
-            color="gray"
-            showLabelOnHover={false}
-            size="md"
-            radius="xs"
+            title={isAllIn ? t("allIn") : t("bet")}
+            disabled={inputValue < minRaise || inputValue > allInTotal}
+            variant={isAllIn ? "allin" : "bet"}
+          />
+          <InputButton
+            action={() => setShowRaise(!showRaise)}
+            title={t("close")}
+            disabled={false}
+            variant="neutral"
           />
         </div>
       </div>
-      <InputButton
-        action={() => handleRaise(appState.username, inputValue - currentBet)}
-        title={isAllIn ? t("allIn") : t("bet")}
-        disabled={inputValue < minRaise || inputValue > allInTotal}
-      />
-      <InputButton
-        action={() => setShowRaise(!showRaise)}
-        title={t("close")}
-        disabled={false}
-        danger
-      />
     </div>
   );
 }

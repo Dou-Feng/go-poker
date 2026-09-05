@@ -145,7 +145,7 @@ export default function Game() {
         <Wallet />
         {me && game && (
           <div className="inline-flex w-20 flex-row items-center justify-between rounded-md bg-card/90 px-2.5 py-1 text-sm text-amber-300">
-            <Chip className="h-4 w-4" />
+            <Chip className="h-4 w-4" amount={me.stack} />
             <span className="type-num leading-none">{me.stack}</span>
           </div>
         )}
@@ -159,7 +159,7 @@ export default function Game() {
         <Wallet />
         {me && game && (
           <div className="inline-flex w-20 flex-row items-center justify-between rounded-md bg-card/90 px-2.5 py-1 text-sm text-amber-300 shadow">
-            <Chip className="h-4 w-4" />
+            <Chip className="h-4 w-4" amount={me.stack} />
             <span className="type-num leading-none">{me.stack}</span>
           </div>
         )}

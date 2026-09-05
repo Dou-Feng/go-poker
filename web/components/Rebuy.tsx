@@ -86,7 +86,7 @@ export default function Rebuy({ className }: rebuyProps) {
           setAmount(0);
           setShow((s) => !s);
         }}
-        className={classNames("btn btn-ghost justify-start", className)}
+        className={classNames("btn btn-ghost", className)}
       >
         <PlusIcon className="h-4 w-4" />
         {t("rebuy")}

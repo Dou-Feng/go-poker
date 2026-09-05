@@ -1,36 +1,32 @@
 import { MouseEventHandler } from "react";
 import classNames from "classnames";
 
+// Game action keys (call / bet / all-in / fold). They are deliberately their
+// own small system (see `.action-key*` in styles/index.css) rather than the
+// toolbar `btn` variants: same surface ladder and radius, but bigger touch
+// targets and one colour per action so the bar reads at a glance.
+export type ActionVariant = "call" | "bet" | "allin" | "fold" | "neutral";
+
 type buttonProps = {
   action: MouseEventHandler<HTMLButtonElement>;
   title: string;
   disabled: boolean;
+  variant?: ActionVariant;
+  /** Legacy alias for variant="fold". */
   danger?: boolean;
-};
-
-const getAction = (danger: boolean, disabled: boolean) => {
-  return classNames(
-    {
-      "text-rose-600 border-rose-600 font-semibold": danger,
-      "text-emerald-500 border-emerald-500 font-normal": !danger,
-      "opacity-20 ": disabled,
-    },
-
-    "mx-0.5 rounded-xl border-2 px-2.5 py-2 text-base sm:px-3 sm:text-lg"
-  );
 };
 
 export default function InputButton({
   action,
   title,
   disabled,
+  variant,
   danger = false,
 }: buttonProps) {
-  if (disabled) {
-    return <div className={getAction(danger, disabled)}>{title}</div>;
-  }
+  const v: ActionVariant = variant ?? (danger ? "fold" : "call");
+  const className = classNames("action-key", `action-key-${v}`);
   return (
-    <button className={getAction(danger, disabled)} onClick={action}>
+    <button className={className} onClick={action} disabled={disabled}>
       {title}
     </button>
   );

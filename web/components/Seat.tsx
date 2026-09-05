@@ -53,8 +53,8 @@ export function useHandLabel() {
 function chipPosition(id: number) {
   return classNames(
     {
-      // The chip (bet amount / dealer) sits on the side of the seat that
-      // faces the table center.
+      // The dealer button and the showdown hand label sit on the side of the
+      // seat that faces the table center (the bet amount sits under the seat).
       "left-1/2 -translate-x-1/2 -top-9 flex-row": id === 1, // bottom
       "right-1 -top-9 flex-row": id === 2, // bottom-left
       "right-1 top-full mt-1 flex-col": id === 3, // top-left
@@ -221,7 +221,10 @@ export default function Seat({ player, id, visualId, reveal }: seatProps) {
                   {player.username}
                 </p>
                 <div className="flex flex-row items-center gap-1">
-                  <Chip className="h-4 w-4 sm:h-5 sm:w-5" />
+                  <Chip
+                    className="h-4 w-4 sm:h-5 sm:w-5"
+                    amount={player.stack}
+                  />
                   <p className="type-num text-base text-amber-300 sm:text-lg">
                     {player.stack}
                   </p>
@@ -275,7 +278,7 @@ export default function Seat({ player, id, visualId, reveal }: seatProps) {
                 {player.username}
               </p>
               <div className="flex flex-row items-center gap-1">
-                <Chip className="h-4 w-4 sm:h-5 sm:w-5" />
+                <Chip className="h-4 w-4 sm:h-5 sm:w-5" amount={player.stack} />
                 <p className="type-num text-base text-amber-300 sm:text-lg">
                   {player.stack}
                 </p>
@@ -307,19 +310,24 @@ export default function Seat({ player, id, visualId, reveal }: seatProps) {
             {player.ready ? t("cancelReady") : t("ready")}
           </button>
         )}
+        {/* This street's bet, directly under the seat (same spot on every
+            seat), as a chip plus amount. */}
+        {running && player.bet !== 0 && (
+          <div className="flex w-full justify-center">
+            <div
+              key={player.bet}
+              className="animate-chip-pop mt-1 inline-flex items-center gap-1 rounded-full border border-amber-300/40 bg-black/40 px-2 py-0.5 text-sm font-semibold text-amber-300 sm:text-base"
+            >
+              <Chip className="h-3.5 w-3.5 sm:h-4 sm:w-4" amount={player.bet} />
+              <span className="type-num leading-none">{player.bet}</span>
+            </div>
+          </div>
+        )}
         <div className={chipPosition(visualId ?? id)}>
           {running && game.dealer == player.position && (
             <div className="mx-0.5 my-0.5 flex h-5 w-6 items-center justify-center text-sm sm:mx-1 sm:my-1 sm:h-7 sm:w-8 sm:text-xl">
               🔔
             </div>
-          )}
-          {player.bet !== 0 && (
-            <p
-              key={player.bet}
-              className="animate-chip-pop flex h-6 w-9 items-center justify-center rounded-3xl bg-amber-300 text-sm font-semibold text-brand sm:h-8 sm:w-12 sm:text-xl"
-            >
-              {player.bet}
-            </p>
           )}
           {/* Best hand at showdown: shown on the table-facing side of the
               seat (same spot as chips), only for players whose cards are
