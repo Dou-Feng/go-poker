@@ -209,6 +209,8 @@ body {
   .action-key {
     @apply inline-flex h-12 min-w-[5.5rem] items-center justify-center gap-1.5 rounded-[14px] border px-4 text-sm font-semibold shadow-md transition disabled:cursor-not-allowed disabled:opacity-40 sm:h-14 sm:min-w-[7rem] sm:px-5 sm:text-base;
     border-color: rgba(212, 161, 27, 0.35);
+    color: #f8fafc;
+    text-shadow: 0 1px 1px rgba(0, 0, 0, 0.45);
     background-image: linear-gradient(
       180deg,
       rgba(255, 255, 255, 0.08) 0%,
@@ -229,34 +231,34 @@ body {
   /* Check / call: grey-blue, the safe secondary move. */
   .action-key-call {
     background-color: #3b4a5c;
-    color: #e8edf1;
+    color: #f4f7fa;
   }
 
   /* Bet / raise: gold-brown, the primary move. */
   .action-key-bet {
     background-color: #7a5a1f;
-    color: #fbe9b7;
+    color: #fff4d6;
     border-color: rgba(241, 199, 90, 0.55);
   }
 
   /* All-in: orange-gold, the high-risk move. */
   .action-key-allin {
     background-color: #c2601a;
-    color: #fff3e0;
+    color: #fff8ee;
     border-color: rgba(255, 200, 120, 0.6);
   }
 
   /* Fold: dark red (never bright), the give-up move; it sits on its own row. */
   .action-key-fold {
     background-color: #5a1f24;
-    color: #f5c2c7;
+    color: #ffd9dd;
     border-color: rgba(190, 60, 70, 0.5);
   }
 
   /* Secondary key inside the raise panel (close). */
   .action-key-neutral {
     background-color: #262f38;
-    color: #8996a3;
+    color: #d5dce4;
   }
 }
 

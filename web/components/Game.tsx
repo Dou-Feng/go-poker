@@ -123,6 +123,13 @@ export default function Game() {
       <div className="absolute left-1 top-[46%] z-20 -translate-y-1/2 sm:hidden">
         <ChatLog compact />
       </div>
+      {/* Phones: the room name stays bottom-left, just above the action
+          area (desktop shows it in the chat tab row). */}
+      {appState.table && (
+        <div className="pointer-events-none absolute bottom-44 left-0 z-10 px-2 sm:hidden">
+          <p className="text-sm font-medium text-muted">{appState.table}</p>
+        </div>
+      )}
       {/* Leave / surrender buttons, anchored at the very top-left. On phones
           the surrender button stacks under the leave button (both flush
           left); the narrow column stays clear of the centred hands pill,

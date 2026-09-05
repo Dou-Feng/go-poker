@@ -88,11 +88,6 @@ export default function ChatLog({ compact = false }: chatLogProps) {
           >
             <FiList size="1rem" />
           </button>
-          {appState.table && (
-            <span className="max-w-[4.5rem] truncate text-[10px] text-muted">
-              {appState.table}
-            </span>
-          )}
         </div>
         {open && (
           <Portal>
