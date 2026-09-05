@@ -140,6 +140,20 @@ export default function Settings() {
                       className={sliderClass}
                     />
                   </div>
+                  <div className="flex flex-row items-center justify-between">
+                    <p className="text-sm text-ink">{t("echoCancellation")}</p>
+                    <button
+                      onClick={() =>
+                        void voice.setEchoCancellation(!v.echoCancellation)
+                      }
+                      role="switch"
+                      aria-checked={v.echoCancellation}
+                      title={t("echoCancellationHint")}
+                      className={optionButton(v.echoCancellation)}
+                    >
+                      {v.echoCancellation ? t("on") : t("off")}
+                    </button>
+                  </div>
                 </div>
               )}
             </div>

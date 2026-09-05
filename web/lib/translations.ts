@@ -163,6 +163,11 @@ export const translations = {
     speakerOff: "Voice off — tap to listen",
     micVolume: "Mic input volume",
     othersVolume: "Others' voice volume",
+    echoCancellation: "Echo cancellation",
+    echoCancellationHint:
+      "Browser acoustic echo cancellation. Keep on with speakers; try off with a headset if your voice sounds clipped.",
+    on: "On",
+    off: "Off",
     muteMicFor: "Mute this player for me",
     unmuteMicFor: "Unmute this player",
     micDenied: "microphone unavailable — check browser permissions",
@@ -333,6 +338,11 @@ export const translations = {
     speakerOff: "语音已关 — 点击收听他人",
     micVolume: "麦克风输入音量",
     othersVolume: "他人语音音量",
+    echoCancellation: "回声消除",
+    echoCancellationHint:
+      "浏览器自带的声学回声消除。用外放请保持开启；戴耳机时若声音被削可尝试关闭。",
+    on: "开",
+    off: "关",
     muteMicFor: "屏蔽此人语音（仅对我）",
     unmuteMicFor: "取消屏蔽此人语音",
     micDenied: "无法使用麦克风，请检查浏览器权限",

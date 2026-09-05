@@ -42,6 +42,12 @@ export type VoiceState = {
   outputVolume: number;
   /** Account UUIDs whose voice this client has muted locally. */
   mutedPeers: string[];
+  /**
+   * Whether the browser's acoustic echo cancellation is requested on the
+   * mic. On by default; turning it off can help with a headset when the
+   * canceller clips speech, and hurts badly on speakers.
+   */
+  echoCancellation: boolean;
   peers: Record<string, VoicePeer>;
   /** Pending user-facing error (a translation key); cleared with clearError. */
   error: TranslationKey | null;
@@ -76,12 +82,15 @@ type StoredSettings = {
   micVolume: number;
   outputVolume: number;
   mutedPeers: string[];
+  /** Browser acoustic echo cancellation on the mic (default on). */
+  echoCancellation: boolean;
 };
 
 const DEFAULT_SETTINGS: StoredSettings = {
   micVolume: 1,
   outputVolume: 1,
   mutedPeers: [],
+  echoCancellation: true,
 };
 
 function clamp01(v: number): number {
@@ -104,6 +113,7 @@ function loadSettings(): StoredSettings {
       mutedPeers: Array.isArray(parsed.mutedPeers)
         ? parsed.mutedPeers.filter((p) => typeof p === "string")
         : [],
+      echoCancellation: parsed.echoCancellation !== false,
     };
   } catch {
     return DEFAULT_SETTINGS;
@@ -184,6 +194,7 @@ class VoiceManager {
       micVolume: settings.micVolume,
       outputVolume: settings.outputVolume,
       mutedPeers: settings.mutedPeers,
+      echoCancellation: settings.echoCancellation,
       peers: {},
       error: null,
     };
@@ -396,6 +407,33 @@ class VoiceManager {
     this.persist();
   }
 
+  /**
+   * Toggle the browser's echo cancellation. The constraint is fixed when the
+   * mic is opened, so a live mic is reopened with the new setting and the
+   * fresh track swapped into every sender (no renegotiation: the transceiver
+   * direction does not change).
+   */
+  async setEchoCancellation(on: boolean): Promise<void> {
+    if (on === this.state.echoCancellation) {
+      return;
+    }
+    this.state = { ...this.state, echoCancellation: on };
+    this.persist();
+    if (this.state.micOn) {
+      this.releaseMic();
+      if (!(await this.startMic())) {
+        // Reopening failed (permission revoked meanwhile): drop the mic
+        // state so the button reflects reality.
+        this.state = { ...this.state, micOn: false };
+        this.peers.forEach((p) => this.applyMicToPeer(p));
+        this.syncPresence(true);
+      } else {
+        this.peers.forEach((p) => this.applyMicToPeer(p));
+      }
+    }
+    this.emit();
+  }
+
   private persist() {
     if (typeof window === "undefined") {
       return;
@@ -404,6 +442,7 @@ class VoiceManager {
       micVolume: this.state.micVolume,
       outputVolume: this.state.outputVolume,
       mutedPeers: this.state.mutedPeers,
+      echoCancellation: this.state.echoCancellation,
     };
     try {
       window.localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
@@ -728,9 +767,12 @@ class VoiceManager {
     }
     let raw: MediaStream;
     try {
+      // Echo cancellation, noise suppression and automatic gain are the
+      // browser's own WebRTC audio processing (Chrome: AEC3); we only ask
+      // for them. Echo cancellation is user-toggleable (Settings).
       raw = await navigator.mediaDevices.getUserMedia({
         audio: {
-          echoCancellation: true,
+          echoCancellation: this.state.echoCancellation,
           noiseSuppression: true,
           autoGainControl: true,
         },
@@ -780,7 +822,8 @@ class VoiceManager {
     return true;
   }
 
-  private stopMic() {
+  /** Release the microphone hardware and the processing graph. */
+  private releaseMic() {
     if (this.rawStream) {
       this.rawStream.getTracks().forEach((t) => t.stop());
       this.rawStream = null;
@@ -794,6 +837,11 @@ class VoiceManager {
       this.micCtx = null;
     }
     this.micGain = null;
+  }
+
+  /** Release the mic and stop sending to every peer (direction → recvonly). */
+  private stopMic() {
+    this.releaseMic();
     this.peers.forEach((p) => this.applyMicToPeer(p));
   }
 
