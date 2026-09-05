@@ -100,10 +100,9 @@ export default function Card({ card, placeholder, folded, hidden }: cardProps) {
     );
   }
 
-  const c = cardToString(card);
-  if (!c) {
-    return null;
-  }
+  // A hidden card renders its back no matter whether the value parses:
+  // censored hole cards arrive as 0 (see GameView.CensorFor), which has no
+  // valid suit, but the back must still be drawn.
   if (hidden) {
     if (folded) {
       return (
@@ -121,6 +120,10 @@ export default function Card({ card, placeholder, folded, hidden }: cardProps) {
         }
       ></div>
     );
+  }
+  const c = cardToString(card);
+  if (!c) {
+    return null;
   }
   if (folded) {
     return (

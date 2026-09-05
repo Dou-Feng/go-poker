@@ -159,8 +159,8 @@ export default function Seat({ player, id, visualId, reveal }: seatProps) {
           {running ? (
             <>
               <div className="flex flex-row items-center justify-center">
-                {player.cards.map((c) => (
-                  <div key={c} className="mx-0.5">
+                {player.cards.map((c, i) => (
+                  <div key={`${i}-${c}`} className="mx-0.5">
                     <Card
                       card={c}
                       placeholder={false}
