@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -264,17 +265,61 @@ func (t *table) unregisterClient(client *Client) {
 	}
 }
 
+// broadcastToClients fans one Redis-consumed message out to every connected
+// client. update-game payloads carry the uncensored view (the Redis channel is
+// internal); here, at the last hop, each client gets its own copy with every
+// hole card it is not entitled to see removed — the censoring works from the
+// snapshot inside the payload, not the live game, so clients always see
+// exactly the state as it was broadcast.
 func (t *table) broadcastToClients(message []byte) {
 	t.clientsMu.Lock()
 	defer t.clientsMu.Unlock()
+
+	var game *updateGame
+	var header base
+	if err := json.Unmarshal(message, &header); err == nil && header.Action == actionUpdateGame {
+		var g updateGame
+		if err := json.Unmarshal(message, &g); err == nil && g.Game != nil {
+			game = &g
+		}
+	}
+
 	for client := range t.clients {
+		out := message
+		if game != nil {
+			out = game.censoredFor(client.uuid)
+			if out == nil {
+				// Marshal failure: skip rather than fall back to the
+				// uncensored payload.
+				continue
+			}
+		}
 		select {
-		case client.send <- message:
+		case client.send <- out:
 		default:
 			close(client.send)
 			delete(t.clients, client)
 		}
 	}
+}
+
+// censoredFor rewrites the update-game message's view for one viewer, hiding
+// every hole card they may not see (see GameView.CensorFor). It returns nil if
+// the personalized copy cannot be marshaled.
+func (m *updateGame) censoredFor(viewerUUID string) []byte {
+	game := updateGame{
+		base:        m.base,
+		Game:        m.Game.CensorFor(m.Game.ViewerNum(viewerUUID)),
+		Waiting:     m.Waiting,
+		SettleVotes: m.SettleVotes,
+	}
+
+	resp, err := json.Marshal(game)
+	if err != nil {
+		slog.Default().Warn("Marshal censored update game", "error", err)
+		return nil
+	}
+	return resp
 }
 
 // info returns a lightweight description of the table for the lobby.

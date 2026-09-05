@@ -1088,10 +1088,29 @@ func createNewLog(message string) []byte {
 	return resp
 }
 
+// createUpdatedGame builds an update-game message for a single client, with
+// the view censored for their seat (a spectator's uuid matches no seat and
+// yields the spectator view).
 func createUpdatedGame(c *Client) []byte {
-	return createUpdatedGameBytes(c.table)
+	view := c.table.game.GenerateOmniView()
+	game := updateGame{
+		base{actionUpdateGame},
+		view.CensorFor(view.ViewerNum(c.uuid)),
+		c.table.waitingUsernames(),
+		c.table.settleVoteList(),
+	}
+
+	resp, err := json.Marshal(game)
+	if err != nil {
+		slog.Default().Warn("Marshal update game", "error", err)
+	}
+	return resp
 }
 
+// createUpdatedGameBytes builds the uncensored (omni) update-game payload for
+// the broadcast channel. It is only ever published to the table's internal
+// Redis channel; the per-client censoring happens at the fan-out
+// (table.broadcastToClients), never on the socket.
 func createUpdatedGameBytes(t *table) []byte {
 	game := updateGame{
 		base{actionUpdateGame},

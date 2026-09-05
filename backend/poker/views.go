@@ -116,81 +116,74 @@ func (g *Game) GeneratePlayerView(pn uint) *GameView {
 	gv := g.copyToView()
 	gv.Deck = nil
 
-	// D. R. Y.!
-	hideCards := func(pn2 uint) { gv.Players[pn2].Cards = [2]eval.Card{0, 0} }
-	showCards := func(pn2 uint) { gv.Players[pn2].Cards = [2]eval.Card{g.players[pn2].Cards[0], g.players[pn2].Cards[1]} }
+	return gv.CensorFor(pn)
+}
 
-	allInCount := 0
-	inCount := 0
-
-	for i, p := range g.players {
-		if uint(i) != pn {
-			hideCards(uint(i))
-		} else {
-			if !g.players[pn].In {
-				hideCards(uint(i))
-			}
-		}
-
-		if p.allIn() {
-			allInCount++
-		}
-
-		if p.In {
-			inCount++
-		}
-
-	}
-
-	// If in a heads-up situation
-	if allInCount == inCount {
-		for i, p := range g.players {
-			if p.In {
-				showCards(uint(i))
-			}
+// ViewerNum returns the player number of the seat held by viewerUUID, or a
+// value outside the player list for spectators and unknown viewers.
+func (gv *GameView) ViewerNum(viewerUUID string) uint {
+	for i := range gv.Players {
+		if gv.Players[i].UUID == viewerUUID {
+			return uint(i)
 		}
 	}
+	return uint(len(gv.Players))
+}
 
-	if g.getStage() == NotReady && inCount > 1 {
+// CensorFor returns a copy of gv showing only the hole cards the viewer pn is
+// entitled to see: their own cards while they still hold them, cards flagged
+// Revealed (a voluntary show, or an all-in player who left), and — once the
+// hand reaches the showdown stage — every player eligible for a contested pot.
+// The showdown set mirrors the clients' reveal logic (getRevealedPlayers in
+// web/components/Table.tsx): a pot only contested by one player reveals
+// nothing. A pn outside the player list (spectator) sees only revealed cards.
+// Departed players' cards are always hidden.
+func (gv *GameView) CensorFor(pn uint) *GameView {
+	out := *gv
+	out.Players = append([]player{}, gv.Players...)
+	out.DepartedPlayers = append([]player{}, gv.DepartedPlayers...)
 
-		showCards(g.calledNum)
-		_, scoreToBeat := eval.BestFiveOfSeven(
-			g.players[g.calledNum].Cards[0],
-			g.players[g.calledNum].Cards[1],
-			g.communityCards[0],
-			g.communityCards[1],
-			g.communityCards[2],
-			g.communityCards[3],
-			g.communityCards[4],
-		)
-
-		for i := range g.players {
-			pni := (g.calledNum + uint(i)) % uint(len(g.players))
-			_, iScore := eval.BestFiveOfSeven(
-				g.players[pni].Cards[0],
-				g.players[pni].Cards[1],
-				g.communityCards[0],
-				g.communityCards[1],
-				g.communityCards[2],
-				g.communityCards[3],
-				g.communityCards[4],
-			)
-
-			if (iScore <= scoreToBeat) && g.players[pni].In {
-				showCards(pni)
-				scoreToBeat = iScore
+	// Reveal the showdown participants only when at least one pot was
+	// actually contested (side pots may have different eligible players).
+	showdown := gv.Stage == Showdown
+	if showdown {
+		contested := false
+		for _, pot := range gv.Pots {
+			if len(pot.EligiblePlayerNums) > 1 {
+				contested = true
+				break
 			}
 		}
+		showdown = contested
+	}
 
-		for _, pot := range g.pots {
-
-			for _, j := range pot.WinningPlayerNums {
-				showCards(j)
-			}
+	for i := range out.Players {
+		p := &out.Players[i]
+		holdsCards := p.Cards[0] != 0 || p.Cards[1] != 0
+		visible := p.Revealed ||
+			(uint(i) == pn && holdsCards) ||
+			(showdown && eligibleForAnyPot(gv.Pots, p.Position))
+		if !visible {
+			p.Cards = [2]eval.Card{0, 0}
 		}
 	}
 
-	return gv
+	for i := range out.DepartedPlayers {
+		out.DepartedPlayers[i].Cards = [2]eval.Card{0, 0}
+	}
+
+	return &out
+}
+
+func eligibleForAnyPot(pots []Pot, position uint) bool {
+	for _, pot := range pots {
+		for _, num := range pot.EligiblePlayerNums {
+			if num == position {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // GenerateOmniView is primarily for creating a view that can be serialized for delivery to a persistance layer, like a db or in-memory store

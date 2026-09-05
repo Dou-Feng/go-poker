@@ -93,6 +93,6 @@ The only HTTP API besides `/ws` and `/ping` is `/api/avatar` (POST multipart upl
 ## Working notes
 
 - `change.md` is the product owner's feature checklist (Chinese) and the source of truth for intended behaviour; its 「状态」 sections define the two state machines above. Check it before changing game flow.
-- `GenerateOmniView()` is what the server broadcasts, so every client currently receives every hole card. `GeneratePlayerView(pn)` exists for per-player censoring but is unused.
+- Hole cards are censored per recipient: `GameView.CensorFor(pn)` (views.go) keeps only the viewer's own cards, `Revealed` players, and — at stage `Showdown` — players eligible for a contested pot (mirroring `getRevealedPlayers` in `web/components/Table.tsx`). The omni view travels only on the internal Redis channel; `table.broadcastToClients` censors each client's copy at the last hop, and `createUpdatedGame` censors unicast sends. Any new message type that carries a `GameView` must go through the same censoring.
 - `Game.AddPlayer`, `Game.Start`, and `Game.Reset` mutate state without taking `g.mtx`; other exported entry points do lock.
 - The server deducts buy-ins from the wallet in `events.go` before calling `poker.BuyIn`; if you add a new seating path (see `seatQueuedClient` in `table.go` for the pattern), keep wallet debit, `SetAccountUUID`, `SetUsername`, `SetAvatar`, `BuyIn`, `SetSeatID` in that order because `SetSeatID` re-sorts players and invalidates `position`.
