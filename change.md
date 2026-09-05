@@ -187,6 +187,17 @@
 
 - [x] 保护服务器不受攻击（SYN flood / 拒绝服务等）。应用层（`backend/server/guard.go`，默认开启、`.env` 可调）：http.Server 超时（ReadHeader 10s / Read 30s / Write 60s / Idle 120s、16KiB 头上限）防 slowloris；每 IP HTTP 令牌桶限速（`RATE_HTTP_RPS`，超限 429）；WebSocket 每 IP / 全局连接数上限（`MAX_CONNS_PER_IP` / `MAX_CONNS`，握手前即拒绝）；每连接消息速率（`RATE_WS_MSGS`，超限以 1008 关闭）；登录/注册每 IP 每分钟尝试次数（`RATE_AUTH_PER_MIN`，防爆破）；房间数量上限（`MAX_TABLES`，防刷房耗尽内存）；WebSocket Origin 白名单（`ALLOWED_ORIGINS`）；代理头仅在 `TRUST_PROXY=true` 时采信，防伪造 IP；空闲 IP 记录 10 分钟后回收。内核/网络层（SYN flood 到不了用户态）：`deploy/sysctl-hardening.conf`（SYN cookies、backlog、重试次数、orphan/conntrack 上限等）+ `deploy/HARDENING.md`（nftables/ufw 限速示例、CDN 建议、公网上线清单）。UT：`backend/server/guard_test.go`（令牌桶补充/上限、429 按 IP 隔离与恢复、代理头信任、连接数上限与释放、登录限流、Origin 匹配、环境变量解析、空闲回收、房间上限）。
 
+## bug
+
+* 当房间的牌局进行中，并且所有玩家都退出了房间，那么房间就进入了一种“dangle”状态，新人加入之后可以选择“加入下一局”，在长时间等待之后，房间就会被解散。
+
+
+
+## to list
+
+* 语音功能，我们应该把设置按钮也搬到房间界面，并且加入语音输入音量和其他人的麦克风音量的滚动条，然后在房间加入两个按钮，分别是麦克风和喇叭（已经上传在了public中）来控制是否打开麦克风（默认关闭），喇叭来控制是否听取其他人的语音（默认关闭），然后我们在每个人的profile中加入一个麦克风按钮，来单独禁止它的麦克风（这个麦克风只是对自己而言，房间里的其他人依然能够听见）。需要考虑PC端和手机端的界面的排列问题。
+
+* 用户点击玩家的头像进入profile窗口之后应该添加一个“+”的按钮，表示添加好友。
 
 ## 状态
 
