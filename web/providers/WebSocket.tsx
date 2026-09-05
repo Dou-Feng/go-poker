@@ -17,8 +17,11 @@ import {
 } from "../interfaces";
 import {
   clearSession,
+  clearTabAuth,
   clearUser,
   loadSession,
+  loadUsername,
+  markTabAuth,
   saveSession,
   saveUser,
   saveUsername,
@@ -156,7 +159,19 @@ export function SocketProvider(props: SocketProviderProps) {
             return;
           case "update-player-uuid":
             dispatch({ type: "updatePlayerID", payload: event.uuid });
-            {
+            if (event.tablename) {
+              // The server handed us a seat we did not join ourselves (a
+              // session takeover or an orphaned-seat claim): own the room in
+              // the app state and persist the session so a refresh restores
+              // it.
+              dispatch({ type: "setTablename", payload: event.tablename });
+              const existing = loadSession();
+              saveSession({
+                username: existing?.username ?? loadUsername() ?? "",
+                table: event.tablename,
+                clientID: event.uuid,
+              });
+            } else {
               const existing = loadSession();
               if (existing) {
                 saveSession({ ...existing, clientID: event.uuid });
@@ -167,6 +182,7 @@ export function SocketProvider(props: SocketProviderProps) {
             if (event.ok) {
               if (event.uuid) {
                 saveUser(event.uuid);
+                markTabAuth(event.uuid);
                 dispatch({ type: "setUuid", payload: event.uuid });
               }
               saveUsername(event.username);
@@ -183,6 +199,7 @@ export function SocketProvider(props: SocketProviderProps) {
             if (event.ok) {
               if (event.uuid) {
                 saveUser(event.uuid);
+                markTabAuth(event.uuid);
                 dispatch({ type: "setUuid", payload: event.uuid });
               }
               saveUsername(event.username);
@@ -285,12 +302,14 @@ export function SocketProvider(props: SocketProviderProps) {
             });
             return;
           case "session-expired": {
-            // No tablename means the account itself is gone (e.g. the
-            // server's Redis was reset): forget the login and return to the
-            // register screen instead of showing a lobby with no account.
+            // No tablename means the account-level session is over (another
+            // device logged in, or the server's Redis was reset): forget the
+            // login and return to the register screen instead of showing a
+            // lobby with no account.
             if (!event.tablename) {
               clearUser();
               clearSession();
+              clearTabAuth();
               dispatch({ type: "resetGame" });
               dispatch({
                 type: "setAuthError",

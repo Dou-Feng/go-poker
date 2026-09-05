@@ -19,6 +19,11 @@ type Hub struct {
 	tablesMu   sync.Mutex
 	users      map[string]bool
 	usersMu    sync.Mutex
+	// sessions maps each account UUID to its single live connection (see
+	// session.go: bindSession enforces one connection per account and
+	// transfers seats between them).
+	sessions   map[string]*Client
+	sessionsMu sync.Mutex
 	// guard holds the abuse protections (rate limits, connection and room
 	// caps). Tests that build a Hub literal leave it nil, which disables them.
 	guard *guard
@@ -40,6 +45,7 @@ func newHub() (*Hub, error) {
 		unregister: make(chan *Client),
 		tables:     make(map[*table]bool),
 		users:      make(map[string]bool),
+		sessions:   make(map[string]*Client),
 		guard:      newGuard(guardConfigFromEnv()),
 	}
 	return hub, nil
@@ -65,6 +71,7 @@ func (h *Hub) registerClient(client *Client) {
 func (h *Hub) unregisterClient(client *Client) {
 	if _, ok := h.clients[client]; ok {
 		delete(h.clients, client)
+		h.forgetSession(client)
 		close(client.send)
 	}
 }

@@ -10,7 +10,12 @@ import {
   addFriend,
   getHistory,
 } from "../actions/actions";
-import { saveSession, clearSession, clearUser } from "../lib/session";
+import {
+  saveSession,
+  clearSession,
+  clearTabAuth,
+  clearUser,
+} from "../lib/session";
 import Settings from "./Settings";
 import Avatar from "./Avatar";
 import History from "./History";
@@ -127,6 +132,7 @@ export default function Lobby() {
   const logout = () => {
     clearUser();
     clearSession();
+    clearTabAuth();
     dispatch({ type: "resetGame" });
   };
 

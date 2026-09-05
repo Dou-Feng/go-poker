@@ -6,6 +6,7 @@ import (
 	"log"
 	"log/slog"
 	"net/http"
+	"sync/atomic"
 	"time"
 
 	"github.com/google/uuid"
@@ -24,6 +25,16 @@ var upgrader = websocket.Upgrader{
 	WriteBufferSize: 1024,
 }
 
+// kickRequest asks writePump to drop the peer. notice (optional, e.g. a
+// session-expired payload) is written BEFORE the close frame so the browser
+// acts on it before its 1s auto-reconnect replays a stale session. Carrying
+// the notice here — instead of pushing to c.send — makes the ordering
+// structural and avoids racing the hub's close(client.send).
+type kickRequest struct {
+	notice   []byte
+	closeMsg []byte
+}
+
 // Client is a middleman between the websocket connection and the hub.
 type Client struct {
 	hub         *Hub
@@ -33,6 +44,11 @@ type Client struct {
 	accountUUID string          // account UUID
 	username    string          // display name
 	table       *table          // Player's table
+
+	// kicked is set when another connection took over this account: inbound
+	// processing stops at once and teardown skips the offline timer (the seat
+	// has already been transferred).
+	kicked atomic.Bool
 
 	// spectateReserved marks that the player wants to move to the spectator
 	// side once the current hand ends.
@@ -44,9 +60,9 @@ type Client struct {
 	ip          string
 	msgBucket   tokenBucket
 	releaseConn func()
-	// kick carries a close frame that writePump must send before shutting
-	// the socket (writePump is the only goroutine allowed to write).
-	kick chan []byte
+	// kick carries a close request that writePump must honor before shutting
+	// down the socket (writePump is the only goroutine allowed to write).
+	kick chan kickRequest
 }
 
 func newClient(conn *websocket.Conn, hub *Hub) *Client {
@@ -54,7 +70,7 @@ func newClient(conn *websocket.Conn, hub *Hub) *Client {
 		hub:  hub,
 		conn: conn,
 		send: make(chan []byte, 1024),
-		kick: make(chan []byte, 1),
+		kick: make(chan kickRequest, 1),
 		uuid: uuid.New().String(),
 	}
 	if hub != nil && hub.guard != nil {
@@ -65,13 +81,25 @@ func newClient(conn *websocket.Conn, hub *Hub) *Client {
 
 func (c *Client) disconnect() {
 	c.hub.unregister <- c
-	if c.table != nil {
-		c.table.unregister <- c
-		c.table.markPlayerOffline(c.uuid)
-	}
+	c.detachTable()
 	c.conn.Close()
 	if c.releaseConn != nil {
 		c.releaseConn()
+	}
+}
+
+// detachTable removes the client from its table on teardown. A client kicked
+// by a session takeover must not arm the offline timer: its seat has already
+// been transferred to the new connection, and the timer would evict the new
+// holder 60s later. The table unregister still runs so the table stops
+// fanning broadcasts out to this (soon closed) send channel.
+func (c *Client) detachTable() {
+	if c.table == nil {
+		return
+	}
+	c.table.unregister <- c
+	if !c.kicked.Load() {
+		c.table.markPlayerOffline(c.uuid)
 	}
 }
 
@@ -129,7 +157,7 @@ func (c *Client) readPump() {
 			slog.Default().Warn("Websocket message rate exceeded, closing", "ip", c.ip)
 			flooded = true
 			select {
-			case c.kick <- websocket.FormatCloseMessage(websocket.ClosePolicyViolation, "message rate exceeded"):
+			case c.kick <- kickRequest{closeMsg: websocket.FormatCloseMessage(websocket.ClosePolicyViolation, "message rate exceeded")}:
 			default:
 			}
 			c.conn.SetReadDeadline(time.Now().Add(writeWait))
@@ -139,6 +167,22 @@ func (c *Client) readPump() {
 			slog.Default().Warn("Process websocket message", "error", err)
 		}
 	}
+}
+
+// writeMessage writes one text message honoring the write deadline. It
+// reports whether the message was fully delivered.
+func (c *Client) writeMessage(message []byte) bool {
+	c.conn.SetWriteDeadline(time.Now().Add(writeWait))
+	w, err := c.conn.NextWriter(websocket.TextMessage)
+	if err != nil {
+		slog.Default().Warn("Write websocket message", "error", err)
+		return false
+	}
+	if _, err := w.Write(message); err != nil {
+		slog.Default().Warn("Write websocket message body", "error", err)
+		return false
+	}
+	return w.Close() == nil
 }
 
 // writePump pumps messages from the hub to the websocket connection.
@@ -155,22 +199,13 @@ func (c *Client) writePump() {
 	for {
 		select {
 		case message, ok := <-c.send:
-			c.conn.SetWriteDeadline(time.Now().Add(writeWait))
 			if !ok {
 				// The hub closed the channel.
+				c.conn.SetWriteDeadline(time.Now().Add(writeWait))
 				c.conn.WriteMessage(websocket.CloseMessage, []byte{})
 				return
 			}
-			w, err := c.conn.NextWriter(websocket.TextMessage)
-			if err != nil {
-				slog.Default().Warn("Write websocket message", "error", err)
-				return
-			}
-			if _, err := w.Write(message); err != nil {
-				slog.Default().Warn("Write websocket message body", "error", err)
-				return
-			}
-			if err := w.Close(); err != nil {
+			if !c.writeMessage(message) {
 				return
 			}
 
@@ -181,12 +216,31 @@ func (c *Client) writePump() {
 				return
 			}
 
-		case closeMsg := <-c.kick:
-			// The read side asked us to drop this peer (message flood):
-			// send the close frame and let the deferred Close end readPump.
-			c.conn.SetWriteDeadline(time.Now().Add(writeWait))
-			c.conn.WriteMessage(websocket.CloseMessage, closeMsg)
-			return
+		case req := <-c.kick:
+			// The takeover notice must reach the peer before the close
+			// frame: the browser auto-reconnects 1s after close and replays
+			// its saved session; without the notice first it would kick the
+			// new client right back.
+			if req.notice != nil && !c.writeMessage(req.notice) {
+				return
+			}
+			// Flush anything already queued before the close frame, then
+			// drop the peer (message flood or session takeover) and let the
+			// deferred Close end readPump.
+			for {
+				select {
+				case message, ok := <-c.send:
+					if !ok || !c.writeMessage(message) {
+						c.conn.SetWriteDeadline(time.Now().Add(writeWait))
+						c.conn.WriteMessage(websocket.CloseMessage, req.closeMsg)
+						return
+					}
+				default:
+					c.conn.SetWriteDeadline(time.Now().Add(writeWait))
+					c.conn.WriteMessage(websocket.CloseMessage, req.closeMsg)
+					return
+				}
+			}
 		}
 	}
 }
@@ -232,6 +286,13 @@ func serveWs(hub *Hub, w http.ResponseWriter, r *http.Request) {
 }
 
 func (c *Client) processEvents(rawMessage []byte) error {
+	// A connection whose session was taken over is being closed; ignore
+	// inbound messages still in flight (e.g. a leave-table that would evict
+	// the seat now held by the new connection).
+	if c.kicked.Load() {
+		return nil
+	}
+
 	var baseMessage base
 	err := json.Unmarshal(rawMessage, &baseMessage)
 	if err != nil {

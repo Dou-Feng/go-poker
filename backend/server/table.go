@@ -142,6 +142,19 @@ func (t *table) markPlayerOnline(playerUUID string) {
 	t.offlineMu.Unlock()
 }
 
+// seatHasClient reports whether any connected client currently holds the seat
+// with the given per-session player uuid.
+func (t *table) seatHasClient(playerUUID string) bool {
+	t.clientsMu.Lock()
+	defer t.clientsMu.Unlock()
+	for c := range t.clients {
+		if c.uuid == playerUUID {
+			return true
+		}
+	}
+	return false
+}
+
 // timeoutPlayer evicts a player whose connection has been gone for longer
 // than the offline grace period. It behaves exactly like the player pressing
 // "leave" (see evictPlayer): between hands they are removed at once; during a
@@ -149,6 +162,13 @@ func (t *table) markPlayerOnline(playerUUID string) {
 // in for the showdown) and dropped when the hand ends, so the pot in play is
 // never destroyed. Their remaining stack is returned to their wallet.
 func (t *table) timeoutPlayer(playerUUID string) {
+	// A live client holds the seat (e.g. a session takeover transferred it to
+	// a new connection): the timer that fired is stale, never evict. This
+	// recheck bounds every race between the grace-period timers and seat
+	// transfers.
+	if t.seatHasClient(playerUUID) {
+		return
+	}
 	username, ok := t.evictPlayer(playerUUID)
 	if !ok {
 		return

@@ -168,6 +168,9 @@ func handleRegisterUser(c *Client, username string, accountUUID string, password
 	c.accountUUID = accountUUID
 	c.send <- createResultWithUUID(actionRegisterResult, true, "", username, accountUUID)
 	c.send <- createUserInfo(c.hub.rdb, user, true)
+	// A fresh account cannot have a live session yet; bound for uniformity
+	// with the other authentication paths.
+	c.hub.bindSession(c)
 }
 
 // handleLogin authenticates by account UUID first, then by username when the
@@ -202,6 +205,9 @@ func handleLogin(c *Client, identifier string, password string) {
 	c.accountUUID = user.UUID
 	c.send <- createResultWithUUID(actionLoginResult, true, "", user.Username, user.UUID)
 	c.send <- createUserInfo(c.hub.rdb, user, true)
+	// Single session per account: a second login kicks the previous
+	// connection and takes over its seat (see session.go).
+	c.hub.bindSession(c)
 }
 
 // handleReconnectUser re-associates a returning client (identified by their
@@ -223,6 +229,9 @@ func handleReconnectUser(c *Client, accountUUID string) {
 	c.username = user.Username
 	c.accountUUID = user.UUID
 	c.send <- createUserInfo(c.hub.rdb, user, true)
+	// The replayed login is the account's newest connection: it takes over
+	// any previous one (and any orphaned seat from an offline grace period).
+	c.hub.bindSession(c)
 }
 
 func handleGetHistory(c *Client) {
@@ -1130,6 +1139,13 @@ func createUpdatedPlayerUUID(c *Client) []byte {
 	uuid := updatePlayerUUID{
 		base{actionUpdatePlayerUUID},
 		c.uuid,
+		"",
+	}
+	// Carrying the room name lets a client that just received a seat — a
+	// session takeover or a replayed reconnect — own the room in its app
+	// state and persist the session, without having joined it itself.
+	if c.table != nil {
+		uuid.Tablename = c.table.name
 	}
 	resp, err := json.Marshal(uuid)
 	if err != nil {

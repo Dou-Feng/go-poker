@@ -8,7 +8,12 @@ import { useContext, useEffect } from "react";
 import { AppContext } from "../providers/AppStore";
 import { useSocket } from "../hooks/useSocket";
 import { joinTable, reconnectUser } from "../actions/actions";
-import { loadSession, loadUser, loadUsername } from "../lib/session";
+import {
+  loadSession,
+  loadUser,
+  loadUsername,
+  tabAuthAccount,
+} from "../lib/session";
 import { detectLanguage } from "../lib/language";
 
 export default function IndexPage() {
@@ -30,14 +35,18 @@ export default function IndexPage() {
   }, [dispatch]);
 
   // Reconnect to a previous session if one exists in localStorage. This also
-  // re-runs whenever the socket reconnects after a disconnect.
+  // re-runs whenever the socket reconnects after a disconnect. Only the tab
+  // that authenticated the account may replay it: a second tab of the same
+  // browser has no tab marker and lands on the login screen, because
+  // replaying would kick the first tab's connection (one session per
+  // account).
   useEffect(() => {
     if (!socket) {
       return;
     }
 
     const user = loadUser();
-    if (!user) {
+    if (!user || tabAuthAccount() !== user) {
       return;
     }
     const send = (fn: () => void) => {

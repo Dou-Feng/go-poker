@@ -77,6 +77,7 @@ function reducer(state: AppState, action: ACTIONTYPE) {
       return {
         ...state,
         clientID: null,
+        uuid: null,
         username: null,
         game: null,
         table: null,

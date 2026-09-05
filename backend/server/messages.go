@@ -265,8 +265,9 @@ type updateGame struct {
 }
 
 type updatePlayerUUID struct {
-	base        //actionUpdatePlayerUUID
-	Uuid string `json:"uuid"`
+	base      //actionUpdatePlayerUUID
+	Uuid      string `json:"uuid"`
+	Tablename string `json:"tablename,omitempty"` // set whenever the client is attached to a room
 }
 
 type result struct {

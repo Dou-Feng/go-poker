@@ -104,6 +104,7 @@ export const translations = {
     buyIns: "buy-ins",
     maxPlayers: "players",
     invalidUsernameOrPassword: "invalid username or password",
+    accountLoggedInElsewhere: "account logged in on another device",
     usernameUnavailable: "Username already taken",
     invalidCredentials: "Invalid credentials",
     invalidUsername: "invalid username",
@@ -259,6 +260,7 @@ export const translations = {
     buyIns: "买入次数",
     maxPlayers: "人数",
     invalidUsernameOrPassword: "用户名或密码错误",
+    accountLoggedInElsewhere: "账号已在其他设备登录",
     usernameUnavailable: "用户名已被注册",
     invalidCredentials: "用户名或密码错误",
     invalidUsername: "无效的用户名",
@@ -318,6 +320,7 @@ export type TranslationKey = keyof typeof translations.en;
 // Maps English server/client error strings to a translation key.
 export const errorKeyByMessage: Record<string, TranslationKey> = {
   "invalid username or password": "invalidUsernameOrPassword",
+  "account logged in on another device": "accountLoggedInElsewhere",
   "username already taken": "usernameUnavailable",
   "username and password required": "invalidUsernameOrPassword",
   "could not hash password": "couldNotSaveUser",
