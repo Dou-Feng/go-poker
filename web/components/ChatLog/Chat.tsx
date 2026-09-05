@@ -55,7 +55,7 @@ export default function Chat() {
     <div className="flex h-full w-full grow flex-col overflow-auto">
       <div
         ref={scrollRef}
-        className="mb-2 h-full overflow-auto bg-card p-2"
+        className="selectable mb-2 h-full overflow-auto bg-card p-2"
       >
         {appState.messages.map((message, index) => (
           <ChatMessage
@@ -76,10 +76,7 @@ export default function Chat() {
           onChange={handleChange}
           ref={messageRef}
         ></input>
-        <button
-          className=" bg-card px-4 text-muted"
-          onClick={handleClick}
-        >
+        <button className=" bg-card px-4 text-muted" onClick={handleClick}>
           <FiSend />
         </button>
       </div>

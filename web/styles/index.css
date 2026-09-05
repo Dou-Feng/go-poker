@@ -45,6 +45,23 @@ body {
     "Noto Color Emoji";
   overflow-x: hidden;
   overscroll-behavior: none;
+  /* Game UI, not a document: a long press must not start a text selection
+     or raise the copy/paste callout (hold gestures peek at cards instead),
+     and taps get no grey highlight flash on mobile. Text entry and the
+     chat/log panels opt back in below. */
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+input,
+textarea,
+[contenteditable="true"],
+.selectable {
+  -webkit-user-select: text;
+  user-select: text;
+  -webkit-touch-callout: default;
 }
 
 /* Brand black: every screen grows out of this color. The login screen and

@@ -53,7 +53,12 @@ export default function Game() {
   const myVoted = !!game && game.settleVotes.includes(appState.username ?? "");
 
   return (
-    <div className="app-screen room-wallpaper relative w-screen overflow-hidden bg-floor">
+    <div
+      className="app-screen room-wallpaper relative w-screen overflow-hidden bg-floor"
+      // No long-press / right-click context menu anywhere in the room: the
+      // hold gesture is a game control here.
+      onContextMenu={(e) => e.preventDefault()}
+    >
       <div className="flex h-full w-full items-start justify-center">
         <Table />
       </div>

@@ -10,7 +10,7 @@ export default function Log() {
   return (
     <div
       ref={scrollRef}
-      className=" h-full w-full overflow-auto bg-card p-2"
+      className="selectable h-full w-full overflow-auto bg-card p-2"
     >
       {appState.logs.map((log, index) => (
         <LogMessage
