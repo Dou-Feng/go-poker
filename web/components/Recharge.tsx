@@ -4,15 +4,16 @@ import ui from "../styles/Dialog.module.css";
 import Portal from "./Portal";
 
 // Diamond recharge packs, ported from tmp/recharge (designer preview). The
-// price/amount copy is display-only: tapping a card still grants the diamond
-// amount as chips through the existing mock top-up (addChips).
+// price copy is display-only; tapping a card grants diamonds + bonus as chips
+// through the existing mock top-up (addChips).
 type Pack = {
   img: string;
   diamonds: number;
   price: string;
   desc: string;
   tag?: string;
-  bonus?: string;
+  /** Bonus diamonds, shown as "+N BONUS" and included in the credit. */
+  bonus?: number;
   legend?: boolean;
   hot?: boolean;
 };
@@ -37,14 +38,14 @@ const PACKS: Pack[] = [
     diamonds: 1000,
     price: "$9.99",
     desc: "更多精彩，更多可能",
-    bonus: "+100 BONUS",
+    bonus: 100,
   },
   {
     img: "diamond_large.png",
     diamonds: 2000,
     price: "$19.99",
     desc: "最佳性价比",
-    bonus: "+300 BONUS",
+    bonus: 300,
     legend: true,
   },
 ];
@@ -62,9 +63,9 @@ type RechargeProps = {
 export default function Recharge({ onClose }: RechargeProps) {
   const socket = useSocket();
 
-  const topUp = (diamonds: number) => {
+  const topUp = (diamonds: number, bonus = 0) => {
     if (socket) {
-      addChips(socket, diamonds);
+      addChips(socket, diamonds + bonus);
     }
     onClose();
   };
@@ -98,11 +99,11 @@ export default function Recharge({ onClose }: RechargeProps) {
                   aria-hidden
                 />
                 <h2>{pack.diamonds} 💎</h2>
-                {pack.bonus && (
-                  <div className="recharge-bonus">{pack.bonus}</div>
-                )}
+                {pack.bonus ? (
+                  <div className="recharge-bonus">+{pack.bonus} BONUS</div>
+                ) : null}
                 <p>{pack.desc}</p>
-                <button onClick={() => topUp(pack.diamonds)}>
+                <button onClick={() => topUp(pack.diamonds, pack.bonus ?? 0)}>
                   {pack.price}
                 </button>
               </div>
