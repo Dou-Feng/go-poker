@@ -133,7 +133,7 @@ export default function ChatLog({ compact = false }: chatLogProps) {
   }
 
   return (
-    <div>
+    <div className="pointer-events-auto w-fit">
       <div className="flex flex-row items-end">
         <button
           className={tabStyle(chatVisible)}

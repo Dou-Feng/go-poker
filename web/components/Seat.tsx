@@ -22,6 +22,7 @@ import Avatar from "./Avatar";
 import PlusIcon from "./PlusIcon";
 import MicIcon from "./MicIcon";
 import { useVoice } from "../hooks/useVoice";
+import { playSfx } from "../lib/sfx";
 
 type seatProps = {
   player: Player | null;
@@ -150,6 +151,8 @@ export default function Seat({
         player.stack === 0 &&
         !player.revealed
       ) {
+        // Voluntarily showing my hand (all-in, cards not up yet).
+        playSfx("showcard");
         if (socket) {
           showHand(socket);
         }

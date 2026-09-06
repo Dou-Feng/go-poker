@@ -3,6 +3,7 @@ import { Game as GameType } from "../interfaces";
 // A single table animation event derived from two consecutive game snapshots.
 export type FxAction =
   | { kind: "bet"; position: number; amount: number } // any bet/call/raise
+  | { kind: "check"; position: number } // checked (no chips committed)
   | { kind: "fold"; position: number };
 
 // In-play stages only (PreFlop..River); Showdown (6) is handled separately.
@@ -54,6 +55,31 @@ export function diffTableActions(
       const committed = (p.totalBet ?? 0) - (before.totalBet ?? 0);
       if (committed > 0 && p.in) {
         events.push({ kind: "bet", position: p.position, amount: committed });
+      }
+    }
+
+    // A check: the player who was to act stayed in, put no chips in, and the
+    // turn moved on (action changed, the street advanced, or betting closed).
+    // The last two guards keep no-op re-broadcasts during a live street (a
+    // spectator reserving a seat, the action clock arming) - where the same
+    // player is still to act - from reading as a check.
+    if (prev.action < prev.players.length) {
+      const was = prev.players[prev.action];
+      const now = next.players.find((p) => p.position === was.position);
+      const committed = now ? (now.totalBet ?? 0) - (was.totalBet ?? 0) : 1; // gone: not a check
+      const moved =
+        next.action !== prev.action ||
+        next.stage !== prev.stage ||
+        !next.betting;
+      if (
+        now &&
+        was.in &&
+        now.in &&
+        now.left === false &&
+        committed === 0 &&
+        moved
+      ) {
+        events.push({ kind: "check", position: was.position });
       }
     }
   }

@@ -3,6 +3,7 @@ import { Game as GameType } from "../interfaces";
 import { AppContext } from "../providers/AppStore";
 import { diffTableActions } from "../lib/tableFx";
 import { subscribeFx } from "../lib/fxBus";
+import { getSfxDurationMs, playSfx } from "../lib/sfx";
 import Chip, { ChipTone, chipToneFor } from "./Chip";
 
 import { TableLayout, tableSeatPoint } from "../lib/tableLayout";
@@ -78,6 +79,11 @@ export default function TableFx({ game, maxPlayers, layout }: props) {
   const { appState } = useContext(AppContext);
   const me = game?.players.find((p) => p.uuid === appState.clientID);
   const rotation = game.running && me ? me.seatID - 1 : 0;
+  // The seat uuid of the viewer ("" for a spectator): opponent sounds are
+  // skipped on their own actions, since the acting player already hears
+  // them from the action bar.
+  const heroUuidRef = useRef(appState.clientID);
+  heroUuidRef.current = appState.clientID;
 
   const layoutRef = useRef(layout);
   layoutRef.current = layout;
@@ -167,14 +173,43 @@ export default function TableFx({ game, maxPlayers, layout }: props) {
     // subscribed. Seed it here so the very first subsequent bet animates.
     let last: GameType | null = game;
     let collectTimer: number | undefined;
+    let disposed = false;
     const unsubscribe = subscribeFx((snap) => {
       const prev = last;
       last = snap;
+      const events = diffTableActions(prev, snap);
+
+      // Opponent-action sounds: everyone except the acting player hears a
+      // call/raise (otherBet), an all-in (allin) or a fold (card drop) here,
+      // from the same snapshot diff that drives the chip animations. The
+      // acting player already heard their own key from the action bar, so
+      // their seat is skipped. Sound is not gated by prefers-reduced-motion:
+      // that setting only suppresses the animations below.
+      const heroPos = snap.players.find(
+        (p) => p.uuid === heroUuidRef.current
+      )?.position;
+      for (const ev of events) {
+        if (ev.position === heroPos) {
+          continue; // own action: already heard from the action bar
+        }
+        if (ev.kind === "check") {
+          playSfx("check");
+          continue;
+        }
+        if (ev.kind === "fold") {
+          playSfx("fold");
+          continue;
+        }
+        const actor = snap.players.find((p) => p.position === ev.position);
+        const allIn = !!actor && actor.in && actor.stack === 0;
+        playSfx(allIn ? "allin" : "otherBet");
+      }
+
       if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
 
       // Bet feedback within a live betting street (PreFlop..River).
       let betAnimated = false;
-      for (const ev of diffTableActions(prev, snap)) {
+      for (const ev of events) {
         const slot = seatSlot(snap.players, ev.position);
         if (slot === null) continue;
         const seat = tableSeatPoint(
@@ -219,12 +254,32 @@ export default function TableFx({ game, maxPlayers, layout }: props) {
       }
 
       // Pot collect when the Showdown window first opens with decided pots.
-      // A call that closes the river lands in Showdown in the same snapshot;
-      // let its chips reach the pot before the pot streams out to the winner.
+      // If the showdown flips revealed hands open, the reveal sound plays
+      // first: wait for it to finish, then stream the pot to the winners in
+      // sync with the win chime (Table.tsx schedules that sound on the same
+      // timing). Without a reveal the collect starts at once - or 700 ms
+      // later when a call that closed the river landed in the same snapshot,
+      // so its chips can reach the pot before it streams back out.
       if (snap.stage === 6 && (!prev || prev.stage !== 6)) {
         const pots = snap.pots ?? [];
         const players = snap.players ?? [];
-        if (betAnimated) {
+        const willReveal = pots.some(
+          (pot) => (pot.eligiblePlayerNums?.length ?? 0) > 1
+        );
+        if (willReveal) {
+          void getSfxDurationMs("showcardAll").then((ms) => {
+            if (disposed) {
+              return;
+            }
+            // Wait out the reveal sound before streaming the pot to the
+            // winners (same floor as the win chime in Table.tsx, so the two
+            // start together only after the reveal has finished).
+            collectTimer = window.setTimeout(
+              () => scheduleCollect(pots, players),
+              Math.max(ms, 700)
+            );
+          });
+        } else if (betAnimated) {
           collectTimer = window.setTimeout(
             () => scheduleCollect(pots, players),
             700
@@ -236,6 +291,7 @@ export default function TableFx({ game, maxPlayers, layout }: props) {
     });
     return () => {
       unsubscribe();
+      disposed = true;
       window.clearTimeout(collectTimer);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps

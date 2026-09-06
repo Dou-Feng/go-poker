@@ -119,7 +119,7 @@ export default function Game() {
         <div className="pointer-events-none w-full sm:absolute sm:inset-x-0 sm:bottom-0 sm:z-20">
           <Input />
         </div>
-        <div className="pointer-events-auto hidden w-full sm:absolute sm:bottom-0 sm:left-0 sm:right-auto sm:z-10 sm:block">
+        <div className="pointer-events-none hidden w-full sm:absolute sm:bottom-0 sm:left-0 sm:right-auto sm:z-10 sm:block">
           <ChatLog />
         </div>
       </div>

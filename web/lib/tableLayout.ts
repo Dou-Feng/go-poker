@@ -11,10 +11,13 @@ export function createTableLayout(
   const portrait = height >= width * 0.85;
   const baseWidth = large ? 224 : 128;
   const baseHeight = large ? 148 : 100;
+  // Desktop (large) seats grow with the room so they do not look tiny on a
+  // big monitor; phones keep the fixed 128px footprint.
+  const seatCap = large ? 240 : 180;
   const seatWidth = Math.min(
-    width * (portrait ? 0.3 : 0.19),
-    height * (portrait ? 0.24 : height < 300 ? 0.38 : 0.32),
-    180
+    width * (portrait ? 0.3 : large ? 0.21 : 0.19),
+    height * (portrait ? 0.24 : height < 300 ? 0.38 : large ? 0.33 : 0.32),
+    seatCap
   );
   const scale = seatWidth / baseWidth;
   // Include the 1.1x all-in pop, the bet pill above and ready/show below.

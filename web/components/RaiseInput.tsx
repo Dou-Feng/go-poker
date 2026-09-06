@@ -80,7 +80,7 @@ export default function RaiseInput({ onClose }: raiseProps) {
 
   const confirm = () => {
     if (socket) {
-      playSfx(isAllIn ? "allin" : "raise");
+      playSfx(isAllIn ? "allin" : "heroBet");
       sendLog(
         socket,
         isAllIn

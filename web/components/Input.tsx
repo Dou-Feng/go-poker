@@ -65,11 +65,11 @@ export default function Input() {
       return;
     }
     if (canCheck) {
-      playSfx("click");
+      playSfx("check");
       sendLog(socket, user + " checks");
       playerCheck(socket);
     } else {
-      playSfx("call");
+      playSfx("heroBet");
       sendLog(socket, user + " calls " + callAmount);
       playerCall(socket);
     }

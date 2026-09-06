@@ -10,7 +10,7 @@ import { AppContext } from "../providers/AppStore";
 import { sendLog, dealGame } from "../actions/actions";
 import { useSocket } from "../hooks/useSocket";
 import { useTranslation } from "../hooks/useTranslation";
-import { playSfx } from "../lib/sfx";
+import { getSfxDurationMs, playSfx } from "../lib/sfx";
 import { bestHandName } from "../lib/handEval";
 import { useContext, useState, useEffect, useRef } from "react";
 
@@ -137,7 +137,13 @@ export default function Table() {
   const dismissTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const mountedRef = useRef(true);
+  // Previous stage, so the game-start sting fires exactly when the room
+  // leaves the not-ready (未准备) phase into a running hand.
   const lastStageRef = useRef<number>(-1);
+  // "READY GO!" shown at the table centre while the game-start sound plays,
+  // so play visibly holds a beat before the next action sound can overlap it.
+  const [readyGo, setReadyGo] = useState(false);
+  const readyGoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Board view popup: the felt is small on a phone and a neighbouring seat can
   // overlap the player's own hole cards, so the community cards (and the
@@ -312,14 +318,49 @@ export default function Table() {
       return;
     }
     shownHandRef.current = sig;
-    setRevealedPositions(getRevealedPlayers(game).map((p) => p.position));
+    const revealed = getRevealedPlayers(game).map((p) => p.position);
+    setRevealedPositions(revealed);
     setForfeited(!!forfeitPot);
-    playSfx(forfeitPot ? "error" : "win");
     if (forfeitPot) {
+      playSfx("error");
       if (socket) {
         sendLog(socket, "chips forfeited");
       }
     } else {
+      // Pot won at showdown, kept overlap-free. If revealed hands flip open,
+      // their reveal sound plays first; only once it has finished does the
+      // pot collect (chips fly out in TableFx on the same timing) and the win
+      // chime start. The chime is two sequential plays - the second is
+      // scheduled only after the first ends, so they never overlap but
+      // together span the collect animation. An uncontested win has no
+      // reveal, so the chime starts with the collect right away.
+      const winCollect = () => {
+        if (!mountedRef.current) {
+          return;
+        }
+        playSfx("win");
+        void getSfxDurationMs("win").then((winMs) => {
+          window.setTimeout(
+            () => mountedRef.current && playSfx("win"),
+            // Never shorter than a floor: if the asset is still decoding the
+            // two plays would otherwise overlap instead of following on.
+            Math.max(winMs, 700)
+          );
+        });
+      };
+      if (revealed.length > 0) {
+        playSfx("showcardAll");
+        void getSfxDurationMs("showcardAll").then((ms) => {
+          window.setTimeout(
+            winCollect,
+            // Same floor as TableFx, so the chip animation and the win chime
+            // start together only after the reveal sound has finished.
+            Math.max(ms, 700)
+          );
+        });
+      } else {
+        winCollect();
+      }
       handleWinner(game, socket);
     }
     if (dismissTimerRef.current) {
@@ -348,16 +389,32 @@ export default function Table() {
     }, 5000);
   }, [game?.stage, game?.pots?.length]);
 
-  // Deal sound: a new hand starts when the stage leaves NotReady into the
-  // first betting street (PreFlop).
+  // Game-start sound: plays when the room goes from the not-ready phase
+  // (NotReady) into a running hand - a player sits down and everyone readies
+  // up, a fresh session's first hand, or a restart after waiting for a
+  // newcomer. Consecutive auto-dealt hands (everyone stays ready) jump
+  // Showdown -> PreFlop without a NotReady frame in between, so they stay
+  // silent. While the sting plays, a "READY GO!" caption holds the table
+  // centre and clears the moment the sound ends.
   useEffect(() => {
     const stage = game?.stage ?? -1;
+    const running = game?.running ?? false;
     if (
-      game?.running &&
+      running &&
       stage !== Stage.NotReady &&
       lastStageRef.current === Stage.NotReady
     ) {
-      playSfx("deal");
+      playSfx("gameStart");
+      setReadyGo(true);
+      if (readyGoTimerRef.current) {
+        clearTimeout(readyGoTimerRef.current);
+        readyGoTimerRef.current = null;
+      }
+      void getSfxDurationMs("gameStart").then((ms) => {
+        if (mountedRef.current) {
+          readyGoTimerRef.current = setTimeout(() => setReadyGo(false), ms);
+        }
+      });
     }
     lastStageRef.current = stage;
   }, [game?.running, game?.stage]);
@@ -367,6 +424,10 @@ export default function Table() {
     mountedRef.current = true;
     return () => {
       mountedRef.current = false;
+      if (readyGoTimerRef.current) {
+        clearTimeout(readyGoTimerRef.current);
+        readyGoTimerRef.current = null;
+      }
     };
   }, []);
 
@@ -555,6 +616,13 @@ export default function Table() {
         {game && (
           <TableFx game={game} maxPlayers={maxPlayers} layout={layout} />
         )}
+        {readyGo && (
+          <div className="pointer-events-none absolute inset-0 z-30 flex items-center justify-center">
+            <p className="animate-ready-go text-2xl font-extrabold italic tracking-[0.3em] text-[#ffd97a] drop-shadow-[0_2px_12px_rgba(0,0,0,0.85)] sm:text-4xl">
+              READY GO!
+            </p>
+          </div>
+        )}
         {game && (!appState.clientID || (me && !game.running && !me.ready)) && (
           <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center">
             <div className="pointer-events-auto flex flex-col items-center gap-1 rounded-lg bg-black/50 px-4 py-2 text-center">
@@ -590,7 +658,8 @@ export default function Table() {
           const isMine = !!player && player.uuid === appState.clientID;
           // Once a hand is running the other players' seats are drawn a
           // little smaller (their cards are face down anyway), leaving more
-          // room for the board and the player's own seat. Scaling about the
+          // room for the board and the player's own seat. The shrink is
+          // milder on desktop, which already has room. Scaling about the
           // centre keeps the seat anchored where TableFx expects it.
           const shrink = !!game?.running && !!player && !isMine;
           return (
@@ -605,7 +674,7 @@ export default function Table() {
                 left: `${pos.x}%`,
                 top: `${pos.y}%`,
                 transform: `translate(-50%, -50%) scale(${
-                  layout.scale * (shrink ? 0.85 : 1)
+                  layout.scale * (shrink ? (layout.large ? 0.9 : 0.82) : 1)
                 })`,
               }}
               data-seat-position={player ? player.position : undefined}

@@ -1,27 +1,34 @@
-// Simple WebAudio-based sound effect manager. All sounds are CC0
-// (Kenney Interface Sounds, via Calinou/kenney-interface-sounds).
-// Volume is persisted in localStorage; 0 disables playback entirely.
+// Simple WebAudio-based sound effect manager. The game sounds are custom
+// assets shipped in web/public/sfx; only click/error keep the CC0 Kenney
+// Interface Sounds. Volume is persisted in localStorage; 0 disables playback
+// entirely.
 
 const SFX_BASE = "/sfx";
 
 export type SfxName =
-  | "click" // check / generic button
-  | "call" // call / confirm
-  | "raise" // raise / bet
-  | "fold" // fold
-  | "allin" // all-in
-  | "deal" // cards dealt / hand start
-  | "win" // pot won / settlement
-  | "error"; // errors
+  | "click" // generic button
+  | "check" // check (tap on the felt) - hero and opponents
+  | "heroBet" // my own call/raise (chips in)
+  | "otherBet" // another player's call/raise
+  | "fold" // fold (card drop) - hero and opponents
+  | "allin" // all-in, anyone
+  | "gameStart" // a fresh session's first hand begins
+  | "showcard" // voluntarily showing my own hand ("show")
+  | "showcardAll" // showdown flips the revealed hands open
+  | "win" // pot collected at showdown (played twice)
+  | "error"; // errors / forfeited pot
 
 const FILES: Record<SfxName, string> = {
   click: "click_002.wav",
-  call: "glass_002.wav",
-  raise: "drop_002.wav",
-  fold: "bong_001.wav",
-  allin: "switch_002.wav",
-  deal: "click_003.wav",
-  win: "confirmation_002.wav",
+  check: "check_felt.wav",
+  heroBet: "hero_bet.ogg",
+  otherBet: "other_bet.ogg",
+  fold: "card_drop.ogg",
+  allin: "allin.wav",
+  gameStart: "game_start.ogg",
+  showcard: "showcard.ogg",
+  showcardAll: "showcard_all.ogg",
+  win: "win_pot.wav",
   error: "error_004.wav",
 };
 
@@ -125,5 +132,22 @@ export function playSfx(name: SfxName) {
     });
   } catch {
     // ignore: sounds are best-effort
+  }
+}
+
+// Length of a sound in ms once its asset is decoded (0 if it cannot be
+// loaded). Visual cues that must clear when a sound finishes (the "READY
+// GO!" caption, the showdown pot collect) are timed from this so they stay in
+// sync even if an asset is swapped for one of a different length.
+export async function getSfxDurationMs(name: SfxName): Promise<number> {
+  try {
+    const ctx = getCtx();
+    if (!ctx) {
+      return 0;
+    }
+    const buf = await getBuffer(ctx, name);
+    return buf ? Math.round(buf.duration * 1000) : 0;
+  } catch {
+    return 0;
   }
 }
