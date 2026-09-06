@@ -316,24 +316,15 @@ export default function Table() {
     } else {
       // Pot won at showdown, kept overlap-free. If revealed hands flip open,
       // their reveal sound plays first; only once it has finished does the
-      // pot collect (chips fly out in TableFx on the same timing) and the win
-      // chime start. The chime is two sequential plays - the second is
-      // scheduled only after the first ends, so they never overlap but
-      // together span the collect animation. An uncontested win has no
-      // reveal, so the chime starts with the collect right away.
+      // pot collect (chips fly out in TableFx on the same timing) and the
+      // win chime start. An uncontested win has no reveal, so the chime
+      // starts with the collect right away. The chime itself is a single
+      // play - one clean pot-collect sound.
       const winCollect = () => {
         if (!mountedRef.current) {
           return;
         }
         playSfx("win");
-        void getSfxDurationMs("win").then((winMs) => {
-          window.setTimeout(
-            () => mountedRef.current && playSfx("win"),
-            // Never shorter than a floor: if the asset is still decoding the
-            // two plays would otherwise overlap instead of following on.
-            Math.max(winMs, 700)
-          );
-        });
       };
       if (revealed.length > 0) {
         playSfx("showcardAll");

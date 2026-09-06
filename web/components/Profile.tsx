@@ -179,6 +179,7 @@ export default function Profile() {
                 setShowPicker(false);
                 dispatch({ type: "setProfile", payload: null });
               }}
+              data-sfx="back"
               aria-label={t("close")}
               className={ui.iconButton}
             >
@@ -216,6 +217,7 @@ export default function Profile() {
                     setShowChangeUsername(false);
                     setNewUsername("");
                   }}
+                  data-sfx="pong"
                   aria-label={t("cancel")}
                   className={ui.secondary}
                 >

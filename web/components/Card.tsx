@@ -6,6 +6,9 @@ type cardProps = {
   placeholder: boolean;
   folded: boolean;
   hidden: boolean;
+  /** Face is up because the player showed / is at a revealing showdown:
+   *  render it as a frosted-glass card instead of an opaque white face. */
+  shown?: boolean;
 };
 
 type ParsedCard = {
@@ -96,26 +99,40 @@ function SuitPip({ suit, className }: { suit: string; className?: string }) {
 // Pip size tracks the old glyph size: ~20px on phones, ~40px on desktop.
 const pipClass = "h-5 w-5 sm:h-10 sm:w-10";
 
-function color(suit: string) {
+function color(suit: string, shown = false) {
+  const suitColor = classNames({
+    "text-red-700": suit == "H",
+    "text-blue-700": suit == "D",
+    "text-green-700": suit == "C",
+    "text-black": suit == "S",
+  });
+  // Phone size is 36x56px: rank (text-base, 20px line) + suit (text-xl,
+  // 25px line) + top padding must stay under 56px or the suit glyph spills
+  // past the card's bottom edge. Desktop (64x96px) has room for the larger
+  // faces.
+  const layout =
+    "rounded-md border pt-0.5 px-1 text-xl leading-tight font-normal w-9 h-14 sm:pt-1 sm:px-2.5 sm:text-5xl sm:leading-normal sm:w-16 sm:h-24 flex items-center justify-start flex-col overflow-hidden";
   return classNames(
-    {
-      "text-red-700": suit == "H",
-      "text-blue-700": suit == "D",
-      "text-green-700": suit == "C",
-      "text-black": suit == "S",
-    },
-    // Phone size is 36x56px: rank (text-base, 20px line) + suit (text-xl,
-    // 25px line) + top padding must stay under 56px or the suit glyph spills
-    // past the card's bottom edge. Desktop (64x96px) has room for the larger
-    // faces.
-    "rounded-md border border-zinc-100 shadow-2xl bg-white pt-0.5 px-1 text-xl leading-tight font-normal w-9 h-14 sm:pt-1 sm:px-2.5 sm:text-5xl sm:leading-normal sm:w-16 sm:h-24 flex items-center justify-start flex-col overflow-hidden"
+    suitColor,
+    layout,
+    shown
+      ? // A shown card is a pane of glass: translucent white with a frosty
+        // blur so the felt glows through, plus a bright rim and inner ring.
+        "border-white/60 bg-white/25 shadow-xl ring-1 ring-inset ring-white/40 backdrop-blur-[3px]"
+      : "border-zinc-100 bg-white shadow-2xl"
   );
 }
 
 const rankClass =
   "flex w-full items-start justify-start text-base leading-tight font-semibold sm:text-3xl sm:leading-normal";
 
-export default function Card({ card, placeholder, folded, hidden }: cardProps) {
+export default function Card({
+  card,
+  placeholder,
+  folded,
+  hidden,
+  shown = false,
+}: cardProps) {
   if (placeholder) {
     // Undealt board slot: a faint white outline of a card on the felt, not a
     // dark block (which looked like a cut-out in the table).
@@ -153,7 +170,7 @@ export default function Card({ card, placeholder, folded, hidden }: cardProps) {
     );
   }
   return (
-    <div className={classNames(color(c.suit), "animate-deal-in")}>
+    <div className={classNames(color(c.suit, shown), "animate-deal-in")}>
       <div className={rankClass}>{c.rank}</div>
       <SuitPip suit={c.suit} className={pipClass} />
     </div>

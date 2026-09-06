@@ -89,6 +89,17 @@ export default function Seat({
 
   const game = appState.game;
   const running = game?.running ?? false;
+  // Set only by the dedicated "show cards" button (below the seat): that is
+  // the one gesture that turns the cards into glass. Showing by tapping the
+  // seat surface, and natural showdown reveals, stay plain white faces.
+  const [glassShown, setGlassShown] = useState(false);
+  // Drop the flag when the hand ends so the next hand starts with ordinary
+  // cards again.
+  useEffect(() => {
+    if (!running) {
+      setGlassShown(false);
+    }
+  }, [running]);
   // Action clock for the seat to act (null = no clock or nobody to act).
   const onClock =
     !!game &&
@@ -294,6 +305,8 @@ export default function Seat({
                   placeholder={false}
                   folded={!player.in}
                   hidden={reveal || player.revealed ? false : hidden}
+                  // Glass only via the "show cards" button gesture.
+                  shown={glassShown}
                 />
               ))}
             </div>
@@ -339,11 +352,13 @@ export default function Seat({
         {canShow && (
           <InputButton
             kind="bet"
+            dataSfx="showcard"
             label={t("showCards")}
             icon={<FiEye className="gp-action-btn__icon" />}
             disabled={!socket}
             onClick={(e) => {
               e.stopPropagation();
+              setGlassShown(true);
               if (socket) {
                 showHand(socket);
               }
@@ -354,6 +369,7 @@ export default function Seat({
         {!running && isMine && (
           <InputButton
             kind={player.ready ? "check" : "bet"}
+            dataSfx="tick"
             label={player.ready ? t("cancelReady") : t("ready")}
             icon={
               player.ready ? (
@@ -471,6 +487,7 @@ export default function Seat({
       <div>
         <button
           onClick={sitOrClaim}
+          data-sfx="drop"
           title={t("reserveSeat")}
           className="m-1 h-16 w-32 rounded-2xl border border-amber-300/50 bg-transparent p-2 text-ink transition-colors hover:bg-card sm:m-4 sm:h-20 sm:w-56"
         >
@@ -488,6 +505,7 @@ export default function Seat({
         <button
           className="m-1 flex h-16 w-32 flex-col items-center justify-center rounded-2xl border-2 border-dashed border-emerald-500/70 bg-emerald-900/20 p-2 text-emerald-300 transition-colors hover:bg-emerald-900/40 sm:m-4 sm:h-20 sm:w-56"
           onClick={() => socket && addBot(socket, id)}
+          data-sfx="drop"
           title={t("addBot")}
         >
           <PlusIcon className="h-7 w-7 sm:h-9 sm:w-9" />
@@ -521,6 +539,7 @@ export default function Seat({
         <button
           className="m-1 h-16 w-32 rounded-2xl border border-muted/40 bg-transparent p-2 text-ink transition-colors hover:bg-card sm:m-4 sm:h-20 sm:w-56"
           onClick={handleClick}
+          data-sfx="drop"
         >
           <p className="text-3xl sm:text-4xl">{t("open")}</p>
           <h2 className="text-xs opacity-70 sm:text-base">{id}</h2>

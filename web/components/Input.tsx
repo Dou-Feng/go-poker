@@ -8,7 +8,7 @@ import {
   sendLog,
 } from "../actions/actions";
 import { useSocket } from "../hooks/useSocket";
-import { playSfx } from "../lib/sfx";
+import { playSfx, playTickedAction } from "../lib/sfx";
 import InputButton from "./InputButton";
 import RaiseInput from "./RaiseInput";
 
@@ -19,6 +19,7 @@ export default function Input() {
 
   const handleFold = (user: string | null) => {
     if (socket) {
+      // Fold has its own card-drop sound: no tick prefix.
       playSfx("fold");
       let foldMessage = user + " folds";
       sendLog(socket, foldMessage);
@@ -65,11 +66,12 @@ export default function Input() {
       return;
     }
     if (canCheck) {
+      // Check is a quiet action: no tick prefix, just the felt sound.
       playSfx("check");
       sendLog(socket, user + " checks");
       playerCheck(socket);
     } else {
-      playSfx("heroBet");
+      playTickedAction("heroBet");
       sendLog(socket, user + " calls " + callAmount);
       playerCall(socket);
     }
@@ -79,7 +81,7 @@ export default function Input() {
     if (!socket) {
       return;
     }
-    playSfx("allin");
+    playTickedAction("allin");
     sendLog(socket, user + " is all in");
     playerRaise(socket, player.stack);
   };

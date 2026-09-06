@@ -76,6 +76,7 @@ export default function Register() {
             <button
               key={item}
               type="button"
+              data-sfx="pong"
               aria-pressed={mode === item}
               className={mode === item ? styles.active : ""}
               onClick={() => switchMode(item)}
@@ -152,6 +153,7 @@ export default function Register() {
                 )}
                 <button
                   type="submit"
+                  data-sfx="pong"
                   className={styles.primary}
                   disabled={
                     password === "" ||

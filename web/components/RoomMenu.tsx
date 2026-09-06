@@ -47,6 +47,7 @@ export default function RoomMenu() {
             setReservedSpectate(!reservedSpectate);
             spectate(socket);
           }}
+          data-sfx="pong"
           aria-pressed={reservedSpectate}
           className={classNames(
             "btn btn-room-control min-w-[4.5rem]",
@@ -66,6 +67,7 @@ export default function RoomMenu() {
       {open && isHost && (
         <button
           onClick={() => dispatch({ type: "setBotMode", payload: !botMode })}
+          data-sfx="pong"
           disabled={game.running || hostReady}
           title={
             game.running
@@ -103,6 +105,7 @@ export default function RoomMenu() {
       {isHost && (
         <button
           onClick={() => setOpen(!open)}
+          data-sfx="pong"
           aria-expanded={open}
           aria-label={open ? t("close") : t("more")}
           title={open ? t("close") : t("more")}

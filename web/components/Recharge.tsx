@@ -76,6 +76,7 @@ export default function Recharge({ onClose }: RechargeProps) {
         <div className="recharge-modal">
           <button
             onClick={onClose}
+            data-sfx="back"
             aria-label="关闭"
             className="recharge-close"
           >

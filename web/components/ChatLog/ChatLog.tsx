@@ -98,6 +98,7 @@ export default function ChatLog({ compact = false }: chatLogProps) {
                 </span>
                 <button
                   onClick={() => setOpen(false)}
+                  data-sfx="back"
                   className="btn btn-text"
                   aria-label={t("close")}
                 >

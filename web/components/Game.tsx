@@ -155,13 +155,18 @@ export default function Game() {
           left); the narrow column stays clear of the centred hands pill,
           which hangs from the top edge. */}
       <div className="absolute left-0 top-0 z-10 flex flex-col items-start sm:flex-row sm:items-center">
-        <button onClick={handleLeave} className="btn btn-room-control m-2">
+        <button
+          onClick={handleLeave}
+          data-sfx="pong"
+          className="btn btn-room-control m-2"
+        >
           <FiLogOut size={16} aria-hidden="true" className="shrink-0" />
           {t("leave")}
         </button>
         {me && showVotes && (
           <button
             onClick={() => socket && voteSettle(socket)}
+            data-sfx="pong"
             aria-pressed={myVoted}
             className="btn btn-room-control btn-room-surrender mx-2 mb-2 sm:ml-0 sm:mt-2"
           >

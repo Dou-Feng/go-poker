@@ -2,7 +2,7 @@ import { useContext, useMemo, useState } from "react";
 import { AppContext } from "../providers/AppStore";
 import { playerRaise, sendLog } from "../actions/actions";
 import { useSocket } from "../hooks/useSocket";
-import { playSfx } from "../lib/sfx";
+import { playSfx, playTickedAction } from "../lib/sfx";
 import InputButton from "./InputButton";
 import Chip from "./Chip";
 import classNames from "classnames";
@@ -80,7 +80,7 @@ export default function RaiseInput({ onClose }: raiseProps) {
 
   const confirm = () => {
     if (socket) {
-      playSfx(isAllIn ? "allin" : "heroBet");
+      playTickedAction(isAllIn ? "allin" : "heroBet");
       sendLog(
         socket,
         isAllIn
@@ -120,6 +120,7 @@ export default function RaiseInput({ onClose }: raiseProps) {
         <button
           type="button"
           className="gp-raise-panel__close"
+          data-sfx="back"
           onClick={onClose}
           aria-label="关闭"
         >
@@ -138,7 +139,10 @@ export default function RaiseInput({ onClose }: raiseProps) {
               "gp-preset",
               selected === preset && "is-selected"
             )}
-            onClick={() => setAmount(presetValue[preset])}
+            onClick={() => {
+              playSfx("tick");
+              setAmount(presetValue[preset]);
+            }}
           >
             <strong>{PRESET_TEXT[preset].zh}</strong>
             <span>{PRESET_TEXT[preset].en}</span>
@@ -172,7 +176,10 @@ export default function RaiseInput({ onClose }: raiseProps) {
         <div className="gp-raise-panel__controls">
           <button
             type="button"
-            onClick={() => setAmount(clamp(value - step))}
+            onClick={() => {
+              playSfx("tick");
+              setAmount(clamp(value - step));
+            }}
             disabled={value <= minRaise}
             aria-label="减少"
           >
@@ -184,7 +191,10 @@ export default function RaiseInput({ onClose }: raiseProps) {
           </div>
           <button
             type="button"
-            onClick={() => setAmount(clamp(value + step))}
+            onClick={() => {
+              playSfx("tick");
+              setAmount(clamp(value + step));
+            }}
             disabled={value >= allInTotal}
             aria-label="增加"
           >

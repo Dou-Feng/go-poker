@@ -63,6 +63,7 @@ export default function History({ onClose }: HistoryProps) {
           <h2 id="history-title">{t("history")}</h2>
           <button
             onClick={onClose}
+            data-sfx="back"
             className={ui.iconButton}
             aria-label={t("close")}
           >

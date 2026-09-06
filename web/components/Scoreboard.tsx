@@ -65,6 +65,7 @@ export default function Scoreboard({
             </div>
             <button
               onClick={onClose}
+              data-sfx="back"
               aria-label={t("close")}
               className={ui.iconButton}
             >

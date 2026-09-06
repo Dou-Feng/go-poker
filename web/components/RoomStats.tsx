@@ -70,6 +70,7 @@ export default function RoomStats({ className }: roomStatsProps) {
     <>
       <button
         onClick={() => setShow(true)}
+        data-sfx="pong"
         title={t("roomStats")}
         className={classNames("btn btn-room-control", className)}
       >

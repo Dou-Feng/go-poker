@@ -67,6 +67,7 @@ export default function Settings({ buttonClassName }: SettingsProps) {
                 <h2>{t("settings")}</h2>
                 <button
                   onClick={() => setOpen(false)}
+                  data-sfx="back"
                   aria-label={t("close")}
                   className={ui.iconButton}
                 >

@@ -19,6 +19,8 @@ type InputButtonProps = {
   disabled?: boolean;
   onClick?: MouseEventHandler<HTMLButtonElement>;
   className?: string;
+  /** Optional sound tag forwarded to the button's data-sfx attribute. */
+  dataSfx?: string;
 };
 
 // Game action keys (check / bet / all-in / fold), rendered as layered material
@@ -33,12 +35,14 @@ export default function InputButton({
   disabled = false,
   onClick,
   className = "",
+  dataSfx,
 }: InputButtonProps) {
   return (
     <button
       type="button"
       className={`gp-action-btn gp-action-btn--${kind} ${className}`}
       disabled={disabled}
+      data-sfx={dataSfx}
       onClick={onClick}
       aria-label={label}
       aria-pressed={pressed}

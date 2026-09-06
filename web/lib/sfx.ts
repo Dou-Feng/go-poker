@@ -7,6 +7,10 @@ const SFX_BASE = "/sfx";
 
 export type SfxName =
   | "click" // generic button
+  | "pong" // primary / confirm UI buttons (register, create, room controls)
+  | "drop" // taking a seat (sit down / claim / place a bot)
+  | "tick" // ready / cancel-ready
+  | "back" // close / return "x" buttons
   | "check" // check (tap on the felt) - hero and opponents
   | "heroBet" // my own call/raise (chips in)
   | "otherBet" // another player's call/raise
@@ -19,7 +23,11 @@ export type SfxName =
   | "error"; // errors / forfeited pot
 
 const FILES: Record<SfxName, string> = {
-  click: "click_002.wav",
+  click: "click_003.ogg",
+  pong: "bong_001.ogg",
+  drop: "drop_003.ogg",
+  tick: "tick_001.ogg",
+  back: "click_001.ogg",
   check: "check_felt.wav",
   heroBet: "hero_bet.ogg",
   otherBet: "other_bet.ogg",
@@ -132,6 +140,54 @@ export function playSfx(name: SfxName) {
     });
   } catch {
     // ignore: sounds are best-effort
+  }
+}
+
+// Player-action press feedback: a short tick for the tap, then a ~200 ms
+// breathing gap, then the action's own sound (fold/check/heroBet/allin), so
+// the two follow each other cleanly instead of overlapping.
+export function playTickedAction(sound: SfxName): void {
+  playSfx("tick");
+  void getSfxDurationMs("tick").then((ms) => {
+    window.setTimeout(() => playSfx(sound), ms + 200);
+  });
+}
+
+// Everything except the looping BGM tracks. All small (a few KB each), so
+// decoding the whole set up front is cheap.
+const ALL_SFX: SfxName[] = [
+  "click",
+  "pong",
+  "drop",
+  "tick",
+  "back",
+  "check",
+  "heroBet",
+  "otherBet",
+  "fold",
+  "allin",
+  "gameStart",
+  "showcard",
+  "showcardAll",
+  "win",
+  "error",
+];
+
+// Warm the WebAudio buffer cache so the very first press plays instantly
+// instead of fetching and decoding the asset on demand. Best-effort; the
+// context may still be suspended until the first user gesture, but the
+// decoded buffers are ready for when it resumes.
+export function preloadSfx(names: SfxName[] = ALL_SFX): void {
+  try {
+    const ctx = getCtx();
+    if (!ctx) {
+      return;
+    }
+    for (const name of names) {
+      void getBuffer(ctx, name);
+    }
+  } catch {
+    // ignore: preloading is best-effort
   }
 }
 

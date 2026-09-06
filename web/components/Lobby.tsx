@@ -278,7 +278,11 @@ export default function Lobby() {
             <FiRefreshCw aria-hidden="true" />
             {t("refresh")}
           </button>
-          <button onClick={() => setShowCreate(true)} className={ui.primary}>
+          <button
+            onClick={() => setShowCreate(true)}
+            data-sfx="pong"
+            className={ui.primary}
+          >
             <FiPlus aria-hidden="true" />
             {t("newRoom")}
           </button>
@@ -348,6 +352,7 @@ export default function Lobby() {
                         setJoinTarget(null);
                         setJoinPassword("");
                       }}
+                      data-sfx="pong"
                       className={ui.secondary}
                     >
                       {t("cancel")}
@@ -372,6 +377,7 @@ export default function Lobby() {
               <h2 id="create-room-title">{t("newRoom")}</h2>
               <button
                 onClick={() => setShowCreate(false)}
+                data-sfx="back"
                 className={ui.iconButton}
                 aria-label={t("close")}
               >
@@ -506,11 +512,12 @@ export default function Lobby() {
                 <button
                   type="button"
                   onClick={() => setShowCreate(false)}
+                  data-sfx="pong"
                   className={ui.secondary}
                 >
                   {t("cancel")}
                 </button>
-                <button type="submit" className={ui.primary}>
+                <button type="submit" data-sfx="pong" className={ui.primary}>
                   {t("create")}
                   <FiArrowRight aria-hidden="true" />
                 </button>
@@ -531,6 +538,7 @@ export default function Lobby() {
               <p className="type-heading">{t("friends")}</p>
               <button
                 onClick={() => setShowFriends(false)}
+                data-sfx="back"
                 aria-label={t("close")}
                 className={ui.iconButton}
               >
