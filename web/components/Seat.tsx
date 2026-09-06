@@ -3,6 +3,8 @@ import { AppContext } from "../providers/AppStore";
 import { Player } from "../interfaces/index";
 import Card from "./Card";
 import Chip from "./Chip";
+import InputButton from "./InputButton";
+import { FiCheck, FiX, FiEye } from "react-icons/fi";
 import classNames from "classnames";
 import { useTranslation } from "../hooks/useTranslation";
 import { TranslationKey } from "../lib/translations";
@@ -218,6 +220,17 @@ export default function Seat({
               : t("viewRoomStats")
           }
         >
+          {allIn && (
+            <div className="gps-allin-fx" aria-hidden="true">
+              <span className="gps-allin-fx__wave" />
+              {Array.from({ length: 8 }, (_, i) => (
+                <i
+                  key={i}
+                  className={`gps-allin-fx__particle gps-allin-fx__particle--${i}`}
+                />
+              ))}
+            </div>
+          )}
           {/* This street's bet, above the seat, as a chip plus amount. */}
           {running && player.bet !== 0 && (
             <div className="gps-seat__bet">
@@ -284,6 +297,7 @@ export default function Seat({
           )}
 
           <div className="gps-seat__panel">
+            {allIn && <span className="gps-allin-sweep" aria-hidden="true" />}
             <div className="gps-seat__row">
               {winAmount !== undefined ? (
                 <strong
@@ -320,20 +334,33 @@ export default function Seat({
         </div>
 
         {canShow && (
-          <button
+          <InputButton
+            kind="bet"
+            label={t("showCards")}
+            icon={<FiEye className="gp-action-btn__icon" />}
+            disabled={!socket}
             onClick={(e) => {
               e.stopPropagation();
               if (socket) {
                 showHand(socket);
               }
             }}
-            className="btn btn-accent mt-1 w-full py-1 text-xs font-bold sm:text-sm"
-          >
-            {t("showCards")}
-          </button>
+            className="gp-seat-action"
+          />
         )}
         {!running && isMine && (
-          <button
+          <InputButton
+            kind={player.ready ? "check" : "bet"}
+            label={player.ready ? t("cancelReady") : t("ready")}
+            icon={
+              player.ready ? (
+                <FiX className="gp-action-btn__icon" />
+              ) : (
+                <FiCheck className="gp-action-btn__icon" />
+              )
+            }
+            pressed={player.ready}
+            disabled={!socket}
             onClick={(e) => {
               e.stopPropagation();
               if (player.stack === 0) {
@@ -347,15 +374,8 @@ export default function Seat({
                 toggleReady(socket);
               }
             }}
-            className={classNames(
-              // Narrower than the seat and centred, so it reads as a control
-              // under the seat rather than a bar.
-              "btn mx-auto mt-1 flex w-24 py-1 text-xs font-bold sm:w-36 sm:text-sm",
-              player.ready ? "btn-secondary" : "btn-confirm"
-            )}
-          >
-            {player.ready ? t("cancelReady") : t("ready")}
-          </button>
+            className="gp-seat-action"
+          />
         )}
       </div>
     );

@@ -3,7 +3,6 @@ import { Game as GameType } from "../interfaces";
 import { AppContext } from "../providers/AppStore";
 import { diffTableActions } from "../lib/tableFx";
 import { subscribeFx } from "../lib/fxBus";
-import classNames from "classnames";
 import Chip, { ChipTone, chipToneFor } from "./Chip";
 
 // Geometry mirroring Table.tsx's seat layout (percent within the table
@@ -27,14 +26,6 @@ type FlySpec = {
   color: string;
   ms: number;
   delay: number;
-};
-
-type TagSpec = {
-  id: number;
-  x: number;
-  y: number;
-  text: string;
-  tone: "action" | "fold" | "check";
 };
 
 let fxSeq = 1;
@@ -94,7 +85,6 @@ export default function TableFx({ game, maxPlayers }: props) {
   const rotation = me ? me.seatID - 1 : 0;
 
   const [flies, setFlies] = useState<FlySpec[]>([]);
-  const [tags, setTags] = useState<TagSpec[]>([]);
   // The rotation can settle after the seat is known; read the live value from
   // a ref inside the socket-driven callback instead of a stale closure.
   const rotationRef = useRef(rotation);
@@ -104,7 +94,6 @@ export default function TableFx({ game, maxPlayers }: props) {
 
   const dropChip = (id: number) =>
     setFlies((f) => f.filter((c) => c.id !== id));
-  const dropTag = (id: number) => setTags((t) => t.filter((x) => x.id !== id));
 
   function flyBetween(
     fromX: number,
@@ -173,7 +162,7 @@ export default function TableFx({ game, maxPlayers }: props) {
       const prev = last;
       last = snap;
 
-      // Bet / fold feedback within a live betting street (PreFlop..River).
+      // Bet feedback within a live betting street (PreFlop..River).
       let betAnimated = false;
       for (const ev of diffTableActions(prev, snap)) {
         const slot = seatSlot(snap.players, ev.position);
@@ -188,14 +177,6 @@ export default function TableFx({ game, maxPlayers }: props) {
           flyBetween(seat.x, seat.y, POT_X, POT_Y, tone, 0, 550);
           flyBetween(seat.x, seat.y, POT_X, POT_Y, tone, 140, 550);
           flyBetween(seat.x, seat.y, POT_X, POT_Y, tone, 280, 550);
-        } else if (ev.kind === "fold") {
-          const id = fxSeq++;
-          const done = window.setTimeout(() => dropTag(id), 800);
-          setTags((t) => [
-            ...t,
-            { id, x: seat.x, y: seat.y, text: "fold", tone: "fold" },
-          ]);
-          window.setTimeout(() => window.clearTimeout(done), 1000);
         }
       }
 
@@ -211,11 +192,6 @@ export default function TableFx({ game, maxPlayers }: props) {
           scheduleCollect(pots, players);
         }
       }
-
-      // Drop transient labels when a fresh hand starts.
-      if (!snap.running && prev && prev.running) {
-        setTags([]);
-      }
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -226,20 +202,6 @@ export default function TableFx({ game, maxPlayers }: props) {
     <div className="pointer-events-none absolute inset-0 z-30 overflow-visible">
       {flies.map((c) => (
         <FlyChip key={c.id} chip={c} onDone={dropChip} />
-      ))}
-      {tags.map((t) => (
-        <div
-          key={t.id}
-          className={classNames(
-            "animate-fx-tag absolute z-40 whitespace-nowrap rounded-md px-2 py-0.5 text-xs font-bold sm:text-sm",
-            t.tone === "fold" && "bg-red-600 text-ink",
-            t.tone === "action" && "bg-amber-500 text-brand",
-            t.tone === "check" && "bg-cardhi text-ink"
-          )}
-          style={{ left: `${t.x}%`, top: `${t.y - 14}%` }}
-        >
-          {t.text}
-        </div>
       ))}
     </div>
   );

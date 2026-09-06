@@ -1,1 +1,0 @@
-Open index.html. Click REPLAY ALL-IN to replay the burst animation.

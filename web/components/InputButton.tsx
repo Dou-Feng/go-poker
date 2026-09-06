@@ -1,4 +1,4 @@
-import { MouseEventHandler } from "react";
+import { MouseEventHandler, ReactNode } from "react";
 
 export type ActionKind = "check" | "bet" | "allin" | "fold";
 
@@ -11,6 +11,8 @@ const ICON_PATH: Record<ActionKind, string> = {
 
 type InputButtonProps = {
   kind: ActionKind;
+  icon?: ReactNode;
+  pressed?: boolean;
   label: string;
   /** Small English caption shown under the label. */
   subLabel?: string;
@@ -24,6 +26,8 @@ type InputButtonProps = {
 // subLabel is the small English caption under it.
 export default function InputButton({
   kind,
+  icon,
+  pressed,
   label,
   subLabel = "",
   disabled = false,
@@ -37,6 +41,7 @@ export default function InputButton({
       disabled={disabled}
       onClick={onClick}
       aria-label={label}
+      aria-pressed={pressed}
     >
       <span className="gp-action-btn__shadow" aria-hidden="true" />
       <span className="gp-action-btn__surface" aria-hidden="true" />
@@ -46,7 +51,9 @@ export default function InputButton({
 
       <span className="gp-action-btn__content">
         <span className="gp-action-btn__icon-wrap" aria-hidden="true">
-          <img src={ICON_PATH[kind]} alt="" className="gp-action-btn__icon" />
+          {icon ?? (
+            <img src={ICON_PATH[kind]} alt="" className="gp-action-btn__icon" />
+          )}
         </span>
 
         <span className="gp-action-btn__divider" aria-hidden="true" />

@@ -494,3 +494,255 @@
 .gps-seat--removable .gps-seat__avatar {
   box-shadow: 0 0 0 2px #f43f5e;
 }
+
+/* Burst → steady, adapted from tmp/allin_animation. The persistent state
+   class prevents normal game updates from restarting the entrance. */
+.gps-seat--allin {
+  transform-origin: center 70%;
+  animation: gps-allin-pop 0.72s cubic-bezier(0.2, 0.9, 0.18, 1);
+}
+.gps-seat--allin:not(.gps-seat--winner) .gps-seat__panel {
+  animation: gps-allin-flash 0.9s ease,
+    gps-allin-breathe 2.2s 0.9s ease-in-out infinite;
+}
+.gps-seat--allin .gps-seat__avatar {
+  border-color: #e5af47;
+  animation: gps-allin-avatar 0.9s ease;
+}
+.gps-seat--allin .gps-seat__status {
+  padding: 4px 5px;
+  border-radius: 6px;
+  color: #201507;
+  background: linear-gradient(#fff0b8, #eab54c 55%, #b87620);
+  box-shadow: 0 3px 8px #0005, inset 0 1px 0 #ffffff7a;
+  animation: gps-allin-tag 0.68s cubic-bezier(0.15, 1.4, 0.25, 1),
+    gps-allin-glow 2.2s 0.9s ease-in-out infinite;
+}
+.gps-allin-sweep {
+  position: absolute;
+  pointer-events: none;
+  inset: 0 auto 0 0;
+  width: 35%;
+  opacity: 0;
+  background: linear-gradient(90deg, transparent, #fff4cc3d, transparent);
+  animation: gps-allin-sweep 0.62s 0.08s ease-out;
+}
+.gps-allin-fx {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9;
+}
+.gps-allin-fx__wave {
+  position: absolute;
+  inset: 28% 8% 0;
+  border: 2px solid transparent;
+  border-radius: 24px;
+  opacity: 0;
+  animation: gps-allin-wave 0.72s ease-out;
+}
+.gps-allin-fx__particle {
+  position: absolute;
+  left: 50%;
+  top: 60%;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #f6d984;
+  opacity: 0;
+  box-shadow: 0 0 8px #f6d984b3;
+  animation: gps-allin-particle 0.68s ease-out;
+}
+.gps-allin-fx__particle--0 {
+  --x: -70px;
+  --y: -42px;
+}
+.gps-allin-fx__particle--1 {
+  --x: 66px;
+  --y: -34px;
+}
+.gps-allin-fx__particle--2 {
+  --x: -58px;
+  --y: 35px;
+}
+.gps-allin-fx__particle--3 {
+  --x: 72px;
+  --y: 40px;
+}
+.gps-allin-fx__particle--4 {
+  --x: -14px;
+  --y: -63px;
+}
+.gps-allin-fx__particle--5 {
+  --x: 24px;
+  --y: 60px;
+}
+.gps-allin-fx__particle--6 {
+  --x: 84px;
+  --y: 6px;
+}
+.gps-allin-fx__particle--7 {
+  --x: -84px;
+  --y: 5px;
+}
+@keyframes gps-allin-pop {
+  0% {
+    transform: scale(0.96);
+  }
+  24% {
+    transform: scale(1.1) translateY(-4px);
+  }
+  48% {
+    transform: scale(1.025);
+  }
+  72% {
+    transform: scale(1.05);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+@keyframes gps-allin-flash {
+  0%,
+  100% {
+    filter: brightness(1);
+  }
+  26% {
+    filter: brightness(1.5);
+  }
+  55% {
+    filter: brightness(1.12);
+  }
+}
+@keyframes gps-allin-glow {
+  0%,
+  100% {
+    filter: brightness(1);
+  }
+  50% {
+    filter: brightness(1.13);
+  }
+}
+@keyframes gps-allin-avatar {
+  30% {
+    box-shadow: 0 0 0 7px #ffdb8233, 0 0 36px #ffc24194;
+  }
+}
+@keyframes gps-allin-sweep {
+  0% {
+    left: 0;
+    opacity: 0;
+  }
+  18% {
+    opacity: 1;
+  }
+  100% {
+    left: 65%;
+    opacity: 0;
+  }
+}
+@keyframes gps-allin-tag {
+  0% {
+    transform: rotate(-3deg) scale(0.4);
+    opacity: 0;
+  }
+  42% {
+    transform: rotate(-5deg) scale(1.28);
+    opacity: 1;
+  }
+  70% {
+    transform: rotate(-2deg) scale(0.95);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+@keyframes gps-allin-wave {
+  0% {
+    transform: scale(0.75);
+    opacity: 0.9;
+    border-color: #f8d57ee6;
+  }
+  100% {
+    transform: scale(1.5);
+    opacity: 0;
+    border-color: transparent;
+  }
+}
+@keyframes gps-allin-particle {
+  0% {
+    opacity: 0;
+    transform: translate(0, 0) scale(0.4);
+  }
+  20% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(var(--x), var(--y)) scale(1);
+  }
+}
+@keyframes gps-allin-breathe {
+  0%,
+  100% {
+    box-shadow: 0 0 14px #e79f311f, inset 0 1px 0 #ffefca14;
+  }
+  50% {
+    box-shadow: 0 0 28px #e79f3142, inset 0 1px 0 #ffefca1a;
+  }
+}
+/* Anchor below the panel without changing the seat's table position.
+   The panel starts 12px (desktop 16px) to the right of the avatar edge. */
+.gp-action-btn.gp-seat-action {
+  position: absolute;
+  top: 100%;
+  left: calc(50% + 6px - 48px);
+  width: 96px;
+  height: 36px;
+  margin-top: 6px;
+}
+.gp-seat-action .gp-action-btn__content {
+  gap: 4px;
+  padding: 0 6px;
+}
+.gp-seat-action .gp-action-btn__icon-wrap {
+  width: 14px;
+  height: 14px;
+  flex-basis: 14px;
+}
+.gp-seat-action .gp-action-btn__icon {
+  width: 14px;
+  height: 14px;
+}
+.gp-seat-action .gp-action-btn__divider {
+  height: 18px;
+}
+.gp-seat-action .gp-action-btn__text {
+  min-width: 0;
+}
+.gp-seat-action .gp-action-btn__text strong {
+  font-size: 11px;
+  white-space: normal;
+  text-align: center;
+}
+@media (min-width: 640px) {
+  .gp-action-btn.gp-seat-action {
+    left: calc(50% + 8px - 52px);
+    width: 104px;
+    height: 40px;
+  }
+  .gp-seat-action .gp-action-btn__text strong {
+    font-size: 12px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .gps-seat--allin,
+  .gps-seat--allin .gps-seat__panel,
+  .gps-seat--allin .gps-seat__avatar,
+  .gps-seat--allin .gps-seat__status,
+  .gps-allin-sweep,
+  .gps-allin-fx__wave,
+  .gps-allin-fx__particle {
+    animation: none;
+  }
+}
