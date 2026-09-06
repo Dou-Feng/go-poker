@@ -94,6 +94,8 @@ func (t *table) canBuyIn(account string, amount uint) bool {
 func (t *table) resetSession() {
 	t.startNewSession()
 	t.ledger.reset()
+	// A new session means buy-ins start again: everyone can re-seat.
+	t.clearBusted()
 	t.sessionID = uuid.New().String()
 }
 

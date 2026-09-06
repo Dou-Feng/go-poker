@@ -158,6 +158,7 @@ export function SocketProvider(props: SocketProviderProps) {
               reserved: event.reserved ?? [],
               settleVotes: event.settleVotes ?? [],
               host: event.host ?? "",
+              busted: event.busted ?? false,
               actionTimeout: event.actionTimeout ?? 0,
               // The server sends time *left*, so a phone whose clock is off
               // by minutes still counts down correctly.

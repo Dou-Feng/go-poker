@@ -170,6 +170,9 @@ export type Game = {
   settleVotes: string[];
   /** Account UUID of the room host (the only one who manages bots). */
   host: string;
+  /** True when this account busted out of the tournament session: no empty
+   *  seats should be offered until the session resets. */
+  busted: boolean;
   /** Seconds each player gets to act; 0 = no clock (server clock.go). */
   actionTimeout: number;
   /** Local clock time (ms) when the player to act times out, or null. */

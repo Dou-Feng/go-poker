@@ -69,6 +69,11 @@ type table struct {
 	botState
 	// Per-turn action clock (see clock.go); zero timeout = off.
 	clock actionClock
+	// busted tracks accounts that busted out of a tournament session (max
+	// buy-ins used, stack 0). Their clients are not offered empty seats until
+	// the session resets (see autoSpectateBusted / clearBusted).
+	bustedMu sync.Mutex
+	busted   map[string]bool
 }
 
 // newTable creates a new table
@@ -92,6 +97,7 @@ func newTable(name string, redisClient *redis.Client, hub *Hub) *table {
 		settleVotes:   make(map[string]bool),
 		ledger:        newSessionLedger(),
 		sessionID:     uuid.New().String(),
+		busted:        make(map[string]bool),
 		botState:      botState{botDelays: defaultBotDelays},
 	}
 }
@@ -327,6 +333,29 @@ func (t *table) unregisterClient(client *Client) {
 	}
 }
 
+// censoredGameFor builds the per-client copy of a broadcast update-game: the
+// view is censored for the viewer's seat, and the payload carries whether this
+// account is busted out of the session (see markBusted).
+func (t *table) censoredGameFor(client *Client, m *updateGame) []byte {
+	game := updateGame{
+		base:              m.base,
+		Game:              m.Game.CensorFor(m.Game.ViewerNum(client.uuid)),
+		Reserved:          m.Reserved,
+		SettleVotes:       m.SettleVotes,
+		Host:              m.Host,
+		Busted:            t.isBusted(client.accountUUID),
+		ActionTimeout:     m.ActionTimeout,
+		ActionRemainingMs: m.ActionRemainingMs,
+	}
+
+	resp, err := json.Marshal(game)
+	if err != nil {
+		slog.Default().Warn("Marshal censored update game", "error", err)
+		return nil
+	}
+	return resp
+}
+
 // broadcastToClients fans one Redis-consumed message out to every connected
 // client. update-game payloads carry the uncensored view (the Redis channel is
 // internal); here, at the last hop, each client gets its own copy with every
@@ -349,7 +378,7 @@ func (t *table) broadcastToClients(message []byte) {
 	for client := range t.clients {
 		out := message
 		if game != nil {
-			out = game.censoredFor(client.uuid)
+			out = t.censoredGameFor(client, game)
 			if out == nil {
 				// Marshal failure: skip rather than fall back to the
 				// uncensored payload.
@@ -685,6 +714,31 @@ func (t *table) applySpectateReservations() {
 	}
 }
 
+// isBusted reports whether the account busted out of the current session and
+// cannot buy back in until it resets.
+func (t *table) isBusted(account string) bool {
+	t.bustedMu.Lock()
+	defer t.bustedMu.Unlock()
+	return t.busted[account]
+}
+
+// markBusted records that the account has no buy-ins left this session.
+func (t *table) markBusted(account string) {
+	if account == "" {
+		return
+	}
+	t.bustedMu.Lock()
+	t.busted[account] = true
+	t.bustedMu.Unlock()
+}
+
+// clearBusted forgets every busted account (a fresh session starts).
+func (t *table) clearBusted() {
+	t.bustedMu.Lock()
+	t.busted = make(map[string]bool)
+	t.bustedMu.Unlock()
+}
+
 // autoSpectateBusted moves players who are busted with no remaining buy-ins to
 // the spectator side, between hands.
 func (t *table) autoSpectateBusted() {
@@ -717,6 +771,7 @@ func (t *table) autoSpectateBusted() {
 		// Tell the player why they are suddenly watching; the ledger keeps
 		// them from taking a seat again this session (no buy-ins left).
 		t.notifyAccount(p.AccountUUID, createError(msgBustedOut))
+		t.markBusted(p.AccountUUID)
 		t.broadcast <- createNewLog(fmt.Sprintf("%s is out of chips and moves to the spectators", p.Username))
 	}
 }

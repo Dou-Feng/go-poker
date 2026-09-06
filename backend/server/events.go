@@ -1211,6 +1211,7 @@ func createUpdatedGame(c *Client) []byte {
 		Reserved:          c.table.reservations(),
 		SettleVotes:       c.table.settleVoteList(),
 		Host:              c.table.hostAccount(),
+		Busted:            c.table.isBusted(c.accountUUID),
 		ActionTimeout:     timeoutSec,
 		ActionRemainingMs: remainingMs,
 	}

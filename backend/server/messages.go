@@ -337,6 +337,10 @@ type updateGame struct {
 	// milliseconds the player to act has left at the time of this update.
 	ActionTimeout     int   `json:"actionTimeout,omitempty"`
 	ActionRemainingMs int64 `json:"actionRemainingMs,omitempty"`
+	// Busted is true for the viewer when they busted out of the current
+	// tournament session (max buy-ins used, stack 0): the client should not
+	// offer them empty seats they can no longer take.
+	Busted bool `json:"busted,omitempty"`
 }
 
 type updatePlayerUUID struct {

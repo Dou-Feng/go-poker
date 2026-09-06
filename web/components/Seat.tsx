@@ -400,6 +400,11 @@ export default function Seat({
   }
 
   const buyIn = game.config.buyIn ?? 200;
+  // A viewer who cannot actually join (busted out of a tournament session, or
+  // not enough chips in the wallet) must not be offered empty seats: the
+  // server would only reject them.
+  const cannotJoin =
+    !!game.busted || (appState.chips != null && appState.chips < buyIn);
   // take-seat: sits down between hands; during a hand it claims the seat for
   // the next hand instead (the server seats the claimant, not ready, when the
   // hand ends). Tapping an own claim again cancels it.
@@ -459,7 +464,7 @@ export default function Seat({
   // them the empty slots stay visible as claimable "next hand" seats.
   if (running) {
     const canClaim = !appState.clientID && !!appState.username;
-    if (!canClaim) {
+    if (!canClaim || cannotJoin) {
       return null;
     }
     return (
@@ -495,8 +500,11 @@ export default function Seat({
   const me = game.players.find((p) => p.uuid === appState.clientID);
   const canMove = !!me && !me.ready && !running;
   const canSit = !appState.clientID || canMove;
+  // A seated player may still move; a spectator who cannot join is offered
+  // nothing at all.
+  const spectatorBlocked = !appState.clientID && cannotJoin;
 
-  if (canSit) {
+  if (canSit && !spectatorBlocked) {
     const handleClick = () => {
       if (!socket) {
         return;
