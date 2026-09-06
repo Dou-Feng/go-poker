@@ -50,22 +50,6 @@ export function useHandLabel() {
   };
 }
 
-function chipPosition(id: number) {
-  return classNames(
-    {
-      // The showdown hand label sits on the side of the seat that faces the
-      // table centre (the bet pill is above the seat, D/SB/BB on the avatar).
-      "left-1/2 -translate-x-1/2 -top-9 flex-row": id === 1, // bottom
-      "right-1 -top-9 flex-row": id === 2, // bottom-left
-      "right-1 top-full mt-1 flex-col": id === 3, // top-left
-      "left-1/2 -translate-x-1/2 top-full mt-1 flex-row": id === 4, // top
-      "left-1 top-full mt-1 flex-row": id === 5, // top-right
-      "left-1 -top-9 flex-row": id === 6, // bottom-right
-    },
-    "absolute flex items-center justify-start z-10"
-  );
-}
-
 export default function Seat({ player, id, visualId, reveal }: seatProps) {
   const { appState, dispatch } = useContext(AppContext);
   const socket = useSocket();
@@ -241,6 +225,13 @@ export default function Seat({ player, id, visualId, reveal }: seatProps) {
 
           {running && (
             <div className="gps-seat__cards">
+              {/* Showdown hand name, as a translucent pill over the cards,
+                  only for players whose cards are actually revealed. */}
+              {player.bestHand && (reveal || player.revealed) && (
+                <span className="gps-seat__hand animate-fade-in">
+                  {handLabel(player.bestHand)}
+                </span>
+              )}
               {player.cards.map((c, i) => (
                 <Card
                   key={`${i}-${c}`}
@@ -306,21 +297,6 @@ export default function Seat({ player, id, visualId, reveal }: seatProps) {
             {player.ready ? t("cancelReady") : t("ready")}
           </button>
         )}
-        <div className={chipPosition(visualId ?? id)}>
-          {/* Best hand at showdown: shown on the table-facing side of the
-              seat, only for players whose cards are actually revealed
-              (participated in the showdown). */}
-          {running && player.bestHand && (reveal || player.revealed) && (
-            <p
-              className={classNames(
-                "animate-fade-in max-w-28 sm:max-w-36 truncate rounded-3xl bg-tablehi/90 px-2 text-xs font-semibold text-amber-300 sm:text-sm",
-                (visualId ?? id) === 3 ? "flex-col items-start" : "flex-row"
-              )}
-            >
-              {handLabel(player.bestHand)}
-            </p>
-          )}
-        </div>
       </div>
     );
   }
@@ -394,27 +370,24 @@ export default function Seat({ player, id, visualId, reveal }: seatProps) {
     );
   }
 
-  // During a hand a spectator can claim the seat for the next hand; seated
-  // players and anonymous viewers just see the empty slot.
+  // During a hand empty seats are not drawn: seated players and anonymous
+  // viewers see only the players (and any seat a newcomer has claimed, above).
+  // A logged-in spectator is the exception: they need a target to tap, so for
+  // them the empty slots stay visible as claimable "next hand" seats.
   if (running) {
     const canClaim = !appState.clientID && !!appState.username;
+    if (!canClaim) {
+      return null;
+    }
     return (
       <div>
         <button
-          disabled={!canClaim}
           onClick={sitOrClaim}
-          title={canClaim ? t("reserveSeat") : undefined}
-          className={classNames(
-            "m-1 h-16 w-32 rounded-2xl border bg-transparent p-2 sm:m-4 sm:h-20 sm:w-56",
-            canClaim
-              ? "border-amber-300/50 text-ink transition-colors hover:bg-card"
-              : "border-muted/40 text-muted opacity-20"
-          )}
+          title={t("reserveSeat")}
+          className="m-1 h-16 w-32 rounded-2xl border border-amber-300/50 bg-transparent p-2 text-ink transition-colors hover:bg-card sm:m-4 sm:h-20 sm:w-56"
         >
           <p className="text-3xl sm:text-4xl">{t("open")}</p>
-          <h2 className="text-xs opacity-70 sm:text-base">
-            {canClaim ? t("nextHand") : id}
-          </h2>
+          <h2 className="text-xs opacity-70 sm:text-base">{t("nextHand")}</h2>
         </button>
       </div>
     );

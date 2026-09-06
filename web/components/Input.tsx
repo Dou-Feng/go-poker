@@ -92,10 +92,12 @@ export default function Input() {
   // The raise panel opens above the bar (the bar stays put underneath, its
   // 加注 key toggles the panel).
   return (
-    <div className="pointer-events-auto flex w-full flex-col items-center gap-4 px-2 pt-2 pb-[10dvh]">
+    // The strip spans the screen but must not swallow taps beside the keys
+    // (the room menu sits bottom-right): only the panel and bar are targets.
+    <div className="pointer-events-none flex w-full flex-col items-center gap-4 px-2 pt-2 pb-[10dvh]">
       {showRaise && <RaiseInput onClose={() => setShowRaise(false)} />}
       <div
-        className="gp-action-bar animate-fade-in"
+        className="gp-action-bar animate-fade-in pointer-events-auto"
         role="group"
         aria-label="玩家操作"
       >

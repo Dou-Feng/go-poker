@@ -94,7 +94,7 @@ export default function RaiseInput({ onClose }: raiseProps) {
 
   return (
     <div
-      className="gp-raise-panel animate-fade-in"
+      className="gp-raise-panel animate-fade-in pointer-events-auto"
       role="dialog"
       aria-label="加注"
     >

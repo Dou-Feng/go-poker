@@ -180,20 +180,14 @@ export default function TableFx({ game, maxPlayers }: props) {
         if (slot === null) continue;
         const seat = seatXY(slot, maxPlayersRef.current);
         if (ev.kind === "bet") {
-          // A short stream of chips flies from the bettor's seat to the pot,
-          // with a "+amount" label popping above the seat.
+          // A short stream of chips flies from the bettor's seat to the pot.
+          // No "+amount" tag: the seat's own bet pill already shows the
+          // number, so the tag was just noise over the cards.
           betAnimated = true;
           const tone = chipToneFor(ev.amount);
           flyBetween(seat.x, seat.y, POT_X, POT_Y, tone, 0, 550);
           flyBetween(seat.x, seat.y, POT_X, POT_Y, tone, 140, 550);
           flyBetween(seat.x, seat.y, POT_X, POT_Y, tone, 280, 550);
-          const id = fxSeq++;
-          const done = window.setTimeout(() => dropTag(id), 900);
-          setTags((t) => [
-            ...t,
-            { id, x: seat.x, y: seat.y, text: `+${ev.amount}`, tone: "action" },
-          ]);
-          window.setTimeout(() => window.clearTimeout(done), 1000);
         } else if (ev.kind === "fold") {
           const id = fxSeq++;
           const done = window.setTimeout(() => dropTag(id), 800);

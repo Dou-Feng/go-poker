@@ -15,8 +15,8 @@
   --gps-w: 128px;
   --gps-avatar: 44px;
   --gps-card-h: 56px; /* Card.tsx h-14 */
-  --gps-panel-h: 50px;
-  --gps-overlap: 14px; /* how far the cards sit down into the panel */
+  --gps-panel-h: 56px;
+  --gps-overlap: 12px; /* how far the cards sit down into the panel */
   --gps-panel-left: 12px;
   --gps-name: 14px;
   --gps-stack: 15px;
@@ -41,8 +41,8 @@
     --gps-w: 224px;
     --gps-avatar: 56px;
     --gps-card-h: 96px; /* Card.tsx sm:h-24 */
-    --gps-panel-h: 62px;
-    --gps-overlap: 18px;
+    --gps-panel-h: 68px;
+    --gps-overlap: 16px;
     --gps-panel-left: 16px;
     --gps-name: 16px;
     --gps-stack: 18px;
@@ -217,6 +217,32 @@
   }
 }
 
+/* Showdown hand name over the hole cards: the bet pill's look, translucent
+   so the cards read through it. */
+.gps-seat__hand {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 6;
+  max-width: calc(100% + 8px);
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: rgba(6, 20, 28, 0.72);
+  border: 1px solid rgba(211, 177, 102, 0.45);
+  color: #f3d99d;
+  font-size: var(--gps-bet);
+  font-weight: 800;
+  line-height: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  pointer-events: none;
+}
+
 /* ---- info panel ---- */
 .gps-seat__panel {
   position: absolute;
@@ -224,7 +250,12 @@
   right: 0;
   bottom: 0;
   height: var(--gps-panel-h);
-  padding: calc(var(--gps-overlap) + 3px) 6px 4px
+  /* The cards eat the top --gps-overlap of the panel; the text block is
+     centred in what is left, clear of the bottom edge. */
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: calc(var(--gps-overlap) + 2px) 6px 6px
     calc(var(--gps-avatar) + 6px - var(--gps-panel-left));
   border-radius: 14px;
   text-align: left;
@@ -242,7 +273,7 @@
 
 /* Idle seats have no cards eating the top of the panel. */
 .gps-seat--idle .gps-seat__panel {
-  padding-top: 9px;
+  padding-top: 6px;
 }
 
 @media (min-width: 640px) {
@@ -252,7 +283,7 @@
   }
 
   .gps-seat--idle .gps-seat__panel {
-    padding-top: 12px;
+    padding-top: 8px;
   }
 }
 
