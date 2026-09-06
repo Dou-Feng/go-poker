@@ -1,0 +1,277 @@
+.page {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  min-height: 100svh;
+  color: #e8f1f7;
+  background-color: #0e1319;
+}
+.page::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(
+    ellipse at 50% 45%,
+    #040c14d9,
+    #040c1499 55%,
+    #040c1466
+  );
+}
+.toolbar,
+.content,
+.footer {
+  position: relative;
+}
+.toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 16px 20px 0;
+}
+.account {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 8px 12px;
+  background: #0c1922b3;
+  border-radius: 14px;
+}
+.profile {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  text-align: left;
+}
+.profile span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 42vw;
+}
+.wallet {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 10px;
+  min-height: 40px;
+  color: #f4cf72;
+  font-variant-numeric: tabular-nums;
+}
+.wallet > svg:last-child {
+  margin-left: 6px;
+  color: #acbfcd;
+  font-size: 20px;
+}
+.tools {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  align-items: center;
+  padding: 2px 0;
+  background: #0c192299;
+  border-radius: 12px;
+}
+.tools > div {
+  display: flex;
+  justify-content: center;
+}
+.content {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  width: 100%;
+  max-width: 880px;
+  margin: 0 auto;
+  padding: 0 20px;
+}
+.brand {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin: 22px 0 24px;
+}
+.brand > svg {
+  font-size: 24px;
+  color: #a1d7ee;
+  margin-bottom: 6px;
+}
+.brand > p {
+  font-size: 30px;
+  font-weight: 800;
+  line-height: 1.15;
+}
+.brand > span {
+  font-size: 8px;
+  letter-spacing: 3px;
+  margin-top: 5px;
+  color: #74a2b8;
+}
+.brand h1 {
+  font-size: 34px;
+  font-weight: 700;
+  margin-top: 20px;
+  line-height: 1.2;
+}
+.actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 30px;
+}
+.rooms {
+  flex: 1;
+}
+.rooms > h2 {
+  margin-bottom: 14px;
+  font-size: 15px;
+  color: #9eb6c6;
+}
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  min-height: 290px;
+  padding: 28px 8px 44px;
+}
+.empty .emptySpade {
+  font-size: 68px;
+  color: #85bed8;
+  filter: drop-shadow(0 0 20px #36c5f01a);
+}
+.empty h3 {
+  margin-top: 22px;
+  font-size: 24px;
+  font-weight: 600;
+}
+.empty p {
+  max-width: 320px;
+  margin-top: 12px;
+  font-size: 14px;
+  line-height: 1.7;
+  color: #98aebb;
+}
+.roomList {
+  display: grid;
+  gap: 12px;
+  padding-bottom: 24px;
+}
+.room {
+  padding: 18px;
+  border-radius: 16px;
+  background: #101e29db;
+  border: 1px solid #7ea7c01f;
+}
+.roomSummary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.roomSummary > button {
+  flex-shrink: 0;
+}
+.roomText {
+  min-width: 0;
+}
+.roomText h3 {
+  overflow-wrap: anywhere;
+  font-size: 17px;
+  font-weight: 600;
+}
+.roomText h3 svg {
+  display: inline;
+  vertical-align: middle;
+  margin-left: 8px;
+  width: 14px;
+  color: #9eb6c6;
+}
+.roomText p {
+  margin-top: 6px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: #98aebb;
+}
+.badge {
+  display: inline-block;
+  margin-top: 6px;
+  padding: 2px 6px;
+  border-radius: 5px;
+  color: #dfc38b;
+  background: #b18b3526;
+  font-size: 11px;
+}
+.joinForm {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+.footer {
+  padding: 20px 16px max(20px, env(safe-area-inset-bottom));
+  font-size: 10px;
+  letter-spacing: 1px;
+  color: #7290a2;
+  text-align: center;
+}
+.page button:focus-visible {
+  outline: 2px solid #7fddff;
+  outline-offset: 3px;
+}
+@media (min-width: 640px) {
+  .toolbar {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    padding-top: 24px;
+  }
+  .account {
+    min-width: 280px;
+  }
+  .profile span {
+    max-width: 220px;
+  }
+  .tools {
+    gap: 8px;
+    padding: 4px 8px;
+  }
+  .brand {
+    margin-top: 32px;
+  }
+  .brand h1 {
+    font-size: 40px;
+  }
+  .content {
+    padding: 0 32px;
+  }
+  .empty {
+    min-height: 350px;
+  }
+}
+@media (max-width: 360px) {
+  .toolbar {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+  .content {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+}
+
+.friendRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px;
+  border-radius: 12px;
+  background: #09162066;
+}

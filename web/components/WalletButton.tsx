@@ -1,4 +1,5 @@
 import { useContext } from "react";
+import { useTranslation } from "../hooks/useTranslation";
 import { AppContext } from "../providers/AppStore";
 
 type WalletButtonProps = {
@@ -6,11 +7,13 @@ type WalletButtonProps = {
 };
 
 export default function WalletButton({ onOpen }: WalletButtonProps) {
+  const { t } = useTranslation();
   const { appState } = useContext(AppContext);
 
   return (
     <button
       onClick={onOpen}
+      aria-label={`${t("recharge")}: ${appState.chips ?? 0} ${t("chips")}`}
       className="inline-flex w-20 flex-row items-center justify-between rounded-md bg-card/90 px-2.5 py-1 text-sm font-medium text-amber-300 shadow hover:bg-floor"
     >
       <img
@@ -20,9 +23,7 @@ export default function WalletButton({ onOpen }: WalletButtonProps) {
         aria-hidden
         className="h-4 w-4"
       />
-      <span className="type-num leading-none">
-        {appState.chips ?? 0}
-      </span>
+      <span className="type-num leading-none">{appState.chips ?? 0}</span>
     </button>
   );
 }

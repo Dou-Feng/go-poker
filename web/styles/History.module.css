@@ -1,0 +1,103 @@
+.historyDialog {
+  overflow: hidden;
+}
+.historyHint {
+  flex-shrink: 0;
+  margin: -6px 0 18px;
+  color: #91aabb;
+  font-size: 13px;
+}
+.historyList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+}
+.historyRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+  width: 100%;
+  min-height: 88px;
+  padding: 14px 12px;
+  border: 1px solid #7ea7c024;
+  border-radius: 14px;
+  background: #09162066;
+  text-align: left;
+}
+.historyRow:hover {
+  background: #1b3040;
+  border-color: #7ea7c04d;
+}
+.historyRow > :first-child {
+  flex-shrink: 0;
+}
+.historyText {
+  flex: 1;
+  min-width: 0;
+}
+.historyText p {
+  font-size: 15px;
+  overflow-wrap: anywhere;
+}
+.historyText span,
+.historyText time {
+  display: block;
+  color: #94adbd;
+  font-size: 12px;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+.historyResult {
+  max-width: 35%;
+  text-align: right;
+}
+.historyResult p {
+  font-size: 16px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+.historyResult span {
+  color: #94adbd;
+  font-size: 11px;
+}
+.positive {
+  color: #42d7a2;
+}
+.negative {
+  color: #f27b90;
+}
+.chevron {
+  flex-shrink: 0;
+  width: 16px;
+  color: #a3b8c6;
+}
+.historyEmpty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 200px;
+  gap: 18px;
+  color: #94adbd;
+  font-size: 14px;
+}
+.historyEmpty svg {
+  width: 38px;
+  height: 38px;
+  color: #85bed8;
+}
+@media (max-width: 360px) {
+  .historyRow {
+    gap: 8px;
+    padding: 12px 8px;
+  }
+  .chevron {
+    display: none;
+  }
+}

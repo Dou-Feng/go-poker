@@ -77,7 +77,7 @@ export default function Profile() {
     // Above the scoreboards (z-50, some rendered through a body portal) so a
     // player tapped on a session board opens on top of it.
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4">
-      <div className="w-full max-w-sm rounded-lg bg-card p-6 shadow-2xl">
+      <div className="max-h-[calc(100dvh-2rem)] w-full max-w-sm overflow-y-auto rounded-lg bg-card p-4 shadow-2xl sm:p-6">
         <div className="mb-4 flex flex-row items-center justify-between">
           <div className="flex flex-row items-center gap-3">
             <button
@@ -177,6 +177,7 @@ export default function Profile() {
                 setShowPicker(false);
                 dispatch({ type: "setProfile", payload: null });
               }}
+              aria-label={t("close")}
               className="btn btn-text"
             >
               ✕
@@ -193,6 +194,7 @@ export default function Profile() {
                   value={newUsername}
                   onChange={(e) => setNewUsername(e.target.value)}
                   placeholder={t("newUsername")}
+                  aria-label={t("newUsername")}
                   className="min-w-0 flex-1 rounded-md bg-floor px-2 py-1.5 text-sm text-ink outline-none"
                 />
                 <button
@@ -212,6 +214,7 @@ export default function Profile() {
                     setShowChangeUsername(false);
                     setNewUsername("");
                   }}
+                  aria-label={t("cancel")}
                   className="btn btn-secondary"
                 >
                   ✕

@@ -2,7 +2,7 @@ import { MouseEventHandler, ReactNode } from "react";
 import classNames from "classnames";
 
 // Game action keys (call / bet / all-in / fold). They are deliberately their
-// own small system (see `.action-key*` in styles/index.css) rather than the
+// own small system (see `.action-key*` in styles/game.css) rather than the
 // toolbar `btn` variants: thumb-sized targets, dark-gold edged charcoal, and
 // one risk colour per action so the bar reads at a glance. A small icon
 // (16–20px) sits before the label to lower recognition effort.

@@ -11,7 +11,11 @@ import Portal from "./Portal";
 const sliderClass =
   "h-1.5 w-full cursor-pointer appearance-none rounded-full bg-cardhi accent-cyan-700";
 
-export default function Settings() {
+type SettingsProps = {
+  buttonClassName?: string;
+};
+
+export default function Settings({ buttonClassName }: SettingsProps) {
   const { language, setLanguage, t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [volume, setVolume] = useState(() => Math.round(getSfxVolume() * 100));
@@ -34,7 +38,8 @@ export default function Settings() {
       <button
         onClick={() => setOpen(true)}
         title={t("settings")}
-        className="btn btn-icon"
+        aria-label={t("settings")}
+        className={buttonClassName ?? "btn btn-icon"}
       >
         <FiSettings size="1rem" />
       </button>
@@ -42,10 +47,14 @@ export default function Settings() {
       {open && (
         <Portal>
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-            <div className="w-full max-w-xs rounded-lg bg-card p-5 shadow-2xl">
+            <div className="max-h-[calc(100dvh-2rem)] w-full max-w-xs overflow-y-auto rounded-lg bg-card p-5 shadow-2xl">
               <div className="mb-4 flex flex-row items-center justify-between">
                 <p className="type-heading">{t("settings")}</p>
-                <button onClick={() => setOpen(false)} className="btn btn-text">
+                <button
+                  onClick={() => setOpen(false)}
+                  aria-label={t("close")}
+                  className="btn btn-text"
+                >
                   ✕
                 </button>
               </div>
@@ -55,12 +64,14 @@ export default function Settings() {
                 <div className="flex flex-row gap-2">
                   <button
                     onClick={() => setLanguage("en")}
+                    aria-pressed={language === "en"}
                     className={optionButton(language === "en")}
                   >
                     English
                   </button>
                   <button
                     onClick={() => setLanguage("zh")}
+                    aria-pressed={language === "zh"}
                     className={optionButton(language === "zh")}
                   >
                     中文
@@ -79,6 +90,7 @@ export default function Settings() {
                     min={0}
                     max={100}
                     step={5}
+                    aria-label={t("sfx")}
                     value={volume}
                     onChange={(e) => applyVolume(Number(e.target.value))}
                     onPointerUp={() => playSfx("click")}
@@ -90,6 +102,8 @@ export default function Settings() {
                       applyVolume(volume === 0 ? 50 : 0);
                     }}
                     title={t("sfx")}
+                    aria-label={t("sfx")}
+                    aria-pressed={volume === 0}
                     className="btn btn-icon"
                   >
                     {volume === 0 ? "🔇" : "🔊"}
@@ -113,6 +127,7 @@ export default function Settings() {
                       min={0}
                       max={100}
                       step={5}
+                      aria-label={t("micVolume")}
                       value={micPct}
                       onChange={(e) =>
                         voice.setMicVolume(Number(e.target.value) / 100)
@@ -133,6 +148,7 @@ export default function Settings() {
                       min={0}
                       max={100}
                       step={5}
+                      aria-label={t("othersVolume")}
                       value={outPct}
                       onChange={(e) =>
                         voice.setOutputVolume(Number(e.target.value) / 100)
@@ -147,6 +163,7 @@ export default function Settings() {
                         void voice.setEchoCancellation(!v.echoCancellation)
                       }
                       role="switch"
+                      aria-label={t("echoCancellation")}
                       aria-checked={v.echoCancellation}
                       title={t("echoCancellationHint")}
                       className={optionButton(v.echoCancellation)}

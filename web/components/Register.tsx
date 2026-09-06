@@ -1,7 +1,10 @@
 import React, { useContext, useEffect, useRef, useState } from "react";
 import { useSocket } from "../hooks/useSocket";
 import { AppContext } from "../providers/AppStore";
-import Footer from "./Footer";
+import { FiUser, FiLock, FiArrowRight } from "react-icons/fi";
+import { FaDiscord, FaSteam } from "react-icons/fa";
+import { FcGoogle } from "react-icons/fc";
+import styles from "../styles/Register.module.css";
 import Settings from "./Settings";
 import { registerUser, login } from "../actions/actions";
 import { useTranslation } from "../hooks/useTranslation";
@@ -47,138 +50,195 @@ export default function Register() {
     }
   };
 
+  const switchMode = (next: "register" | "login") => {
+    setMode(next);
+    dispatch({ type: "setAuthError", payload: null });
+  };
+
   return (
-    <div className="login-wallpaper flex min-h-screen flex-col">
-      <div className="flex w-full justify-end px-4 py-2">
+    <main className={styles.page}>
+      <div className={styles.mask} aria-hidden="true" />
+      <div className={styles.settings}>
         <Settings />
       </div>
-      <div className="flex flex-grow flex-col items-center justify-center px-4">
-        <h1 className="type-display mb-10 text-5xl">{t("title")}</h1>
-        <div className="flex flex-col items-center gap-2">
-          <div className="mb-2 flex flex-row gap-1 rounded-md bg-card p-1">
-            <button
-              onClick={() => setMode("register")}
-              className={`rounded-sm px-4 py-1 text-sm ${
-                mode === "register"
-                  ? "bg-cyan-900 text-ink"
-                  : "text-ink hover:text-ink"
-              }`}
-            >
-              {t("signUp")}
-            </button>
-            <button
-              onClick={() => setMode("login")}
-              className={`rounded-sm px-4 py-1 text-sm ${
-                mode === "login"
-                  ? "bg-cyan-900 text-ink"
-                  : "text-ink hover:text-ink"
-              }`}
-            >
-              {t("logIn")}
-            </button>
+      <section className={styles.shell} aria-label={t("title")}>
+        <header className={styles.brand}>
+          <div className={styles.symbol} aria-hidden="true">
+            <span />♠<span />
           </div>
-
-          <div className="grid">
-            <div
-              className={`col-start-1 row-start-1 flex flex-col items-center gap-2 ${
-                mode === "register" ? "" : "invisible"
-              }`}
-              aria-hidden={mode !== "register"}
-            >
-              <input
-                ref={registerField}
-                className="w-64 rounded-sm bg-floor py-2 pl-4 text-ink focus:outline-none"
-                type="text"
-                value={username}
-                placeholder={t("username")}
-                maxLength={20}
-                onChange={(e) => setUsername(e.target.value)}
-              />
-              <input
-                className="w-64 rounded-sm bg-floor py-2 pl-4 text-ink focus:outline-none"
-                type="text"
-                value={uuid}
-                placeholder={t("uuid")}
-                maxLength={32}
-                onChange={(e) => setUuid(e.target.value)}
-              />
-              <p className="type-caption">{t("uuidHint")}</p>
-              <input
-                className="w-64 rounded-sm bg-floor py-2 pl-4 text-ink focus:outline-none"
-                type="password"
-                value={password}
-                placeholder={t("password")}
-                maxLength={64}
-                onChange={(e) => setPassword(e.target.value)}
-              />
-              <div className="flex flex-row items-center gap-1 py-1">
-                {AVATARS.map((a) => (
-                  <button
-                    key={a}
-                    type="button"
-                    onClick={() => setAvatar(a)}
-                    className={`rounded-md p-1 text-2xl ${
-                      avatar === a ? "bg-cardhi" : "hover:bg-floor"
-                    }`}
-                  >
-                    {a}
-                  </button>
-                ))}
-              </div>
-              <button
-                disabled={username == "" || uuid == "" || password == ""}
-                onClick={submit}
-                className="btn btn-primary"
-              >
-                {t("signUp")}
-              </button>
-            </div>
-            <div
-              className={`col-start-1 row-start-1 flex flex-col items-center gap-2 ${
-                mode === "login" ? "" : "invisible"
-              }`}
-              aria-hidden={mode !== "login"}
-            >
-              <input
-                ref={loginField}
-                className="w-64 rounded-sm bg-floor py-2 pl-4 text-ink focus:outline-none"
-                type="text"
-                value={identifier}
-                placeholder={t("identifier")}
-                maxLength={32}
-                onChange={(e) => setIdentifier(e.target.value)}
-              />
-              <input
-                className="w-64 rounded-sm bg-floor py-2 pl-4 text-ink focus:outline-none"
-                type="password"
-                value={password}
-                placeholder={t("password")}
-                maxLength={64}
-                onChange={(e) => setPassword(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    submit();
-                  }
-                }}
-              />
-              <button
-                disabled={identifier == "" || password == ""}
-                onClick={submit}
-                className="btn btn-ghost"
-              >
-                {t("logIn")}
-              </button>
-            </div>
-          </div>
-
-          {/* Fixed-height slot: the error message appearing/disappearing
-              must not re-center (and jump) the whole block. */}
-          <p className="mt-2 h-5 text-sm text-rose-400">
-            {appState.authError ? tError(appState.authError) : ""}
+          <h1>GoPoker</h1>
+          <p>
+            PLAY <b>•</b> MEET <b>•</b> ENJOY
           </p>
+        </header>
+        <div className={styles.switch} aria-label={t("authMode")}>
+          {(["register", "login"] as const).map((item) => (
+            <button
+              key={item}
+              type="button"
+              aria-pressed={mode === item}
+              className={mode === item ? styles.active : ""}
+              onClick={() => switchMode(item)}
+            >
+              {t(item === "register" ? "signUp" : "logIn")}
+            </button>
+          ))}
         </div>
-      </div>
-      <Footer />
-    </div>
+        <div className={styles.forms}>
+          {(["register", "login"] as const).map((item) => {
+            const registering = item === "register";
+            return (
+              <form
+                key={item}
+                className={`${styles.form} ${
+                  mode !== item ? styles.hidden : ""
+                }`}
+                aria-hidden={mode !== item}
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  submit();
+                }}
+              >
+                {registering && (
+                  <Field
+                    inputRef={registerField}
+                    icon={<FiUser />}
+                    label={t("username")}
+                    value={username}
+                    onChange={setUsername}
+                    maxLength={20}
+                    autoComplete="nickname"
+                  />
+                )}
+                <Field
+                  inputRef={registering ? undefined : loginField}
+                  icon={<FiLock />}
+                  label={registering ? t("authUserId") : t("identifier")}
+                  hint={registering ? t("uuidHint") : undefined}
+                  value={registering ? uuid : identifier}
+                  onChange={registering ? setUuid : setIdentifier}
+                  maxLength={32}
+                  autoComplete="username"
+                />
+                <Field
+                  icon={<FiLock />}
+                  label={t("password")}
+                  type="password"
+                  value={password}
+                  onChange={setPassword}
+                  maxLength={64}
+                  autoComplete={
+                    registering ? "new-password" : "current-password"
+                  }
+                />
+                {registering && (
+                  <fieldset className={styles.avatarSection}>
+                    <legend>{t("authChooseAvatar")}</legend>
+                    <div className={styles.avatars}>
+                      {AVATARS.map((a, index) => (
+                        <button
+                          key={a}
+                          type="button"
+                          aria-label={`${t("authAvatar")} ${index + 1}`}
+                          aria-pressed={avatar === a}
+                          onClick={() => setAvatar(a)}
+                          className={avatar === a ? styles.selected : ""}
+                        >
+                          {a}
+                        </button>
+                      ))}
+                    </div>
+                  </fieldset>
+                )}
+                <button
+                  type="submit"
+                  className={styles.primary}
+                  disabled={
+                    password === "" ||
+                    (registering
+                      ? username === "" || uuid === ""
+                      : identifier === "")
+                  }
+                >
+                  {t(registering ? "signUp" : "logIn")}
+                  <FiArrowRight aria-hidden="true" />
+                </button>
+              </form>
+            );
+          })}
+        </div>
+        <p className={styles.error} role="status" aria-live="polite">
+          {appState.authError ? tError(appState.authError) : ""}
+        </p>
+        <div className={styles.divider}>
+          <span />
+          {t("authOtherMethods")}
+          <span />
+        </div>
+        <div className={styles.oauth}>
+          {[
+            { name: "Google", icon: <FcGoogle /> },
+            { name: "Discord", icon: <FaDiscord color="#8993ff" /> },
+            { name: "Steam", icon: <FaSteam /> },
+          ].map(({ name, icon }) => (
+            <button
+              key={name}
+              type="button"
+              disabled
+              aria-label={`${name}: ${t("authUnavailable")}`}
+              title={t("authUnavailable")}
+            >
+              {icon}
+            </button>
+          ))}
+        </div>
+        <p className={styles.note}>{t("authUnavailable")}</p>
+      </section>
+    </main>
+  );
+}
+
+interface FieldProps {
+  inputRef?: React.Ref<HTMLInputElement>;
+  icon: React.ReactNode;
+  label: string;
+  hint?: string;
+  type?: string;
+  value: string;
+  maxLength: number;
+  autoComplete: string;
+  onChange: (value: string) => void;
+}
+
+function Field({
+  inputRef,
+  icon,
+  label,
+  hint,
+  type = "text",
+  value,
+  maxLength,
+  autoComplete,
+  onChange,
+}: FieldProps) {
+  return (
+    <label className={styles.field}>
+      <span className={styles.fieldIcon} aria-hidden="true">
+        {icon}
+      </span>
+      <input
+        ref={inputRef}
+        aria-label={label}
+        title={hint}
+        type={type}
+        placeholder={label}
+        required
+        value={value}
+        maxLength={maxLength}
+        autoComplete={autoComplete}
+        onChange={(event) => onChange(event.target.value)}
+      />
+      {hint && <span className={styles.hint}>{hint}</span>}
+    </label>
   );
 }

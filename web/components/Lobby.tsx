@@ -1,7 +1,9 @@
 import { useContext, useEffect, useState } from "react";
 import { useSocket } from "../hooks/useSocket";
 import { AppContext } from "../providers/AppStore";
-import Footer from "./Footer";
+import Chip from "./Chip";
+import styles from "../styles/Lobby.module.css";
+import ui from "../styles/Dialog.module.css";
 import {
   listTables,
   joinTable,
@@ -19,10 +21,21 @@ import {
 import Settings from "./Settings";
 import Avatar from "./Avatar";
 import History from "./History";
-import WalletButton from "./WalletButton";
+
 import Recharge from "./Recharge";
 import { useTranslation } from "../hooks/useTranslation";
-import { FiUsers, FiClock, FiLogOut } from "react-icons/fi";
+import {
+  FiUsers,
+  FiClock,
+  FiLogOut,
+  FiRefreshCw,
+  FiPlus,
+  FiLock,
+  FiX,
+  FiArrowRight,
+  FiCreditCard,
+} from "react-icons/fi";
+import { GiSpades } from "react-icons/gi";
 
 export default function Lobby() {
   const socket = useSocket();
@@ -176,117 +189,133 @@ export default function Lobby() {
   };
 
   return (
-    <div className="app-screen room-wallpaper flex flex-col overflow-hidden bg-lobby">
-      <div className="flex w-full flex-row items-center justify-between px-4 py-2">
-        <div className="flex flex-row items-center gap-3">
-          <button onClick={viewSelf} className="text-3xl" title={t("myStats")}>
+    <main className={`room-wallpaper ${styles.page}`}>
+      <header className={styles.toolbar}>
+        <div className={styles.account}>
+          <button
+            onClick={viewSelf}
+            className={styles.profile}
+            title={t("myStats")}
+          >
             <Avatar
               username={appState.username ?? ""}
               uuid={appState.uuid ?? ""}
               emoji={appState.avatar ?? "🙂"}
               hasImage={appState.avatarImage}
-              size={32}
+              size={36}
               version={appState.avatarVersion}
             />
+            <span>{appState.username}</span>
           </button>
-          <div className="flex flex-col items-center gap-1">
-            <WalletButton onOpen={() => setShowRecharge(true)} />
-            <p className="text-sm text-ink">{appState.username}</p>
-          </div>
+          <button
+            className={styles.wallet}
+            onClick={() => setShowRecharge(true)}
+            aria-label={t("recharge")}
+          >
+            <Chip amount={appState.chips} className="h-5 w-5" />
+            <span>{appState.chips ?? 0}</span>
+            <FiCreditCard aria-hidden="true" />
+          </button>
         </div>
-        <div className="flex flex-row items-center gap-2">
+        <nav className={styles.tools} aria-label={t("lobbyTools")}>
           <button
             onClick={() => setShowFriends(true)}
             title={t("friends")}
-            className="btn btn-icon"
+            aria-label={t("friends")}
+            className={ui.iconButton}
           >
-            <FiUsers size="1rem" />
+            <FiUsers />
           </button>
           <button
             onClick={() => {
-              setShowHistory(!showHistory);
-              if (socket) {
-                getHistory(socket);
-              }
+              setShowHistory(true);
+              if (socket) getHistory(socket);
             }}
             title={t("history")}
-            className="btn btn-icon"
+            aria-label={t("history")}
+            className={ui.iconButton}
           >
-            <FiClock size="1rem" />
+            <FiClock />
           </button>
-          <Settings />
-          <button onClick={logout} title={t("logout")} className="btn btn-icon">
-            <FiLogOut size="1rem" />
+          <Settings buttonClassName={ui.iconButton} />
+          <button
+            onClick={logout}
+            title={t("logout")}
+            aria-label={t("logout")}
+            className={ui.iconButton}
+          >
+            <FiLogOut />
           </button>
+        </nav>
+      </header>
+      <section className={styles.content}>
+        <div className={styles.brand}>
+          <GiSpades aria-hidden="true" />
+          <p>GoPoker</p>
+          <span>PLAY • MEET • ENJOY</span>
+          <h1>{t("lobby")}</h1>
         </div>
-      </div>
-
-      <div className="flex min-h-0 flex-1 flex-col items-center px-4">
-        <h1 className="type-display mb-6 mt-4 text-4xl">{t("lobby")}</h1>
-
-        <div className="mb-4 flex w-full max-w-md flex-row items-center justify-between">
+        <div className={styles.actions}>
           <button
             onClick={() => socket && listTables(socket)}
-            className="btn btn-ghost"
+            className={ui.secondary}
           >
+            <FiRefreshCw aria-hidden="true" />
             {t("refresh")}
           </button>
-          <button
-            onClick={() => setShowCreate(true)}
-            className="btn btn-primary"
-          >
+          <button onClick={() => setShowCreate(true)} className={ui.primary}>
+            <FiPlus aria-hidden="true" />
             {t("newRoom")}
           </button>
         </div>
-
-        <div className="flex min-h-0 w-full max-w-md flex-1 flex-col gap-4 overflow-y-auto pb-4">
-          <div className="flex flex-col gap-2">
-            <p className="type-label">{t("rooms")}</p>
-            {appState.tables.length === 0 && (
-              <p className="text-sm text-muted/60">{t("noRooms")}</p>
-            )}
+        <section className={styles.rooms} aria-label={t("rooms")}>
+          <h2>{t("rooms")}</h2>
+          {appState.tables.length === 0 && (
+            <div className={styles.empty}>
+              <GiSpades aria-hidden="true" className={styles.emptySpade} />
+              <h3>{t("lobbyEmptyTitle")}</h3>
+              <p>{t("lobbyEmptyHint")}</p>
+            </div>
+          )}
+          <div className={styles.roomList}>
             {appState.tables.map((room) => (
-              <div
-                key={room.name}
-                className="flex flex-col rounded-sm bg-card px-4 py-3"
-              >
-                <div className="flex flex-row items-center justify-between">
-                  <div className="flex flex-col">
-                    <p className="text-ink">
+              <article key={room.name} className={styles.room}>
+                <div className={styles.roomSummary}>
+                  <div className={styles.roomText}>
+                    <h3>
                       {room.name}
-                      {room.locked && (
-                        <span className="type-label ml-2">🔒</span>
-                      )}
-                      {room.tournament && (
-                        <span
-                          className="ml-2 rounded-sm bg-amber-600/20 px-1.5 py-0.5 text-xs text-amber-300"
-                          title={t("tournamentHint")}
-                        >
-                          {t("tournament")}
-                        </span>
-                      )}
-                    </p>
-                    <p className="type-caption">
-                      {room.players} {t("players")}
-                      {" · "}
-                      {room.spectators} {t("watching")}
+                      {room.locked && <FiLock aria-label={t("roomPassword")} />}
+                    </h3>
+                    {room.tournament && (
+                      <span
+                        className={styles.badge}
+                        title={t("tournamentHint")}
+                      >
+                        {t("tournament")}
+                      </span>
+                    )}
+                    <p>
+                      {room.players} {t("players")} · {room.spectators}{" "}
+                      {t("watching")}
                       {room.running ? " · " + t("running") : ""}
                     </p>
                   </div>
                   <button
                     onClick={() => onJoinClick(room)}
-                    className="btn btn-secondary"
+                    className={ui.secondary}
                   >
                     {t("join")}
+                    <FiArrowRight aria-hidden="true" />
                   </button>
                 </div>
                 {joinTarget === room.name && (
-                  <div className="mt-2 flex flex-row items-center gap-2">
+                  <div className={styles.joinForm}>
                     <input
                       autoFocus
-                      className="flex-1 rounded-sm bg-floor py-1.5 pl-3 text-ink focus:outline-none"
+                      className={ui.input}
                       type="password"
                       value={joinPassword}
+                      aria-label={t("roomPassword")}
                       placeholder={t("roomPassword")}
                       onChange={(e) => setJoinPassword(e.target.value)}
                       onKeyDown={(e) => {
@@ -302,211 +331,232 @@ export default function Lobby() {
                         setJoinTarget(null);
                         setJoinPassword("");
                       }}
-                      className="type-caption hover:text-ink"
+                      className={ui.secondary}
                     >
                       {t("cancel")}
                     </button>
                   </div>
                 )}
-              </div>
+              </article>
             ))}
           </div>
-          {showCreate && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-              <div className="flex max-h-[85vh] w-full max-w-md flex-col gap-3 overflow-y-auto rounded-lg bg-card p-6 shadow-2xl">
-                <div className="flex flex-row items-center justify-between">
-                  <p className="type-heading">{t("newRoom")}</p>
-                  <button
-                    onClick={() => setShowCreate(false)}
-                    className="text-muted hover:text-ink"
-                  >
-                    ✕
-                  </button>
-                </div>
-
-                <div className="flex flex-row items-center gap-2">
-                  <input
-                    className="flex-1 rounded-sm border border-muted/30 bg-transparent py-2 pl-4 text-ink focus:outline-none"
-                    type="text"
-                    value={newRoom}
-                    placeholder={t("newRoomName")}
-                    maxLength={20}
-                    onChange={(e) => setNewRoom(e.target.value)}
-                  />
-                  <input
-                    className="w-32 rounded-sm border border-muted/30 bg-transparent py-2 pl-4 text-ink focus:outline-none"
-                    type="password"
-                    value={newPassword}
-                    placeholder={t("password")}
-                    maxLength={20}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                  />
-                </div>
-
-                <div className="flex flex-row items-center gap-2 rounded-sm bg-floor px-3 py-2 text-xs">
-                  <span className="w-16 shrink-0 text-muted">
-                    {t("blinds")}
-                  </span>
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    value={sb}
-                    onChange={(e) => setSb(e.target.value)}
-                    className="w-20 flex-1 rounded-sm border border-muted/30 bg-transparent px-2 py-1 text-ink focus:outline-none"
-                  />
-                  <span className="text-muted">/</span>
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    value={bb}
-                    onChange={(e) => setBb(e.target.value)}
-                    className="w-20 flex-1 rounded-sm border border-muted/30 bg-transparent px-2 py-1 text-ink focus:outline-none"
-                  />
-                </div>
-
-                <div className="flex flex-row items-center gap-2 rounded-sm bg-floor px-3 py-2 text-xs">
-                  <span className="w-16 shrink-0 text-muted">{t("buyIn")}</span>
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    value={buyIn}
-                    onChange={(e) => setBuyIn(e.target.value)}
-                    className="flex-1 rounded-sm border border-muted/30 bg-transparent px-2 py-1 text-ink focus:outline-none"
-                  />
-                </div>
-
-                <label className="flex cursor-pointer flex-row items-center gap-2 rounded-sm bg-floor px-3 py-2 text-xs">
-                  <input
-                    type="checkbox"
-                    checked={tournament}
-                    onChange={(e) => setTournament(e.target.checked)}
-                    className="h-4 w-4 accent-cyan-700"
-                  />
-                  <span className="text-ink">{t("tournament")}</span>
-                  <span className="text-muted">— {t("tournamentHint")}</span>
-                </label>
-
-                {tournament && (
-                  <div className="flex flex-row items-center gap-2 rounded-sm bg-floor px-3 py-2 text-xs">
-                    <span className="w-16 shrink-0 text-muted">
-                      {t("maxBuy")}
-                    </span>
+        </section>
+      </section>
+      <footer className={styles.footer}>GoPoker · PLAY · MEET · ENJOY</footer>
+      {showCreate && (
+        <div className={ui.overlay}>
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="create-room-title"
+            className={ui.dialog}
+          >
+            <header className={ui.dialogHeader}>
+              <h2 id="create-room-title">{t("newRoom")}</h2>
+              <button
+                onClick={() => setShowCreate(false)}
+                className={ui.iconButton}
+                aria-label={t("close")}
+              >
+                <FiX />
+              </button>
+            </header>
+            <form
+              className={ui.createForm}
+              onSubmit={(event) => {
+                event.preventDefault();
+                create();
+              }}
+            >
+              <label className={ui.field}>
+                {t("newRoomName")}
+                <input
+                  autoFocus
+                  className={ui.input}
+                  type="text"
+                  value={newRoom}
+                  placeholder={t("roomAutoName")}
+                  maxLength={20}
+                  onChange={(e) => setNewRoom(e.target.value)}
+                />
+              </label>
+              <label className={ui.field}>
+                {t("roomPassword")}
+                <input
+                  className={ui.input}
+                  type="password"
+                  value={newPassword}
+                  placeholder={t("optionalField")}
+                  maxLength={20}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  autoComplete="new-password"
+                />
+              </label>
+              <fieldset className={ui.blinds}>
+                <legend>{t("blinds")}</legend>
+                <div className={ui.columns}>
+                  <label className={ui.inlineField}>
+                    <span>{t("smallBlindLabel")}</span>
                     <input
+                      aria-label={t("smallBlindLabel")}
                       type="text"
                       inputMode="numeric"
-                      value={maxBuy}
-                      onChange={(e) => setMaxBuy(e.target.value)}
-                      className="flex-1 rounded-sm border border-muted/30 bg-transparent px-2 py-1 text-ink focus:outline-none"
+                      value={sb}
+                      onChange={(e) => setSb(e.target.value)}
                     />
-                  </div>
-                )}
-
-                <div className="flex flex-row items-center gap-2 rounded-sm bg-floor px-3 py-2 text-xs">
-                  <span className="w-16 shrink-0 text-muted">
-                    {t("maxPlayers")}
-                  </span>
+                  </label>
+                  <label className={ui.inlineField}>
+                    <span>{t("bigBlindLabel")}</span>
+                    <input
+                      aria-label={t("bigBlindLabel")}
+                      type="text"
+                      inputMode="numeric"
+                      value={bb}
+                      onChange={(e) => setBb(e.target.value)}
+                    />
+                  </label>
+                </div>
+              </fieldset>
+              <label className={ui.field}>
+                {t("buyIn")}
+                <input
+                  className={ui.input}
+                  type="text"
+                  inputMode="numeric"
+                  value={buyIn}
+                  onChange={(e) => setBuyIn(e.target.value)}
+                />
+              </label>
+              <label className={ui.tournament}>
+                <span>
+                  {t("tournament")}
+                  <small>{t("tournamentHint")}</small>
+                </span>
+                <input
+                  type="checkbox"
+                  role="switch"
+                  checked={tournament}
+                  onChange={(e) => setTournament(e.target.checked)}
+                />
+              </label>
+              {tournament && (
+                <label className={ui.field}>
+                  {t("maxBuy")}
                   <input
+                    className={ui.input}
+                    type="text"
+                    inputMode="numeric"
+                    value={maxBuy}
+                    onChange={(e) => setMaxBuy(e.target.value)}
+                  />
+                </label>
+              )}
+              <div className={ui.columns}>
+                <label className={ui.field}>
+                  {t("maxPlayers")}
+                  <input
+                    className={ui.input}
                     type="text"
                     inputMode="numeric"
                     value={maxPlayers}
                     onChange={(e) => setMaxPlayers(e.target.value)}
-                    className="flex-1 rounded-sm border border-muted/30 bg-transparent px-2 py-1 text-ink focus:outline-none"
                   />
-                </div>
-
-                <div className="flex flex-row items-center gap-2 rounded-sm bg-floor px-3 py-2 text-xs">
-                  <span className="w-16 shrink-0 text-muted">{t("hands")}</span>
+                </label>
+                <label className={ui.field}>
+                  {t("hands")}
                   <input
+                    className={ui.input}
                     type="text"
                     inputMode="numeric"
                     value={handsLimit}
                     onChange={(e) => setHandsLimit(e.target.value)}
-                    className="flex-1 rounded-sm border border-muted/30 bg-transparent px-2 py-1 text-ink focus:outline-none"
                   />
-                  <span className="shrink-0 text-muted">
-                    0 = {t("unlimited")}
-                  </span>
-                </div>
-
-                <div className="mt-2 flex flex-row justify-end gap-2">
-                  <button
-                    onClick={() => setShowCreate(false)}
-                    className="btn btn-ghost"
-                  >
-                    {t("cancel")}
-                  </button>
-                  <button onClick={create} className="btn btn-primary">
-                    {t("create")}
-                  </button>
-                </div>
+                  <small>0 = {t("unlimited")}</small>
+                </label>
               </div>
-            </div>
-          )}
-          {showFriends && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-              <div className="w-full max-w-md rounded-lg bg-card p-6 shadow-2xl">
-                <div className="mb-4 flex flex-row items-center justify-between">
-                  <p className="type-heading">{t("friends")}</p>
-                  <button
-                    onClick={() => setShowFriends(false)}
-                    className="text-muted hover:text-ink"
-                  >
-                    ✕
-                  </button>
-                </div>
-                <div className="flex flex-row items-center gap-2">
-                  <input
-                    className="flex-1 rounded-sm bg-floor py-2 pl-4 text-ink focus:outline-none"
-                    type="text"
-                    value={friendUuid}
-                    placeholder={t("friendUuid")}
-                    maxLength={32}
-                    onChange={(e) => setFriendUuid(e.target.value)}
-                  />
-                  <button
-                    onClick={onAddFriend}
-                    disabled={friendUuid == ""}
-                    className="btn btn-secondary"
-                  >
-                    {t("add")}
-                  </button>
-                </div>
-                {appState.friends.length === 0 && (
-                  <p className="type-label mt-3">{t("noFriends")}</p>
-                )}
-                <div className="mt-2 flex flex-col gap-2">
-                  {appState.friends.map((f) => (
-                    <div
-                      key={f.uuid}
-                      className="flex flex-row items-center justify-between rounded-sm bg-floor px-4 py-2"
-                    >
-                      <div className="flex flex-row items-center gap-2">
-                        <Avatar
-                          username={f.username}
-                          uuid={f.uuid}
-                          emoji={f.avatar || "🙂"}
-                          hasImage={f.avatarImage}
-                          size={24}
-                        />
-                        <p className="text-ink">{f.username}</p>
-                      </div>
-                      <button
-                        onClick={() => socket && getUser(socket, f.uuid)}
-                        className="type-caption hover:text-ink"
-                      >
-                        {t("viewStats")}
-                      </button>
-                    </div>
-                  ))}
-                </div>
+              <div className={ui.dialogActions}>
+                <button
+                  type="button"
+                  onClick={() => setShowCreate(false)}
+                  className={ui.secondary}
+                >
+                  {t("cancel")}
+                </button>
+                <button type="submit" className={ui.primary}>
+                  {t("create")}
+                  <FiArrowRight aria-hidden="true" />
+                </button>
               </div>
-            </div>
-          )}
-          {showRecharge && <Recharge onClose={() => setShowRecharge(false)} />}
-          {showHistory && <History onClose={() => setShowHistory(false)} />}
+            </form>
+          </section>
         </div>
-      </div>
-      <Footer />
-    </div>
+      )}
+      {showFriends && (
+        <div className={ui.overlay}>
+          <div
+            className={ui.dialog}
+            role="dialog"
+            aria-modal="true"
+            aria-label={t("friends")}
+          >
+            <div className={ui.dialogHeader}>
+              <p className="type-heading">{t("friends")}</p>
+              <button
+                onClick={() => setShowFriends(false)}
+                aria-label={t("close")}
+                className={ui.iconButton}
+              >
+                ✕
+              </button>
+            </div>
+            <div className="flex min-w-0 flex-row items-center gap-2">
+              <input
+                className={ui.input}
+                type="text"
+                value={friendUuid}
+                placeholder={t("friendUuid")}
+                aria-label={t("friendUuid")}
+                maxLength={32}
+                onChange={(e) => setFriendUuid(e.target.value)}
+              />
+              <button
+                onClick={onAddFriend}
+                disabled={friendUuid == ""}
+                className={ui.secondary}
+              >
+                {t("add")}
+              </button>
+            </div>
+            {appState.friends.length === 0 && (
+              <p className="type-label mt-3">{t("noFriends")}</p>
+            )}
+            <div className="mt-2 flex flex-col gap-2">
+              {appState.friends.map((f) => (
+                <div key={f.uuid} className={styles.friendRow}>
+                  <div className="flex flex-row items-center gap-2">
+                    <Avatar
+                      username={f.username}
+                      uuid={f.uuid}
+                      emoji={f.avatar || "🙂"}
+                      hasImage={f.avatarImage}
+                      size={24}
+                    />
+                    <p className="min-w-0 break-all text-ink">{f.username}</p>
+                  </div>
+                  <button
+                    onClick={() => socket && getUser(socket, f.uuid)}
+                    className="type-caption shrink-0 hover:text-ink"
+                  >
+                    {t("viewStats")}
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+      {showRecharge && <Recharge onClose={() => setShowRecharge(false)} />}
+      {showHistory && <History onClose={() => setShowHistory(false)} />}
+    </main>
   );
 }

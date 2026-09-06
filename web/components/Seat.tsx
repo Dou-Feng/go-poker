@@ -353,7 +353,7 @@ export default function Seat({ player, id, visualId, reveal }: seatProps) {
   if (!game || running) {
     return (
       <div>
-        <button className="m-1 h-16 w-32 rounded-2xl border border-muted/40 bg-transparent p-2 text-muted opacity-20 sm:m-4 sm:h-20 sm:w-56">
+        <button disabled className="m-1 h-16 w-32 rounded-2xl border border-muted/40 bg-transparent p-2 text-muted opacity-20 sm:m-4 sm:h-20 sm:w-56">
           <p className="text-3xl sm:text-4xl">{t("open")}</p>
           <h2 className="text-xs opacity-70 sm:text-base">{id}</h2>
         </button>
@@ -414,7 +414,7 @@ export default function Seat({ player, id, visualId, reveal }: seatProps) {
 
   return (
     <div>
-      <button className="m-1 h-16 w-32 rounded-2xl border border-muted/40 bg-transparent p-2 text-muted opacity-20 sm:m-4 sm:h-20 sm:w-56">
+      <button disabled className="m-1 h-16 w-32 rounded-2xl border border-muted/40 bg-transparent p-2 text-muted opacity-20 sm:m-4 sm:h-20 sm:w-56">
         <p className="text-3xl sm:text-4xl">{t("open")}</p>
         <h2 className="text-xs opacity-70 sm:text-base">{id}</h2>
       </button>

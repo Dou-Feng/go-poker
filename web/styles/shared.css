@@ -1,0 +1,90 @@
+/* Shared buttons, typography, in-app wallpaper and panel transitions. */
+
+.room-wallpaper {
+  background-image: url("/bg-room-1100.webp");
+  background-position: center;
+  background-size: cover;
+  background-repeat: no-repeat;
+}
+@media (orientation: portrait) {
+  .room-wallpaper {
+    background-image: url("/bg-room-portrait.webp");
+  }
+}
+@media (min-width: 700px) and (orientation: landscape) {
+  .room-wallpaper {
+    background-image: url("/bg-room-1672.webp");
+  }
+}
+.btn {
+  @apply inline-flex items-center justify-center gap-1.5 rounded-sm px-4 py-1.5 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40;
+}
+.btn-primary {
+  @apply bg-cyan-900 text-ink hover:bg-cyan-800;
+}
+.btn-confirm {
+  @apply bg-emerald-600 font-semibold text-ink hover:bg-emerald-500;
+}
+.btn-accent {
+  @apply bg-amber-600 font-semibold text-ink hover:bg-amber-500;
+}
+.btn-secondary {
+  @apply bg-floor text-ink hover:bg-cardhi;
+}
+.btn-ghost {
+  @apply border border-muted/30 text-ink hover:bg-floor;
+}
+.btn-danger {
+  @apply border border-rose-600 font-semibold text-rose-500 hover:bg-rose-600 hover:text-ink;
+}
+.btn-text {
+  @apply px-2 py-1 text-muted hover:bg-floor hover:text-ink;
+}
+.btn-icon {
+  @apply border border-muted/30 px-2 py-1 text-xs text-muted hover:text-ink;
+}
+.type-display {
+  @apply font-semibold text-ink;
+}
+.type-heading {
+  @apply text-lg font-semibold text-ink;
+}
+.type-label {
+  @apply text-sm text-muted;
+}
+.type-caption {
+  @apply text-xs text-muted;
+}
+.type-num {
+  @apply font-mono font-semibold tabular-nums;
+}
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes fade-out {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+.animate-fade-out {
+  animation: fade-out 0.16s ease-in forwards;
+}
+.animate-fade-in {
+  animation: fade-in 0.3s ease-out;
+}
+
+/* Icon-only controls and keyboard users need the same visible focus cue. */
+.btn:focus-visible {
+  outline: 2px solid #8bbacc;
+  outline-offset: 2px;
+}

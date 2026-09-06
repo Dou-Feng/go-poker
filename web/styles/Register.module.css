@@ -1,0 +1,344 @@
+.page {
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  min-height: 100svh;
+  padding: 64px 16px 32px;
+  color: #f5f9fc;
+}
+.mask {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: radial-gradient(
+    ellipse at center,
+    #040c14ed,
+    #040b1299 30%,
+    #050a1642 72%
+  );
+}
+.settings {
+  position: absolute;
+  top: 12px;
+  right: 16px;
+  z-index: 2;
+}
+.shell {
+  width: min(456px, 100%);
+  padding: 16px 0;
+}
+.brand {
+  text-align: center;
+  margin-bottom: 26px;
+}
+.symbol {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  color: #9ed8f2;
+  font-size: 36px;
+  line-height: 1;
+  margin-bottom: 12px;
+}
+.symbol span {
+  width: 54px;
+  height: 1px;
+  background: linear-gradient(to right, transparent, #7dc0dd66);
+}
+.symbol span:last-child {
+  transform: rotate(180deg);
+}
+.brand h1 {
+  margin: 0;
+  font-size: 72px;
+  font-weight: 800;
+  line-height: 1.05;
+  letter-spacing: -2px;
+  text-shadow: 0 2px 12px #0006;
+}
+.brand p {
+  margin-top: 13px;
+  font-size: 11px;
+  letter-spacing: 6px;
+  color: #6fa4bd;
+  font-weight: 600;
+}
+.brand b {
+  color: #80cbe8;
+}
+.switch {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  width: 70%;
+  height: 52px;
+  margin: 0 auto 18px;
+  border: 1px solid #7ea7c038;
+  border-radius: 16px;
+  background: #09151fb3;
+}
+.switch button {
+  border-radius: 14px;
+  color: #dce6ed;
+  font-size: 18px;
+  transition: background 150ms ease, box-shadow 150ms ease;
+}
+.switch button:hover {
+  background-color: #ffffff09;
+}
+.switch .active {
+  color: white;
+  background: linear-gradient(#2ea6d3b3, #14729a99);
+  box-shadow: inset 0 1px 8px #64d8ff70, 0 0 0 1px #37cbff73, 0 0 16px #22ade52e;
+}
+.forms {
+  display: grid;
+}
+.form {
+  grid-area: 1 / 1;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.hidden {
+  visibility: hidden;
+  pointer-events: none;
+}
+.field {
+  display: flex;
+  align-items: center;
+  min-height: 52px;
+  border-radius: 12px;
+  border: 1px solid #7ea7c038;
+  background: #0f1d28d6;
+  transition: border-color 140ms, box-shadow 140ms;
+}
+.field:hover {
+  border-color: #73b6d357;
+}
+.field:focus-within {
+  border-color: #3dc5f4a6;
+  box-shadow: 0 0 0 3px #2eb6e814;
+}
+.fieldIcon {
+  display: grid;
+  place-items: center;
+  flex: 0 0 58px;
+  color: #a8bac7;
+  font-size: 22px;
+}
+.field input {
+  flex: 1;
+  min-width: 0;
+  width: 100%;
+  padding: 14px 12px 14px 0;
+  background: transparent;
+  border: 0;
+  outline: 0;
+  color: #f5f9fc;
+  font-size: 16px;
+}
+.field input::placeholder {
+  color: #91a5b4;
+  opacity: 1;
+}
+.hint {
+  flex-shrink: 0;
+  padding-right: 16px;
+  font-size: 11px;
+  color: #8ba3b3;
+}
+.avatarSection {
+  min-width: 0;
+  margin: 2px 0 0;
+  padding: 0;
+  border: 0;
+}
+.avatarSection legend {
+  margin-bottom: 10px;
+  color: #d4dee5;
+  font-size: 14px;
+}
+.avatars {
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  gap: 10px;
+}
+.avatars button {
+  display: grid;
+  place-items: center;
+  aspect-ratio: 1;
+  min-width: 0;
+  border-radius: 12px;
+  font-size: 28px;
+  border: 1px solid #7aa6bf38;
+  background: #111e29e0;
+  transition: transform 100ms, border-color 130ms, box-shadow 130ms;
+}
+.avatars button:hover {
+  transform: translateY(-2px);
+  border-color: #4cc1ec73;
+}
+.avatars .selected {
+  border-color: #36c5f0;
+  background: #1a72978c;
+  box-shadow: inset 0 1px 8px #64d8ff30, 0 0 12px #26bdf033;
+}
+.primary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  height: 67px;
+  margin-top: 12px;
+  border-radius: 20px;
+  color: white;
+  font-size: 26px;
+  font-weight: 600;
+  border: 1px solid #48d3ffd1;
+  background: linear-gradient(#2893bdfa, #11688efa);
+  box-shadow: inset 0 1px 10px #8ae7ff80, inset 0 -7px 17px #00284026,
+    0 6px 25px #0075a23b, 0 0 19px #2bc6fa26;
+  transition: transform 100ms, filter 140ms;
+}
+.primary svg {
+  position: absolute;
+  right: 25px;
+  width: 27px;
+  height: 27px;
+}
+.primary:hover:not(:disabled) {
+  transform: translateY(-1px);
+  filter: brightness(1.12);
+}
+.primary:active:not(:disabled),
+.avatars button:active {
+  transform: translateY(1px) scale(0.975);
+}
+.primary:disabled {
+  cursor: not-allowed;
+  filter: saturate(0.7);
+}
+.error {
+  min-height: 24px;
+  margin: 6px 0 0;
+  font-size: 13px;
+  color: #fda4af;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+.divider {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 16px;
+  color: #9aacba;
+  font-size: 13px;
+}
+.divider span {
+  height: 1px;
+  background: #799eb338;
+}
+.oauth {
+  display: flex;
+  justify-content: center;
+  gap: 28px;
+  margin-top: 18px;
+}
+.oauth button {
+  display: grid;
+  place-items: center;
+  width: 60px;
+  height: 60px;
+  font-size: 29px;
+  border-radius: 22px;
+  color: #e8f1f7;
+  border: 1px solid #709db63b;
+  background: #0c1a25d1;
+  box-shadow: inset 0 1px 0 #ffffff08, 0 5px 14px #0003;
+  cursor: not-allowed;
+}
+.note {
+  text-align: center;
+  margin-top: 18px;
+  color: #8b9ca8;
+  font-size: 12px;
+}
+.shell button:focus-visible {
+  outline: 2px solid #7fddff;
+  outline-offset: 4px;
+}
+@media (max-height: 800px) {
+  .page {
+    padding-top: 48px;
+    padding-bottom: 20px;
+  }
+  .brand h1 {
+    font-size: 54px;
+  }
+  .brand {
+    margin-bottom: 20px;
+  }
+  .symbol {
+    font-size: 28px;
+    margin-bottom: 8px;
+  }
+  .primary {
+    height: 58px;
+  }
+  .shell {
+    padding: 0;
+  }
+}
+@media (max-width: 520px) {
+  .brand h1 {
+    font-size: 54px;
+  }
+  .brand p {
+    letter-spacing: 4px;
+  }
+  .avatars {
+    gap: 5px;
+  }
+  .avatars button {
+    font-size: clamp(20px, 6vw, 28px);
+    border-radius: 10px;
+  }
+  .fieldIcon {
+    flex-basis: 42px;
+  }
+  .hint {
+    max-width: 44%;
+    font-size: 10px;
+    padding-right: 10px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .shell button,
+  .field {
+    transition: none;
+  }
+}
+
+/* Responsive login wallpaper. */
+
+.page {
+  background-image: url("/bg-1100.webp");
+  background-position: center;
+  background-size: cover;
+  background-repeat: no-repeat;
+}
+@media (orientation: portrait) {
+  .page {
+    background-image: url("/bg-portrait.webp");
+  }
+}
+@media (min-width: 700px) and (orientation: landscape) {
+  .page {
+    background-image: url("/bg-1672.webp");
+  }
+}

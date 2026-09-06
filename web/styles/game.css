@@ -1,0 +1,203 @@
+/* Game screen: table materials, room controls, betting keys and hand animations. */
+
+.felt-material {
+  background-color: #1a4a33; /* felt base while the texture loads */
+  background-image: url("/table-felt.webp");
+  background-repeat: repeat;
+  background-size: 768px;
+}
+
+.rail-material {
+  background-color: #4a3320; /* wood base while the texture loads */
+  background-image: url("/table-edge.webp");
+  background-repeat: repeat;
+  background-size: 768px;
+}
+
+.app-screen {
+  height: 100vh;
+  height: 100dvh;
+}
+
+.btn-room-control {
+  @apply min-h-[40px] rounded-lg px-2.5;
+  border: 0;
+  color: #b7c4cf;
+  background: linear-gradient(180deg, #26343ee6, #1b2730e6);
+  box-shadow: inset 0 1px 0 #ffffff08, 0 2px 5px #0000001a;
+}
+
+.btn-room-control:hover {
+  color: #e3ebf1;
+  background: linear-gradient(180deg, #30414d, #24333e);
+}
+
+.btn-room-control:active {
+  background: #17232d;
+  box-shadow: inset 0 2px 4px #00000033;
+}
+
+.btn-room-control:focus-visible {
+  outline: 2px solid #8bbacc;
+  outline-offset: 2px;
+}
+
+.btn-room-surrender {
+  color: #c3a6aa;
+}
+
+.btn-room-surrender[aria-pressed="true"] {
+  color: #a5c7bd;
+  background: #253a37;
+}
+
+.action-key {
+  @apply inline-flex h-12 min-w-[5.5rem] items-center justify-center gap-1.5 rounded-[14px] border px-4 text-sm font-semibold shadow-md transition disabled:cursor-not-allowed disabled:opacity-40 sm:h-14 sm:min-w-[7rem] sm:px-5 sm:text-base;
+  border-color: rgba(212, 161, 27, 0.35);
+  color: #f8fafc;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.45);
+  background-image: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.08) 0%,
+    rgba(255, 255, 255, 0) 45%,
+    rgba(0, 0, 0, 0.2) 100%
+  );
+}
+
+.action-key:not(:disabled):hover {
+  filter: brightness(1.08);
+}
+
+.action-key:not(:disabled):active {
+  transform: scale(0.97);
+  box-shadow: 0 0 0 2px rgba(241, 199, 90, 0.6), 0 6px 16px rgba(0, 0, 0, 0.4);
+}
+
+.action-key-call {
+  background-color: #3b4a5c;
+  color: #f4f7fa;
+}
+
+.action-key-bet {
+  background-color: #7a5a1f;
+  color: #fff4d6;
+  border-color: rgba(241, 199, 90, 0.55);
+}
+
+.action-key-allin {
+  background-color: #c2601a;
+  color: #fff8ee;
+  border-color: rgba(255, 200, 120, 0.6);
+}
+
+.action-key-fold {
+  background-color: #5a1f24;
+  color: #ffd9dd;
+  border-color: rgba(190, 60, 70, 0.5);
+}
+
+.action-key-neutral {
+  background-color: #262f38;
+  color: #d5dce4;
+}
+
+@keyframes chip-pop {
+  0% {
+    transform: scale(0.4);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.15);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes winner-pop {
+  0% {
+    transform: scale(0.6) translateY(20px);
+    opacity: 0;
+  }
+  70% {
+    transform: scale(1.05) translateY(0);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1) translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes deal-in {
+  0% {
+    transform: perspective(600px) rotateY(90deg) translateY(-8px);
+    opacity: 0;
+  }
+  100% {
+    transform: perspective(600px) rotateY(0deg) translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes active-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 20px 2px rgba(255, 255, 255, 0.2);
+  }
+  50% {
+    box-shadow: 0 0 44px 10px rgba(255, 255, 255, 0.55);
+  }
+}
+
+.animate-chip-pop {
+  animation: chip-pop 0.35s ease-out;
+}
+
+.animate-winner-pop {
+  animation: winner-pop 0.5s ease-out;
+}
+
+.animate-deal-in {
+  animation: deal-in 0.4s ease-out;
+}
+
+@keyframes fold-away {
+  0% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(14px);
+    opacity: 0;
+  }
+}
+
+.animate-fold-away {
+  animation: fold-away 0.3s ease-in forwards;
+}
+
+.animate-active-pulse {
+  animation: active-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes fx-tag-pop {
+  0% {
+    transform: translate(-50%, 0) scale(0.6);
+    opacity: 0;
+  }
+  25% {
+    transform: translate(-50%, -6px) scale(1.08);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(-50%, -26px) scale(1);
+    opacity: 0;
+  }
+}
+
+.animate-fx-tag {
+  animation: fx-tag-pop 0.9s ease-out forwards;
+}

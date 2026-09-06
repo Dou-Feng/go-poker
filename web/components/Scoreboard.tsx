@@ -55,13 +55,17 @@ export default function Scoreboard({
   return (
     <Portal>
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-        <div className="w-full max-w-md rounded-lg bg-card p-6 shadow-2xl">
+        <div className="max-h-[calc(100dvh-2rem)] w-full max-w-md overflow-auto rounded-lg bg-card p-4 shadow-2xl sm:p-6">
           <div className="mb-4 flex flex-row items-center justify-between">
             <div className="min-w-0">
               <p className="type-heading">{title}</p>
               {subtitle && <p className="type-caption truncate">{subtitle}</p>}
             </div>
-            <button onClick={onClose} className="btn btn-text">
+            <button
+              onClick={onClose}
+              aria-label={t("close")}
+              className="btn btn-text"
+            >
               ✕
             </button>
           </div>

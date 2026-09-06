@@ -11,7 +11,7 @@ the static export. Derivatives served to the browser live in `public/`.
 - `bg_room_portal.png` — game-room portrait design source (1600×2848)
 
 Each screen uses compressed WebP derivatives, selected by the orientation/width
-media queries in `styles/index.css`: `public/bg-*-portrait.webp` (portrait
+media queries in `styles/Register.module.css` (login) and `styles/shared.css` (lobby/room): `public/bg-*-portrait.webp` (portrait
 screens), `public/bg-*-1100.webp` (small landscape), `public/bg-*-1672.webp`
 (landscape ≥700px).
 
@@ -32,7 +32,7 @@ npx sharp-cli -i assets-src/bg_room_portal.png -o public/bg-room-portrait.webp -
 - `table_edge.png` — wood rail albedo texture (2048×2048)
 
 Applied as fixed-density tiling backgrounds (`.felt-material` /
-`.rail-material` in `styles/index.css`), not stretched images: the oval
+`.rail-material` in `styles/game.css`), not stretched images: the oval
 geometry stays CSS shape (rounded-full + padding) and resizes with the
 viewport while the texture density (`background-size`) never changes.
 

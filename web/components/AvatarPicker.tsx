@@ -68,6 +68,8 @@ export default function AvatarPicker({ onClose }: AvatarPickerProps) {
         <button
           key={a}
           onClick={() => onChangeAvatar(a)}
+          aria-label={`${t("authAvatar")} ${AVATARS.indexOf(a) + 1}`}
+          aria-pressed={appState.avatar === a}
           className={`rounded-md p-1 text-2xl ${
             appState.avatar === a ? "bg-cardhi" : "hover:bg-floor"
           }`}
@@ -75,12 +77,13 @@ export default function AvatarPicker({ onClose }: AvatarPickerProps) {
           {a}
         </button>
       ))}
-      <label className="ml-2 cursor-pointer rounded-sm border border-muted/30 px-2 py-1 type-caption hover:text-ink">
+      <label className="type-caption relative ml-2 cursor-pointer rounded-sm border border-muted/30 px-2 py-1 focus-within:ring-2 focus-within:ring-cyan-400 hover:text-ink">
         {t("uploadImage")}
         <input
           type="file"
           accept="image/*"
-          className="hidden"
+          aria-label={t("uploadImage")}
+          className="sr-only"
           onChange={handleUpload}
         />
       </label>

@@ -164,6 +164,8 @@ export default function ChatLog({ compact = false }: chatLogProps) {
             <button
               className="absolute top-0 right-0 pt-3 pr-7"
               onClick={() => setExpand(!expand)}
+              aria-label={expand ? t("collapseChat") : t("expandChat")}
+              aria-expanded={expand}
             >
               <MdExpandMore size="1.7rem" />
             </button>
@@ -171,6 +173,8 @@ export default function ChatLog({ compact = false }: chatLogProps) {
             <button
               className="absolute top-0 right-0 pt-3 pr-7"
               onClick={() => setExpand(!expand)}
+              aria-label={expand ? t("collapseChat") : t("expandChat")}
+              aria-expanded={expand}
             >
               <MdExpandLess size="1.7rem" />
             </button>

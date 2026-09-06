@@ -55,7 +55,7 @@ export default function Rebuy({ className }: rebuyProps) {
             <button
               onClick={decrement}
               disabled={amount <= 0}
-              aria-label="-"
+              aria-label={t("decreaseBuyIn")}
               className="btn btn-secondary h-9 w-9 rounded-md px-0 text-xl font-bold"
             >
               −
@@ -66,7 +66,7 @@ export default function Rebuy({ className }: rebuyProps) {
             <button
               onClick={increment}
               disabled={amount >= remaining}
-              aria-label="+"
+              aria-label={t("increaseBuyIn")}
               className="btn btn-secondary h-9 w-9 rounded-md px-0 text-xl font-bold"
             >
               +

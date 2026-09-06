@@ -1,4 +1,3 @@
-import { useContext } from "react";
 import { useSocket } from "../hooks/useSocket";
 import { addChips } from "../actions/actions";
 import { useTranslation } from "../hooks/useTranslation";
@@ -105,21 +104,23 @@ export default function Recharge({ onClose }: RechargeProps) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-      <div className="w-full max-w-sm rounded-lg bg-card p-6 shadow-2xl">
+      <div className="max-h-[calc(100dvh-2rem)] w-full max-w-sm overflow-y-auto rounded-lg bg-card p-6 shadow-2xl">
         <div className="mb-5 flex flex-row items-center justify-between">
           <p className="type-heading">{t("recharge")}</p>
           <button
             onClick={onClose}
+            aria-label={t("close")}
             className="btn btn-text"
           >
             ✕
           </button>
         </div>
-        <div className="grid grid-cols-4 gap-3">
+        <div className="min-[400px]:grid-cols-4 grid grid-cols-2 gap-3">
           {RECHARGE_OPTIONS.map(({ fraction, amount }) => (
             <button
               key={amount}
               onClick={() => topUp(amount)}
+              aria-label={`${t("recharge")} ${amount} ${t("chips")}`}
               className="flex flex-col items-center gap-2 rounded-lg bg-floor p-3 hover:bg-cardhi"
             >
               <GemIcon fraction={fraction} />

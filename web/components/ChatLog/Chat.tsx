@@ -73,10 +73,15 @@ export default function Chat() {
           type="text"
           value={inputValue}
           placeholder={t("saySomething")}
+          aria-label={t("saySomething")}
           onChange={handleChange}
           ref={messageRef}
         ></input>
-        <button className=" bg-card px-4 text-muted" onClick={handleClick}>
+        <button
+          aria-label={t("sendChatMessage")}
+          className="bg-card px-4 text-muted"
+          onClick={handleClick}
+        >
           <FiSend />
         </button>
       </div>

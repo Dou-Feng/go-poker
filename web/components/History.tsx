@@ -5,6 +5,9 @@ import { useTranslation } from "../hooks/useTranslation";
 import { useSocket } from "../hooks/useSocket";
 import { getSession } from "../actions/actions";
 import Avatar from "./Avatar";
+import { FiChevronRight, FiClock, FiX } from "react-icons/fi";
+import historyStyles from "../styles/History.module.css";
+import ui from "../styles/Dialog.module.css";
 
 function formatTime(iso: string): string {
   const d = new Date(iso);
@@ -49,56 +52,72 @@ export default function History({ onClose }: HistoryProps) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-      <div className="flex h-full max-h-[80vh] w-full max-w-md flex-col rounded-lg bg-card shadow-2xl">
-        <div className="flex flex-row items-center justify-between border-b border-muted/30 px-4 py-3">
-          <p className="text-sm font-semibold text-ink">{t("history")}</p>
-          <button onClick={onClose} className="btn btn-text">
-            ✕
+    <div className={ui.overlay}>
+      <section
+        className={`${ui.dialog} ${historyStyles.historyDialog}`}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="history-title"
+      >
+        <header className={ui.dialogHeader}>
+          <h2 id="history-title">{t("history")}</h2>
+          <button
+            onClick={onClose}
+            className={ui.iconButton}
+            aria-label={t("close")}
+          >
+            <FiX />
           </button>
-        </div>
-        <div className="flex flex-1 flex-col gap-2 overflow-y-auto p-4">
+        </header>
+        <p className={historyStyles.historyHint}>{t("historyDetailsHint")}</p>
+        <div className={historyStyles.historyList}>
           {records.length === 0 && (
-            <p className="text-sm text-muted/60">{t("noHistory")}</p>
+            <div className={historyStyles.historyEmpty}>
+              <FiClock aria-hidden="true" />
+              <p>{t("noHistory")}</p>
+            </div>
           )}
           {records.map((rec, i) => (
             <button
               key={i}
               onClick={() => viewSession(rec)}
-              className="flex flex-row items-center justify-between rounded-sm bg-card px-4 py-2 text-left hover:bg-floor"
+              className={historyStyles.historyRow}
             >
-              <div className="flex flex-row items-center gap-3">
-                <Avatar
-                  username={rec.username}
-                  uuid={rec.uuid}
-                  emoji={rec.avatar || "🙂"}
-                  hasImage={rec.avatarImage}
-                  size={28}
-                />
-                <div className="flex flex-col">
-                  <p className="text-ink">{rec.username}</p>
-                  <p className="type-caption">
-                    {rec.room} · {formatTime(rec.time)}
-                  </p>
-                </div>
+              <Avatar
+                username={rec.username}
+                uuid={rec.uuid}
+                emoji={rec.avatar || "🙂"}
+                hasImage={rec.avatarImage}
+                size={36}
+              />
+              <div className={historyStyles.historyText}>
+                <p>{rec.username}</p>
+                <span>{rec.room}</span>
+                <time dateTime={rec.time}>{formatTime(rec.time)}</time>
               </div>
-              <div className="flex flex-col items-end">
+              <div className={historyStyles.historyResult}>
                 <p
-                  className={`text-sm font-semibold ${
-                    rec.net >= 0 ? "text-emerald-400" : "text-rose-400"
-                  }`}
+                  className={
+                    rec.net >= 0
+                      ? historyStyles.positive
+                      : historyStyles.negative
+                  }
                 >
                   {rec.net >= 0 ? "+" : ""}
                   {rec.net}
                 </p>
-                <p className="type-caption">
+                <span>
                   {t("handsPlayed")}: {rec.stats.handsPlayed}
-                </p>
+                </span>
               </div>
+              <FiChevronRight
+                aria-hidden="true"
+                className={historyStyles.chevron}
+              />
             </button>
           ))}
         </div>
-      </div>
+      </section>
     </div>
   );
 }
