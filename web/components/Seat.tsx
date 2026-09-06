@@ -1,4 +1,4 @@
-import { useContext, useEffect, useState } from "react";
+import { useContext, useEffect, useRef, useState } from "react";
 import { AppContext } from "../providers/AppStore";
 import { Player } from "../interfaces/index";
 import Card from "./Card";
@@ -93,13 +93,22 @@ export default function Seat({
   // the one gesture that turns the cards into glass. Showing by tapping the
   // seat surface, and natural showdown reveals, stay plain white faces.
   const [glassShown, setGlassShown] = useState(false);
-  // Drop the flag when the hand ends so the next hand starts with ordinary
-  // cards again.
+  // The flag is per-hand. Clear it whenever a new hand is dealt — including
+  // the consecutive auto-dealt case where Showdown jumps straight back to
+  // PreFlop with no NotReady (running=false) frame in between, but
+  // handsPlayed still advances — as well as when leaving the table.
+  const lastHandRef = useRef(game?.handsPlayed ?? 0);
   useEffect(() => {
     if (!running) {
       setGlassShown(false);
+      return;
     }
-  }, [running]);
+    const hand = game?.handsPlayed ?? 0;
+    if (hand !== lastHandRef.current) {
+      lastHandRef.current = hand;
+      setGlassShown(false);
+    }
+  }, [game?.handsPlayed, running]);
   // Action clock for the seat to act (null = no clock or nobody to act).
   const onClock =
     !!game &&
@@ -489,7 +498,9 @@ export default function Seat({
           onClick={sitOrClaim}
           data-sfx="drop"
           title={t("reserveSeat")}
-          className="m-1 h-16 w-32 rounded-2xl border border-amber-300/50 bg-transparent p-2 text-ink transition-colors hover:bg-card sm:m-4 sm:h-20 sm:w-56"
+          // A claimable seat a spectator sees while watching is dimmed to
+          // 40% (full again on hover) so it does not distract from the hand.
+          className="m-1 h-16 w-32 rounded-2xl border border-amber-300/50 bg-transparent p-2 text-ink opacity-40 transition-opacity hover:bg-card hover:opacity-100 sm:m-4 sm:h-20 sm:w-56"
         >
           <p className="text-3xl sm:text-4xl">{t("open")}</p>
           <h2 className="text-xs opacity-70 sm:text-base">{t("nextHand")}</h2>

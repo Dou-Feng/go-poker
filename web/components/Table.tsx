@@ -561,12 +561,22 @@ export default function Table() {
         )}
         {game && (!appState.clientID || (me && !game.running && !me.ready)) && (
           <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center">
-            <div className="pointer-events-auto flex flex-col items-center gap-1 rounded-lg bg-black/50 px-4 py-2 text-center">
+            {/* Spectators get a transparent pill (no heavy black box) while
+                they watch; the seated "tap ready" hint keeps its backdrop. */}
+            <div
+              className={classNames(
+                "pointer-events-auto flex flex-col items-center gap-1 rounded-lg px-4 py-2 text-center",
+                appState.clientID && "bg-black/50"
+              )}
+            >
               {!appState.clientID ? (
                 <p
                   className={classNames(
                     "text-sm font-medium sm:text-base",
-                    myReservation ? "text-amber-300" : "text-ink"
+                    myReservation ? "text-amber-300" : "text-ink",
+                    // While a hand runs this is only a spectator hint, so it
+                    // stays unobtrusive (40%).
+                    game.running && "opacity-40"
                   )}
                 >
                   {!game.running

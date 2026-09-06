@@ -57,6 +57,20 @@
   margin: 0;
   padding: 0;
 }
+/* Community cards + the GoPoker brand travel together. On desktop
+   (landscape, ≥640px) the whole group is nudged up a touch so the wide table
+   does not feel bottom-heavy. */
+.poker-table-board-group {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+}
+@media (min-width: 640px) {
+  .poker-table-scene[data-layout="landscape"] .poker-table-board-group {
+    transform: translateY(-6%);
+  }
+}
 .poker-table-brand {
   position: absolute;
   top: 63%;
