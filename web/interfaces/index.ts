@@ -1,3 +1,5 @@
+import type { TranslationKey } from "../lib/translations";
+
 export type Message = {
   name: string;
   message: string;
@@ -26,6 +28,8 @@ export type AppState = {
   game: Game | null;
   tables: TableInfo[];
   authError: string | null;
+  /** Neutral (non-error) toast, as a translation key. */
+  notice: TranslationKey | null;
   chips: number | null;
   avatar: string | null;
   avatarImage: boolean;
@@ -136,6 +140,15 @@ export type Player = {
   bestHand: string;
 };
 
+// A spectator's claim on an empty seat for the next hand (server reserve.go).
+export type SeatReservation = {
+  seatID: number;
+  username: string;
+  accountUuid: string;
+  avatar: string;
+  avatarImage: boolean;
+};
+
 export type Game = {
   running: boolean;
   dealer: number;
@@ -152,7 +165,8 @@ export type Game = {
   pots: Pot[];
   minRaise: number;
   readyCount: number;
-  waiting: string[];
+  /** Empty seats spectators claimed for the next hand (tap a seat mid-hand). */
+  reserved: SeatReservation[];
   settleVotes: string[];
   /** Account UUID of the room host (the only one who manages bots). */
   host: string;

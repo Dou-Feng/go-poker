@@ -105,8 +105,8 @@ export default function Seat({ player, id, visualId, reveal }: seatProps) {
   // Bot placement mode (host only, between hands, not yet readied): empty
   // seats become "+" to add a bot there, seated bots become removable.
   const isHost = !!game && !!appState.uuid && game.host === appState.uuid;
-  const hostReady =
-    !!game?.players.find((p) => p.uuid === appState.clientID)?.ready;
+  const hostReady = !!game?.players.find((p) => p.uuid === appState.clientID)
+    ?.ready;
   const botMode = appState.botMode && isHost && !running && !hostReady;
 
   // Occupied seat.
@@ -351,13 +351,96 @@ export default function Seat({ player, id, visualId, reveal }: seatProps) {
     );
   }
 
-  // Empty seat. Only interactive once the game is loaded and not running.
-  if (!game || running) {
+  // Empty seat.
+  if (!game) {
     return (
       <div>
-        <button disabled className="m-1 h-16 w-32 rounded-2xl border border-muted/40 bg-transparent p-2 text-muted opacity-20 sm:m-4 sm:h-20 sm:w-56">
+        <button
+          disabled
+          className="m-1 h-16 w-32 rounded-2xl border border-muted/40 bg-transparent p-2 text-muted opacity-20 sm:m-4 sm:h-20 sm:w-56"
+        >
           <p className="text-3xl sm:text-4xl">{t("open")}</p>
           <h2 className="text-xs opacity-70 sm:text-base">{id}</h2>
+        </button>
+      </div>
+    );
+  }
+
+  const buyIn = game.config.buyIn ?? 200;
+  // take-seat: sits down between hands; during a hand it claims the seat for
+  // the next hand instead (the server seats the claimant, not ready, when the
+  // hand ends). Tapping an own claim again cancels it.
+  const sitOrClaim = () => {
+    if (!socket || !appState.username) {
+      return;
+    }
+    if (appState.chips != null && appState.chips < buyIn) {
+      dispatch({ type: "setAuthError", payload: "not enough chips" });
+      return;
+    }
+    takeSeat(socket, appState.username, id, buyIn);
+    if (!running) {
+      sendLog(socket, appState.username + " buys in for " + buyIn);
+    }
+  };
+
+  // A seat somebody claimed for the next hand: their avatar, dimmed, with a
+  // "next hand" tag. Only the claimant can tap it (to cancel).
+  const reservation = game.reserved.find((r) => r.seatID === id);
+  if (reservation) {
+    const mine = reservation.accountUuid === appState.uuid;
+    return (
+      <div>
+        <button
+          disabled={!mine}
+          onClick={mine ? sitOrClaim : undefined}
+          title={mine ? t("cancelReservation") : undefined}
+          className={classNames(
+            "m-1 flex h-16 w-32 flex-row items-center justify-center gap-2 rounded-2xl border border-dashed border-amber-300/60 bg-black/30 p-2 sm:m-4 sm:h-20 sm:w-56",
+            mine ? "transition-colors hover:bg-card" : "cursor-default"
+          )}
+        >
+          <div className="opacity-70">
+            <Avatar
+              username={reservation.username}
+              uuid={reservation.accountUuid}
+              emoji={reservation.avatar || "🙂"}
+              hasImage={reservation.avatarImage}
+              size={36}
+            />
+          </div>
+          <div className="flex min-w-0 flex-col items-start leading-tight">
+            <p className="max-w-[4.5rem] truncate text-sm font-medium text-ink sm:max-w-[8rem] sm:text-base">
+              {reservation.username}
+            </p>
+            <p className="type-caption text-amber-300">{t("nextHand")}</p>
+          </div>
+        </button>
+      </div>
+    );
+  }
+
+  // During a hand a spectator can claim the seat for the next hand; seated
+  // players and anonymous viewers just see the empty slot.
+  if (running) {
+    const canClaim = !appState.clientID && !!appState.username;
+    return (
+      <div>
+        <button
+          disabled={!canClaim}
+          onClick={sitOrClaim}
+          title={canClaim ? t("reserveSeat") : undefined}
+          className={classNames(
+            "m-1 h-16 w-32 rounded-2xl border bg-transparent p-2 sm:m-4 sm:h-20 sm:w-56",
+            canClaim
+              ? "border-amber-300/50 text-ink transition-colors hover:bg-card"
+              : "border-muted/40 text-muted opacity-20"
+          )}
+        >
+          <p className="text-3xl sm:text-4xl">{t("open")}</p>
+          <h2 className="text-xs opacity-70 sm:text-base">
+            {canClaim ? t("nextHand") : id}
+          </h2>
         </button>
       </div>
     );
@@ -384,7 +467,6 @@ export default function Seat({ player, id, visualId, reveal }: seatProps) {
   const canSit = !appState.clientID || canMove;
 
   if (canSit) {
-    const buyIn = game.config.buyIn ?? 200;
     const handleClick = () => {
       if (!socket) {
         return;
@@ -392,13 +474,8 @@ export default function Seat({ player, id, visualId, reveal }: seatProps) {
       if (appState.clientID) {
         // Already seated but not ready: move to this seat.
         moveSeat(socket, id);
-      } else if (appState.username) {
-        if (appState.chips != null && appState.chips < buyIn) {
-          dispatch({ type: "setAuthError", payload: "not enough chips" });
-          return;
-        }
-        takeSeat(socket, appState.username, id, buyIn);
-        sendLog(socket, appState.username + " buys in for " + buyIn);
+      } else {
+        sitOrClaim();
       }
     };
     return (
@@ -416,7 +493,10 @@ export default function Seat({ player, id, visualId, reveal }: seatProps) {
 
   return (
     <div>
-      <button disabled className="m-1 h-16 w-32 rounded-2xl border border-muted/40 bg-transparent p-2 text-muted opacity-20 sm:m-4 sm:h-20 sm:w-56">
+      <button
+        disabled
+        className="m-1 h-16 w-32 rounded-2xl border border-muted/40 bg-transparent p-2 text-muted opacity-20 sm:m-4 sm:h-20 sm:w-56"
+      >
         <p className="text-3xl sm:text-4xl">{t("open")}</p>
         <h2 className="text-xs opacity-70 sm:text-base">{id}</h2>
       </button>

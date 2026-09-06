@@ -239,6 +239,9 @@ func (t *table) addBot(seatID uint) (*Client, error) {
 	if seatID != 0 && seatTaken(view, seatID) {
 		return nil, errSeatTaken
 	}
+	if _, claimed := t.seatReservedBy(seatID); seatID != 0 && claimed {
+		return nil, errSeatTaken
+	}
 	bot := newBotClient(t.hub, t.botName())
 	bot.table = t
 	t.registerClient(bot)

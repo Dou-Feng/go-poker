@@ -498,10 +498,6 @@ func (c *Client) processEvents(rawMessage []byte) error {
 		handleToggleReady(c)
 		return nil
 
-	case actionQueueNext:
-		handleQueueNext(c)
-		return nil
-
 	case actionMoveSeat:
 		var seat moveSeat
 		err := json.Unmarshal(rawMessage, &seat)

@@ -3,7 +3,6 @@ package server
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"log/slog"
 	"sync"
@@ -32,25 +31,28 @@ type flushFunc func(accountUUID string, room string, totalBuyIn uint, stack uint
 
 // table is a single table or game of poker
 type table struct {
-	name            string
-	rdb             *redis.Client
-	hub             *Hub
-	clients         map[*Client]bool
-	clientsMu       sync.Mutex
-	register        chan *Client
-	unregister      chan *Client
-	broadcast       chan []byte
-	game            *poker.Game
-	password        string
-	stop            chan struct{}
-	stopOnce        sync.Once
-	emptyTimer      *time.Timer
-	offlineTimers   map[string]*time.Timer
-	offlineMu       sync.Mutex
-	offlineAfter    time.Duration // grace period before an offline player is evicted
-	flush           flushFunc     // nil means flushPlayerSession against t.rdb
-	waiting         map[*Client]bool
-	waitingMu       sync.Mutex
+	name          string
+	rdb           *redis.Client
+	hub           *Hub
+	clients       map[*Client]bool
+	clientsMu     sync.Mutex
+	register      chan *Client
+	unregister    chan *Client
+	broadcast     chan []byte
+	game          *poker.Game
+	password      string
+	stop          chan struct{}
+	stopOnce      sync.Once
+	emptyTimer    *time.Timer
+	offlineTimers map[string]*time.Timer
+	offlineMu     sync.Mutex
+	offlineAfter  time.Duration // grace period before an offline player is evicted
+	flush         flushFunc     // nil means flushPlayerSession against t.rdb
+	// reserved holds the seats spectators claimed for the next hand, by
+	// account (see reserve.go). users is the wallet store; nil means Redis.
+	reserved        map[string]seatReservation
+	reserveMu       sync.Mutex
+	users           userStore
 	settleVotes     map[string]bool
 	settleAfterHand bool
 	settled         bool
@@ -84,7 +86,7 @@ func newTable(name string, redisClient *redis.Client, hub *Hub) *table {
 		stop:          make(chan struct{}),
 		offlineTimers: make(map[string]*time.Timer),
 		offlineAfter:  offlineTimeout,
-		waiting:       make(map[*Client]bool),
+		reserved:      make(map[string]seatReservation),
 		settleVotes:   make(map[string]bool),
 		ledger:        newSessionLedger(),
 		sessionID:     uuid.New().String(),
@@ -289,10 +291,6 @@ func (t *table) registerClient(client *Client) {
 }
 
 func (t *table) unregisterClient(client *Client) {
-	t.waitingMu.Lock()
-	delete(t.waiting, client)
-	t.waitingMu.Unlock()
-
 	t.clientsMu.Lock()
 	_, wasMember := t.clients[client]
 	if wasMember {
@@ -303,6 +301,9 @@ func (t *table) unregisterClient(client *Client) {
 	empty := t.humanCount() == 0
 	hostChanged := wasMember && client.accountUUID != "" && t.reassignHostIfGoneLocked()
 	t.clientsMu.Unlock()
+
+	// A seat claimed for the next hand goes with the account's last connection.
+	t.dropReservationIfGone(client.accountUUID)
 
 	if hostChanged {
 		// Let everyone's UI pick up the new host (this runs on the table's
@@ -367,7 +368,7 @@ func (m *updateGame) censoredFor(viewerUUID string) []byte {
 	game := updateGame{
 		base:        m.base,
 		Game:        m.Game.CensorFor(m.Game.ViewerNum(viewerUUID)),
-		Waiting:     m.Waiting,
+		Reserved:    m.Reserved,
 		SettleVotes: m.SettleVotes,
 		Host:        m.Host,
 	}
@@ -408,20 +409,6 @@ func (t *table) info() tableInfo {
 	}
 }
 
-// waitingUsernames returns the usernames of clients queued to join the next
-// hand, for display in the game view.
-func (t *table) waitingUsernames() []string {
-	t.waitingMu.Lock()
-	defer t.waitingMu.Unlock()
-	names := make([]string, 0, len(t.waiting))
-	for c := range t.waiting {
-		if c.username != "" {
-			names = append(names, c.username)
-		}
-	}
-	return names
-}
-
 // settleVoteList returns the usernames of seated players who have voted to
 // settle the current session.
 func (t *table) settleVoteList() []string {
@@ -434,143 +421,11 @@ func (t *table) settleVoteList() []string {
 	return names
 }
 
-// toggleQueue adds or removes a client from the queue for the next hand,
-// reporting whether the client is now queued.
-func (t *table) toggleQueue(c *Client) bool {
-	t.waitingMu.Lock()
-	defer t.waitingMu.Unlock()
-	if _, ok := t.waiting[c]; ok {
-		delete(t.waiting, c)
-		return false
-	}
-	t.waiting[c] = true
-	return true
-}
-
-// seatWaitingPlayers seats every queued spectator into the game. It only does
-// so while the game is between hands (stage PreDeal), so queued players join
-// at the start of the following hand.
-func (t *table) seatWaitingPlayers() {
-	t.waitingMu.Lock()
-	defer t.waitingMu.Unlock()
-
-	if len(t.waiting) == 0 {
-		return
-	}
-
-	view := t.game.GenerateOmniView()
-	if view.Stage != poker.NotReady {
-		return
-	}
-
-	for c := range t.waiting {
-		if c.username == "" {
-			continue
-		}
-		seated, err := t.seatQueuedClient(c)
-		if err != nil {
-			slog.Default().Warn("Seat queued player", "error", err)
-			continue
-		}
-		if seated {
-			delete(t.waiting, c)
-		}
-	}
-}
-
-// seatQueuedClient buys a queued client into the game at the first free seat
-// and readies them so they are dealt into the next hand. It assumes the
-// table's waiting mutex is held.
-func (t *table) seatQueuedClient(c *Client) (bool, error) {
-	view := t.game.GenerateOmniView()
-
-	// Already seated (e.g. the client was seated between the queue check and
-	// now, or reconnected with a seat).
-	for i := range view.Players {
-		if view.Players[i].UUID == c.uuid {
-			return false, nil
-		}
-	}
-
-	// Respect the table's max-player limit.
-	if view.Config.MaxPlayers != 0 && uint(len(view.Players)) >= view.Config.MaxPlayers {
-		return false, errors.New("table is full")
-	}
-
-	amount := view.Config.BuyIn
-	if amount == 0 {
-		return false, errors.New("amount must be positive")
-	}
-	// The account's buy-ins for the whole session count, not just this seat.
-	if !t.canBuyIn(c.accountUUID, amount) {
-		c.send <- createError(msgNoBuyInsLeft)
-		return false, errors.New(msgNoBuyInsLeft)
-	}
-
-	user, err := loadUser(t.rdb, c.accountUUID)
-	if err != nil {
-		return false, err
-	}
-	if user.Chips < amount {
-		return false, errors.New("not enough chips")
-	}
-	user.Chips -= amount
-	if err := saveUser(t.rdb, user); err != nil {
-		return false, err
-	}
-
-	// Pick the first free seat id.
-	seatID := uint(1)
-	for {
-		used := false
-		for _, p := range view.Players {
-			if p.SeatID == seatID {
-				used = true
-				break
-			}
-		}
-		if !used {
-			break
-		}
-		seatID++
-	}
-
-	position := t.game.AddPlayer()
-	c.uuid = t.game.GenerateOmniView().Players[position].UUID
-	c.send <- createUpdatedPlayerUUID(c)
-
-	if err := poker.SetAccountUUID(t.game, position, c.accountUUID); err != nil {
-		slog.Default().Warn("Set account uuid", "error", err)
-	}
-	if err := poker.SetUsername(t.game, position, c.username); err != nil {
-		slog.Default().Warn("Set username", "error", err)
-	}
-	if err := poker.SetAvatar(t.game, position, user.Avatar, user.AvatarImage); err != nil {
-		slog.Default().Warn("Set avatar", "error", err)
-	}
-	if err := poker.BuyIn(t.game, position, amount); err != nil {
-		slog.Default().Warn("Buy in", "error", err)
-	} else {
-		t.ledger.add(c.accountUUID, amount)
-	}
-	// Ready before SetSeatID re-sorts players, so the position index stays
-	// valid. Blinds are recomputed when the next hand is dealt.
-	if err := poker.ToggleReady(t.game, position, 0); err != nil {
-		slog.Default().Warn("Toggle ready", "error", err)
-	}
-	if err := poker.SetSeatID(t.game, position, seatID); err != nil {
-		slog.Default().Warn("Set seat id", "error", err)
-	}
-
-	c.send <- createUserInfo(t.rdb, user, true)
-	return true, nil
-}
-
-// broadcastGame seats any queued spectators, settles the session if the hand
-// limit has been reached or a settle vote passed, then pushes the current game
-// state to everyone.
+// broadcastGame seats the spectators who claimed a seat for the next hand
+// (between hands only), settles the session if the hand limit has been reached
+// or a settle vote passed, then pushes the current game state to everyone.
 func (t *table) broadcastGame() {
-	t.seatWaitingPlayers()
+	t.seatReservedPlayers()
 	if t.maybeSettleAfterHand() {
 		return
 	}

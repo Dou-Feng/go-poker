@@ -155,7 +155,7 @@ export function SocketProvider(props: SocketProviderProps) {
               pots: event.game.pots,
               minRaise: event.game.minRaise,
               readyCount: event.game.readyCount,
-              waiting: event.waiting ?? [],
+              reserved: event.reserved ?? [],
               settleVotes: event.settleVotes ?? [],
               host: event.host ?? "",
               handsPlayed: event.game.handsPlayed ?? 0,

@@ -435,3 +435,78 @@ func TestE2EHistoryOpensSharedSession(t *testing.T) {
 		t.Fatalf("non-participant must get %q, got %v", msgSessionNotFound, e["message"])
 	}
 }
+
+// A spectator joins a running table by tapping an empty seat: the seat is
+// claimed (visible to everyone in update-game), nobody sits down mid-hand,
+// and when the hand ends the spectator is seated there NOT ready, so the
+// table waits in the not-ready phase instead of dealing the next hand.
+func TestE2ESpectatorClaimsSeatMidHand(t *testing.T) {
+	addr, _ := bootE2E(t)
+	a := dialWS(t, "alice", addr)
+	b := dialWS(t, "bob", addr)
+	c := dialWS(t, "carol", addr)
+	register(a, "alice", "alice1")
+	register(b, "bob", "bob001")
+	register(c, "carol", "carol1")
+
+	a.send(map[string]any{"action": actionCreateTable, "tablename": "e2e-claim", "sb": 1, "bb": 2, "buyIn": 100, "maxPlayers": 3, "tournament": false})
+	if m := a.await("create-result", 3*time.Second, isAction(actionCreateResult)); m["ok"] != true {
+		t.Fatalf("create: %v", m["message"])
+	}
+	for _, w := range []*wsClient{b, c} {
+		w.send(map[string]any{"action": actionJoinTable, "tablename": "e2e-claim"})
+		w.await("join update", 3*time.Second, isAction(actionUpdateGame))
+	}
+	a.send(map[string]any{"action": actionTakeSeat, "username": "alice", "seatID": 1, "buyIn": 100})
+	a.await("alice seat uuid", 3*time.Second, isAction(actionUpdatePlayerUUID))
+	b.send(map[string]any{"action": actionTakeSeat, "username": "bob", "seatID": 2, "buyIn": 100})
+	b.await("bob seat uuid", 3*time.Second, isAction(actionUpdatePlayerUUID))
+	clients := map[string]*wsClient{a.uuid: a, b.uuid: b}
+
+	a.send(map[string]any{"action": actionToggleReady})
+	b.send(map[string]any{"action": actionToggleReady})
+	g := c.awaitGame("hand running", 5*time.Second, func(g e2eGame) bool { return g.Running && g.Betting })
+
+	// Carol taps seat 3 mid-hand: everyone sees the claim, nobody is seated.
+	c.send(map[string]any{"action": actionTakeSeat, "username": "carol", "seatID": 3, "buyIn": 100})
+	m := a.await("claim broadcast", 3*time.Second, func(m map[string]any) bool {
+		if m["action"] != actionUpdateGame {
+			return false
+		}
+		list, _ := m["reserved"].([]any)
+		return len(list) == 1
+	})
+	claim := m["reserved"].([]any)[0].(map[string]any)
+	if claim["seatID"] != float64(3) || claim["username"] != "carol" || claim["accountUuid"] != "carol1" {
+		t.Fatalf("unexpected claim: %v", claim)
+	}
+	if len(gameOf(t, m).Players) != 2 {
+		t.Fatalf("nobody sits down mid-hand")
+	}
+
+	// The player to act folds: heads-up that ends the hand (showdown stage).
+	clients[g.Players[g.Action].UUID].send(map[string]any{"action": actionPlayerFold})
+	c.awaitGame("showdown", 5*time.Second, func(g e2eGame) bool { return g.Stage == 6 })
+
+	// Closing the showdown seats carol, not ready; the table does not deal.
+	a.send(map[string]any{"action": actionDealGame})
+	c.await("carol seat uuid", 3*time.Second, isAction(actionUpdatePlayerUUID))
+	// Her wallet paid the buy-in (200 at registration - 100); the user-info
+	// goes straight to her socket, ahead of the Redis-relayed game update.
+	c.await("wallet", 3*time.Second, func(m map[string]any) bool {
+		return m["action"] == actionUserInfo && m["chips"] == float64(100)
+	})
+	g = c.awaitGame("carol seated", 5*time.Second, func(g e2eGame) bool { return g.player(c.uuid) != nil })
+	p := g.player(c.uuid)
+	if g.Running || g.Stage != 1 || p.Ready || p.Stack != 100 {
+		t.Fatalf("expected a not-ready seat on a waiting table, got running=%v stage=%d ready=%v stack=%d", g.Running, g.Stage, p.Ready, p.Stack)
+	}
+	for _, other := range []*wsClient{a, b} {
+		if q := g.player(other.uuid); q == nil || !q.Ready {
+			t.Fatalf("%s must still be ready", other.name)
+		}
+	}
+	// Carol readies up: the three-handed hand starts.
+	c.send(map[string]any{"action": actionToggleReady})
+	g = a.awaitGame("three-handed hand", 5*time.Second, func(g e2eGame) bool { return g.Running && len(g.Players) == 3 })
+}

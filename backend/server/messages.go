@@ -34,7 +34,6 @@ const (
 	actionReconnect      string = "reconnect-user"
 	actionGetHistory     string = "get-history"
 	actionToggleReady    string = "toggle-ready"
-	actionQueueNext      string = "queue-next"
 	actionMoveSeat       string = "move-seat"
 	actionVoteSettle     string = "vote-settle"
 	actionShowHand       string = "show-hand"
@@ -226,10 +225,6 @@ type toggleReady struct {
 	base // actionToggleReady
 }
 
-type queueNext struct {
-	base // actionQueueNext
-}
-
 type moveSeat struct {
 	base        // actionMoveSeat
 	SeatID uint `json:"seatID"`
@@ -328,11 +323,13 @@ type newLog struct {
 }
 
 type updateGame struct {
-	base                        // actionUpdateGame
-	Game        *poker.GameView `json:"game"`
-	Waiting     []string        `json:"waiting"`
-	SettleVotes []string        `json:"settleVotes"`
-	Host        string          `json:"host,omitempty"` // account UUID of the room host (manages bots)
+	base                 // actionUpdateGame
+	Game *poker.GameView `json:"game"`
+	// Reserved lists the empty seats spectators claimed for the next hand
+	// (take-seat during a hand; see reserve.go).
+	Reserved    []seatReservation `json:"reserved"`
+	SettleVotes []string          `json:"settleVotes"`
+	Host        string            `json:"host,omitempty"` // account UUID of the room host (manages bots)
 }
 
 type updatePlayerUUID struct {

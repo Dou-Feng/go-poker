@@ -5,7 +5,7 @@ import TableFx from "./TableFx";
 import classNames from "classnames";
 import { Game as GameType, Player } from "../interfaces";
 import { AppContext } from "../providers/AppStore";
-import { sendLog, dealGame, queueNext } from "../actions/actions";
+import { sendLog, dealGame } from "../actions/actions";
 import { useSocket } from "../hooks/useSocket";
 import { useTranslation } from "../hooks/useTranslation";
 import { playSfx } from "../lib/sfx";
@@ -127,7 +127,12 @@ export default function Table() {
   const { t } = useTranslation();
   const game = appState.game;
   const me = game?.players.find((p) => p.uuid === appState.clientID);
-  const queued = !me && !!game?.waiting.includes(appState.username ?? "");
+  // A spectator's claim on a seat for the next hand (tap an empty seat
+  // mid-hand; see Seat.tsx).
+  const myReservation =
+    !me && !!appState.uuid
+      ? game?.reserved.find((r) => r.accountUuid === appState.uuid) ?? null
+      : null;
   // Only one client drives the all-in runout (and the post-settlement deal).
   // Otherwise every seated/spectating client sends deal-game in the same
   // interval, flipping the turn + river + settlement almost at once and
@@ -565,20 +570,18 @@ export default function Table() {
           <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center">
             <div className="pointer-events-auto flex flex-col items-center gap-1 rounded-lg bg-black/50 px-4 py-2 text-center">
               {!appState.clientID ? (
-                game.running ? (
-                  <button
-                    onClick={() => socket && queueNext(socket)}
-                    className={`text-sm font-medium sm:text-base ${
-                      queued ? "text-amber-300" : "text-ink hover:underline"
-                    }`}
-                  >
-                    {queued ? t("queuedNextHand") : t("joinNextHand")}
-                  </button>
-                ) : (
-                  <p className="text-sm font-medium text-ink sm:text-base">
-                    {t("pickSeat")}
-                  </p>
-                )
+                <p
+                  className={classNames(
+                    "text-sm font-medium sm:text-base",
+                    myReservation ? "text-amber-300" : "text-ink"
+                  )}
+                >
+                  {!game.running
+                    ? t("pickSeat")
+                    : myReservation
+                    ? t("reservedNextHand")
+                    : t("tapSeatToJoinNext")}
+                </p>
               ) : (
                 <>
                   <p className="text-sm font-medium text-ink sm:text-base">

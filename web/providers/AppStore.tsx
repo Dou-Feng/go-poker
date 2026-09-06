@@ -12,7 +12,7 @@ import {
   SessionRecord,
   Friend,
 } from "../interfaces";
-import { Language } from "../lib/translations";
+import { Language, TranslationKey } from "../lib/translations";
 
 const initialState: AppState = {
   messages: [],
@@ -24,6 +24,7 @@ const initialState: AppState = {
   game: null,
   tables: [],
   authError: null,
+  notice: null,
   chips: null,
   avatar: null,
   avatarImage: false,
@@ -54,6 +55,7 @@ type ACTIONTYPE =
   | { type: "setTablename"; payload: string }
   | { type: "setTables"; payload: TableInfo[] }
   | { type: "setAuthError"; payload: string | null }
+  | { type: "setNotice"; payload: TranslationKey | null }
   | { type: "setChips"; payload: number }
   | { type: "setAvatar"; payload: string }
   | { type: "setAvatarImage"; payload: boolean }
@@ -110,6 +112,8 @@ function reducer(state: AppState, action: ACTIONTYPE) {
       return { ...state, tables: action.payload };
     case "setAuthError":
       return { ...state, authError: action.payload };
+    case "setNotice":
+      return { ...state, notice: action.payload };
     case "setChips":
       return { ...state, chips: action.payload };
     case "setAvatar":

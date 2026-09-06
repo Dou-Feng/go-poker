@@ -30,7 +30,7 @@ export default function Stack() {
       </button>
       {showRebuy && (
         <div className="absolute right-0 top-full z-50 mt-1 w-44">
-          <Rebuy />
+          <Rebuy onDone={() => setShowRebuy(false)} />
         </div>
       )}
     </div>

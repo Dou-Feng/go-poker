@@ -511,10 +511,10 @@ func handleNewPlayer(c *Client, username string) {
 func handleTakeSeat(c *Client, username string, seatID uint, buyIn uint) {
 	view := c.table.game.GenerateOmniView()
 
-	// New players can't sit down while a hand is in progress: they queue up
-	// and are seated at the start of the next hand instead.
+	// Nobody sits down while a hand is in progress: tapping an empty seat
+	// then claims it for the next hand instead (see reserve.go).
 	if view.Running {
-		c.send <- createError("game already running")
+		handleReserveSeat(c, seatID)
 		return
 	}
 
@@ -529,6 +529,11 @@ func handleTakeSeat(c *Client, username string, seatID uint, buyIn uint) {
 	// Respect the table's max-player limit.
 	if view.Config.MaxPlayers != 0 && uint(len(view.Players)) >= view.Config.MaxPlayers {
 		c.send <- createError("table is full")
+		return
+	}
+	// A seat somebody claimed during the hand that just ended is theirs.
+	if holder, claimed := c.table.seatReservedBy(seatID); claimed && holder != c.accountUUID {
+		c.send <- createError("seat is taken")
 		return
 	}
 
@@ -746,62 +751,6 @@ func handleToggleReady(c *Client) {
 	c.table.broadcastGame()
 }
 
-// handleQueueNext lets a spectator reserve a seat for the next hand. It acts
-// as a toggle: queued clients are seated automatically between hands, and
-// sending it again while queued cancels the reservation.
-func handleQueueNext(c *Client) {
-	if c.table == nil {
-		c.send <- createError("not in a room")
-		return
-	}
-	if c.username == "" {
-		c.send <- createError("not logged in")
-		return
-	}
-
-	view := c.table.game.GenerateOmniView()
-	if !view.Running {
-		c.send <- createError("game not running")
-		return
-	}
-
-	// Already seated players have nothing to queue for.
-	for i := range view.Players {
-		if view.Players[i].UUID == c.uuid {
-			c.send <- createError("already seated")
-			return
-		}
-	}
-
-	if view.Config.MaxPlayers != 0 && uint(len(view.Players)) >= view.Config.MaxPlayers {
-		c.send <- createError("table is full")
-		return
-	}
-
-	// Validate the buy-in up front for immediate feedback. The final check
-	// happens again when the seat is actually assigned.
-	if view.Config.BuyIn == 0 {
-		c.send <- createError("amount must be positive")
-		return
-	}
-	if !c.table.canBuyIn(c.accountUUID, view.Config.BuyIn) {
-		c.send <- createError(msgNoBuyInsLeft)
-		return
-	}
-	user, err := loadUser(c.hub.rdb, c.accountUUID)
-	if err != nil {
-		c.send <- createError("could not load user")
-		return
-	}
-	if user.Chips < view.Config.BuyIn {
-		c.send <- createError("not enough chips")
-		return
-	}
-
-	c.table.toggleQueue(c)
-	c.table.broadcastGame()
-}
-
 func handleMoveSeat(c *Client, seatID uint) {
 	if seatID == 0 {
 		c.send <- createError("invalid seat")
@@ -889,6 +838,11 @@ func handleDealGame(c *Client) {
 		if c.table.maybeSettle() {
 			return
 		}
+
+		// Seat the spectators who claimed a seat during the hand. They
+		// arrive not ready, so the auto-start below does not fire and the
+		// table waits in the not-ready phase for them.
+		c.table.seatReservedPlayers()
 
 		// Everyone is still ready: auto-start the next hand. Otherwise
 		// broadcast the ready phase and wait for players to re-ready.
@@ -1249,7 +1203,7 @@ func createUpdatedGame(c *Client) []byte {
 	game := updateGame{
 		base{actionUpdateGame},
 		view.CensorFor(view.ViewerNum(c.uuid)),
-		c.table.waitingUsernames(),
+		c.table.reservations(),
 		c.table.settleVoteList(),
 		c.table.hostAccount(),
 	}
@@ -1269,7 +1223,7 @@ func createUpdatedGameBytes(t *table) []byte {
 	game := updateGame{
 		base{actionUpdateGame},
 		t.game.GenerateOmniView(),
-		t.waitingUsernames(),
+		t.reservations(),
 		t.settleVoteList(),
 		t.hostAccount(),
 	}

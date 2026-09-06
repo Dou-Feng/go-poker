@@ -226,12 +226,6 @@ export function toggleReady(socket: WebSocket) {
   });
 }
 
-export function queueNext(socket: WebSocket) {
-  send(socket, {
-    action: "queue-next",
-  });
-}
-
 export function moveSeat(socket: WebSocket, seatID: number) {
   send(socket, {
     action: "move-seat",

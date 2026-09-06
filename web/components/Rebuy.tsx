@@ -4,12 +4,17 @@ import { useSocket } from "../hooks/useSocket";
 import { useTranslation } from "../hooks/useTranslation";
 import { rebuy } from "../actions/actions";
 
+type rebuyProps = {
+  /** Called once the rebuy has been sent, so the parent can close the panel. */
+  onDone?: () => void;
+};
+
 // Rebuy panel: a "- amount +" control plus the rebuy button. Rendered inline
 // by the table-stack chip count in the top-right; the parent controls when it
 // is visible.
-export default function Rebuy() {
+export default function Rebuy({ onDone }: rebuyProps) {
   const socket = useSocket();
-  const { appState } = useContext(AppContext);
+  const { appState, dispatch } = useContext(AppContext);
   const { t } = useTranslation();
   const [amount, setAmount] = useState(0);
 
@@ -33,6 +38,13 @@ export default function Rebuy() {
     }
     rebuy(socket, amount);
     setAmount(0);
+    // While the player is in a hand the server parks the chips
+    // (PendingBuyIn) until the next hand is dealt, so the stack on screen
+    // does not move yet: say so.
+    if (game.running && me.in) {
+      dispatch({ type: "setNotice", payload: "rebuyNextHand" });
+    }
+    onDone?.();
   };
 
   return (
