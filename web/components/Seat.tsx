@@ -1,6 +1,6 @@
 import { useContext } from "react";
 import { AppContext } from "../providers/AppStore";
-import { Game, Player } from "../interfaces/index";
+import { Player } from "../interfaces/index";
 import Card from "./Card";
 import Chip from "./Chip";
 import classNames from "classnames";
@@ -53,8 +53,8 @@ export function useHandLabel() {
 function chipPosition(id: number) {
   return classNames(
     {
-      // The dealer button and the showdown hand label sit on the side of the
-      // seat that faces the table center (the bet amount sits under the seat).
+      // The showdown hand label sits on the side of the seat that faces the
+      // table centre (the bet pill is above the seat, D/SB/BB on the avatar).
       "left-1/2 -translate-x-1/2 -top-9 flex-row": id === 1, // bottom
       "right-1 -top-9 flex-row": id === 2, // bottom-left
       "right-1 top-full mt-1 flex-col": id === 3, // top-left
@@ -63,33 +63,6 @@ function chipPosition(id: number) {
       "left-1 -top-9 flex-row": id === 6, // bottom-right
     },
     "absolute flex items-center justify-start z-10"
-  );
-}
-
-function active(player: Player, game: Game) {
-  const action = player.position === game.action;
-  // A player wins if they are awarded any pot, including side pots.
-  const winner = (game.pots ?? []).some((pot) =>
-    (pot.winningPlayerNums ?? []).includes(player.position)
-  );
-  return classNames(
-    {
-      // betting and player's turn
-      "animate-active-pulse shadow-[0px_0px_40px_2px_rgba(255,255,255,255.3)] bg-ink text-brand":
-        action && game.betting,
-
-      // betting and not player's turn
-      "bg-tablehi text-ink": !action && game.betting,
-
-      // betting over and winner
-      "shadow-[0px_0px_60px_20px_rgba(100,98,92,255.3)] bg-amber-200 text-brand":
-        winner && !game.betting,
-
-      // betting over and not winner
-      "bg-tablehi text-ink ": !winner && !game.betting,
-    },
-
-    "rounded-xl border border-muted/30 flex flex-row justify-start items-center z-2"
   );
 }
 
@@ -159,134 +132,155 @@ export default function Seat({ player, id, visualId, reveal }: seatProps) {
         openStats();
       }
     };
+    const inHand = running && player.in;
+    const allIn = inHand && player.stack === 0;
+    const folded = running && !player.in && !left;
+    const myTurn = running && game.betting && player.position === game.action;
+    // A player wins if they are awarded any pot, including side pots.
+    const winner =
+      running &&
+      !game.betting &&
+      (game.pots ?? []).some((pot) =>
+        (pot.winningPlayerNums ?? []).includes(player.position)
+      );
+    const canShow = isMine && inHand && player.stack === 0 && !player.revealed;
+    // Table position as a badge on the avatar (independent of the seat
+    // state, so BB + TURN or D + ALL-IN simply stack).
+    const role: "dealer" | "sb" | "bb" | null = !running
+      ? null
+      : player.position === game.dealer
+      ? "dealer"
+      : player.position === game.sb
+      ? "sb"
+      : player.position === game.bb
+      ? "bb"
+      : null;
+    const status = !running
+      ? isMine
+        ? "YOU"
+        : isBot
+        ? "BOT"
+        : ""
+      : winner
+      ? "WIN"
+      : allIn
+      ? "ALL-IN"
+      : folded
+      ? "FOLDED"
+      : myTurn
+      ? "TURN"
+      : isMine
+      ? "YOU"
+      : "";
     return (
-      <div className="relative">
+      <div className="relative flex flex-col items-center">
         <div
-          className={classNames(
-            active(player, game),
-            isMine || !running
-              ? "m-1 h-16 w-32 sm:m-4 sm:h-20 sm:w-56"
-              : "m-0.5 h-16 w-32 sm:m-2 sm:h-20 sm:w-44",
-            left && "opacity-40 grayscale",
-            removable && "ring-2 ring-rose-500",
-            "relative"
-          )}
+          className={classNames("gps-seat", {
+            "gps-seat--idle": !running,
+            "gps-seat--hero": isMine,
+            "gps-seat--active": myTurn,
+            "gps-seat--folded": folded,
+            "gps-seat--allin": allIn,
+            "gps-seat--winner": winner,
+            "gps-seat--left": left,
+            "gps-seat--removable": removable,
+          })}
           onClick={handleClick}
+          role="button"
           title={
             removable
               ? t("removeBot")
-              : isMine &&
-                running &&
-                player.in &&
-                player.stack === 0 &&
-                !player.revealed
+              : canShow
               ? t("showCards")
               : t("viewRoomStats")
           }
-          style={{ cursor: "pointer" }}
         >
-          {running ? (
-            <>
-              <div className="flex flex-row items-center justify-center">
-                {player.cards.map((c, i) => (
-                  <div key={`${i}-${c}`} className="mx-0.5">
-                    <Card
-                      card={c}
-                      placeholder={false}
-                      folded={!player.in}
-                      hidden={reveal || player.revealed ? false : hidden}
-                    />
-                  </div>
-                ))}
+          {/* This street's bet, above the seat, as a chip plus amount. */}
+          {running && player.bet !== 0 && (
+            <div className="gps-seat__bet">
+              <div
+                key={player.bet}
+                className="gps-seat__bet-pill animate-chip-pop"
+              >
+                <Chip className="gps-seat__chip" amount={player.bet} />
+                <span className="type-num">{player.bet}</span>
               </div>
-              <div className="flex flex-1 items-center justify-center">
-                <Avatar
-                  username={player.username}
-                  uuid={player.accountUuid}
-                  emoji={player.avatar || "🙂"}
-                  hasImage={player.avatarImage}
-                  size={44}
+            </div>
+          )}
+
+          <div className="gps-seat__avatar">
+            <Avatar
+              username={player.username}
+              uuid={player.accountUuid}
+              emoji={player.avatar || "🙂"}
+              hasImage={player.avatarImage}
+              size={44}
+            />
+            {role && (
+              <span className={`gps-seat__role gps-seat__role--${role}`}>
+                {role === "dealer" ? "D" : role.toUpperCase()}
+              </span>
+            )}
+            {removable && (
+              <span className="gps-seat__x" aria-hidden>
+                ✕
+              </span>
+            )}
+            {(micLive || micMuted) && (
+              <span
+                className={classNames(
+                  "gps-seat__mic",
+                  micMuted ? "is-muted" : "is-live"
+                )}
+                title={micMuted ? t("muteMicFor") : t("micOn")}
+              >
+                <MicIcon off={micMuted} className="h-3 w-3" />
+              </span>
+            )}
+          </div>
+
+          {running && (
+            <div className="gps-seat__cards">
+              {player.cards.map((c, i) => (
+                <Card
+                  key={`${i}-${c}`}
+                  card={c}
+                  placeholder={false}
+                  folded={!player.in}
+                  hidden={reveal || player.revealed ? false : hidden}
                 />
-              </div>
-            </>
-          ) : (
-            <div className="flex flex-1 flex-row items-center justify-center gap-2">
-              <Avatar
-                username={player.username}
-                uuid={player.accountUuid}
-                emoji={player.avatar || "🙂"}
-                hasImage={player.avatarImage}
-                size={44}
-              />
-              <div className="flex min-w-0 flex-col justify-center leading-tight">
-                <p className="truncate text-base font-medium text-ink sm:text-lg">
-                  {player.username}
-                </p>
-                <div className="flex flex-row items-center gap-1">
-                  <Chip
-                    className="h-4 w-4 sm:h-5 sm:w-5"
-                    amount={player.stack}
-                  />
-                  <p className="type-num text-base text-amber-300 sm:text-lg">
-                    {player.stack}
-                  </p>
-                </div>
-              </div>
+              ))}
             </div>
           )}
-          {!running && player.ready && (
-            <div className="absolute inset-0 z-10 flex items-center justify-center rounded-xl bg-black/50">
-              <p className="text-base font-semibold text-ink/90 sm:text-xl">
-                {t("ready")}
-              </p>
+
+          <div className="gps-seat__panel">
+            <div className="gps-seat__row">
+              <strong className="gps-seat__name">{player.username}</strong>
+              {status && <span className="gps-seat__status">{status}</span>}
             </div>
-          )}
-          {removable && (
-            <span
-              className="absolute -left-1.5 -top-1.5 z-20 flex h-5 w-5 items-center justify-center rounded-full bg-rose-600 text-xs font-bold text-ink shadow"
-              aria-hidden
-            >
-              ✕
-            </span>
-          )}
-          {(micLive || micMuted) && (
-            <span
-              className={classNames(
-                "absolute -right-1.5 -top-1.5 z-20 flex h-5 w-5 items-center justify-center rounded-full border border-brand/40 shadow",
-                micMuted ? "bg-rose-600 text-ink" : "bg-emerald-600 text-ink"
-              )}
-              title={micMuted ? t("muteMicFor") : t("micOn")}
-            >
-              <MicIcon off={micMuted} className="h-3 w-3" />
-            </span>
-          )}
+            <div className="gps-seat__stack">
+              <Chip className="gps-seat__chip" amount={player.stack} />
+              <span className="type-num">{player.stack}</span>
+            </div>
+            {!running && player.ready && (
+              <div className="gps-seat__ready">{t("ready")}</div>
+            )}
+          </div>
         </div>
-        {running &&
-          (isMine && player.in && player.stack === 0 && !player.revealed ? (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                if (socket) {
-                  showHand(socket);
-                }
-              }}
-              className="btn btn-accent mt-1 w-full py-1 text-xs font-bold sm:text-sm"
-            >
-              {t("showCards")}
-            </button>
-          ) : (
-            <div className="mt-1 flex w-full flex-row items-center justify-between px-1 sm:px-2">
-              <p className="truncate pr-1 text-base font-medium text-ink sm:text-lg">
-                {player.username}
-              </p>
-              <div className="flex flex-row items-center gap-1">
-                <Chip className="h-4 w-4 sm:h-5 sm:w-5" amount={player.stack} />
-                <p className="type-num text-base text-amber-300 sm:text-lg">
-                  {player.stack}
-                </p>
-              </div>
-            </div>
-          ))}
+
+        {canShow && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              if (socket) {
+                showHand(socket);
+              }
+            }}
+            className="btn btn-accent mt-1 w-full py-1 text-xs font-bold sm:text-sm"
+          >
+            {t("showCards")}
+          </button>
+        )}
         {!running && isMine && (
           <button
             onClick={(e) => {
@@ -303,8 +297,8 @@ export default function Seat({ player, id, visualId, reveal }: seatProps) {
               }
             }}
             className={classNames(
-              // Narrower than the seat box (w-32 / sm:w-56) and centered, so
-              // it reads as a control under the seat rather than a bar.
+              // Narrower than the seat and centred, so it reads as a control
+              // under the seat rather than a bar.
               "btn mx-auto mt-1 flex w-24 py-1 text-xs font-bold sm:w-36 sm:text-sm",
               player.ready ? "btn-secondary" : "btn-confirm"
             )}
@@ -312,34 +306,14 @@ export default function Seat({ player, id, visualId, reveal }: seatProps) {
             {player.ready ? t("cancelReady") : t("ready")}
           </button>
         )}
-        {/* This street's bet, directly under the seat (same spot on every
-            seat), as a chip plus amount. */}
-        {running && player.bet !== 0 && (
-          <div className="flex w-full justify-center">
-            <div
-              key={player.bet}
-              className="animate-chip-pop mt-1 inline-flex items-center gap-1 rounded-full border border-amber-300/40 bg-black/40 px-2 py-0.5 text-sm font-semibold text-amber-300 sm:text-base"
-            >
-              <Chip className="h-3.5 w-3.5 sm:h-4 sm:w-4" amount={player.bet} />
-              <span className="type-num leading-none">{player.bet}</span>
-            </div>
-          </div>
-        )}
         <div className={chipPosition(visualId ?? id)}>
-          {running && game.dealer == player.position && (
-            <div className="mx-0.5 my-0.5 flex h-5 w-6 items-center justify-center text-sm sm:mx-1 sm:my-1 sm:h-7 sm:w-8 sm:text-xl">
-              🔔
-            </div>
-          )}
           {/* Best hand at showdown: shown on the table-facing side of the
-              seat (same spot as chips), only for players whose cards are
-              actually revealed (participated in the showdown). */}
+              seat, only for players whose cards are actually revealed
+              (participated in the showdown). */}
           {running && player.bestHand && (reveal || player.revealed) && (
             <p
               className={classNames(
                 "animate-fade-in max-w-28 sm:max-w-36 truncate rounded-3xl bg-tablehi/90 px-2 text-xs font-semibold text-amber-300 sm:text-sm",
-                // Match the chip's side of the seat so it never overlaps
-                // the hole cards.
                 (visualId ?? id) === 3 ? "flex-col items-start" : "flex-row"
               )}
             >

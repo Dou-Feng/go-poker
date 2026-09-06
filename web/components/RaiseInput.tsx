@@ -1,156 +1,208 @@
-import { useState, useContext } from "react";
+import { useContext, useMemo, useState } from "react";
 import { AppContext } from "../providers/AppStore";
 import { playerRaise, sendLog } from "../actions/actions";
 import { useSocket } from "../hooks/useSocket";
-import { useTranslation } from "../hooks/useTranslation";
 import { playSfx } from "../lib/sfx";
 import InputButton from "./InputButton";
 import Chip from "./Chip";
-import { Slider } from "@mantine/core";
 import classNames from "classnames";
-import { FiX } from "react-icons/fi";
 
 type raiseProps = {
-  showRaise: boolean;
-  setShowRaise: React.Dispatch<React.SetStateAction<boolean>>;
+  /** Hide the panel (close button, or after the raise is sent). */
+  onClose: () => void;
 };
-// Quick-amount chips (min / ½ pot / pot / 2× pot): flat toolbar buttons.
-function button() {
-  return classNames("btn btn-secondary px-2.5 py-1 text-xs sm:text-sm");
-}
 
-export default function RaiseInput({ showRaise, setShowRaise }: raiseProps) {
+type Preset = "min" | "half" | "pot" | "double";
+
+// Labels follow the action bar next to the panel: Chinese primary, small
+// English caption (see Input.tsx).
+const PRESET_TEXT: Record<Preset, { zh: string; en: string }> = {
+  min: { zh: "最小", en: "MIN" },
+  half: { zh: "1/2 底池", en: "1/2 POT" },
+  pot: { zh: "满池", en: "POT" },
+  double: { zh: "2 倍底池", en: "2 × POT" },
+};
+
+// Raise panel above the action bar (styles/raisepanel.css): quick amounts,
+// a slider with −/+ nudges in big-blind steps, and the bar's own BET /
+// ALL-IN key to confirm. Amounts are the player's total bet for the street
+// (what the slider shows); the server receives the increment on top of what
+// they already have in.
+export default function RaiseInput({ onClose }: raiseProps) {
   const socket = useSocket();
   const { appState } = useContext(AppContext);
-  const { t } = useTranslation();
+  const game = appState.game;
 
-  if (!appState.game) {
+  const bigBlind = game?.config.bb ?? 0;
+  const smallBlind = game?.config.sb ?? 0;
+  const actor = game ? game.players[game.action] : undefined;
+  const currentBet = actor?.bet ?? 0;
+  const currentStack = actor?.stack ?? 0;
+  const maxBet = game ? Math.max(...game.players.map((p) => p.bet)) : 0;
+  const allInTotal = currentStack + currentBet;
+  // Minimum legal total; a short stack that cannot make a full raise can
+  // still shove, so the floor never exceeds the all-in amount.
+  const minRaise = Math.min(maxBet + (game?.minRaise ?? 0), allInTotal);
+  const currentPot =
+    game && game.pots.length !== 0
+      ? game.pots[0].amount
+      : bigBlind + smallBlind;
+
+  const clamp = (v: number) =>
+    Math.min(allInTotal, Math.max(minRaise, Math.round(v)));
+
+  // Quick amounts are pot-sized raises relative to the current pot.
+  const presetValue = useMemo(() => {
+    const potBet = currentPot + 2 * (maxBet - currentBet);
+    return {
+      min: clamp(minRaise),
+      half: clamp(Math.ceil(potBet / 2)),
+      pot: clamp(potBet),
+      double: clamp(potBet * 2),
+    } as Record<Preset, number>;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentPot, maxBet, currentBet, minRaise, allInTotal]);
+
+  const [amount, setAmount] = useState(minRaise);
+
+  if (!game || !actor) {
     return null;
   }
 
-  const bigBlind = appState.game.config.bb;
-  const smallBlind = appState.game.config.sb;
-  const currentBet = appState.game.players[appState.game.action].bet; // active player's bet
-  const currentStack = appState.game.players[appState.game.action].stack; // active player's stack
-  const playerBets = appState.game.players.map((player) => player.bet); // array of all players' bets
-  const maxBet = Math.max(...playerBets); // largest bet out of all players' bets
-  const minRaise = maxBet + appState.game.minRaise;
+  const value = clamp(amount);
+  const isAllIn = value >= allInTotal;
+  const step = Math.max(1, bigBlind);
+  const fill =
+    allInTotal > minRaise ? (value - minRaise) / (allInTotal - minRaise) : 1;
+  const selected = (Object.keys(PRESET_TEXT) as Preset[]).find(
+    (p) => presetValue[p] === value
+  );
 
-  const currentPot =
-    appState.game.pots.length != 0
-      ? appState.game.pots[0].amount
-      : bigBlind + smallBlind;
-
-  function betValidator(bet: number, min: number, stack: number) {
-    // bet can never be smaller than min raise and can never be bigger than player stack + committed chips
-    if (bet < min) {
-      return min;
-    } else if (bet > stack) {
-      return stack;
-    } else {
-      return bet;
-    }
-  }
-
-  // Quick amounts are a pot-sized raise relative to the current pot.
-  const potBet = currentPot + 2 * (maxBet - currentBet);
-  const half = Math.ceil(potBet / 2);
-  const full = potBet;
-  const double = potBet * 2;
-  const allInTotal = currentStack + currentBet;
-
-  const [inputValue, setInputValue] = useState(minRaise);
-
-  const isAllIn = inputValue >= allInTotal;
-
-  const handleRaise = (user: string | null, amount: number) => {
+  const confirm = () => {
     if (socket) {
       playSfx(isAllIn ? "allin" : "raise");
-      const raiseMessage = isAllIn
-        ? user + " is all in"
-        : user + " bets " + amount;
-      sendLog(socket, raiseMessage);
-      playerRaise(socket, amount);
+      sendLog(
+        socket,
+        isAllIn
+          ? appState.username + " is all in"
+          : appState.username + " bets " + value
+      );
+      playerRaise(socket, value - currentBet);
     }
-    setShowRaise(!showRaise);
+    onClose();
   };
 
   return (
-    <div className="pointer-events-auto flex w-full justify-center px-2 pt-2 pb-[10dvh]">
-      <div className="animate-fade-in flex flex-row flex-wrap items-center justify-center gap-2 rounded-2xl border border-amber-700/40 bg-tablehi/95 p-2.5 shadow-lg sm:gap-3 sm:p-3">
-        <div className="flex flex-col items-center justify-center gap-1.5 rounded-lg bg-card px-3 py-2">
-          <div className="flex items-center justify-center gap-1.5 text-xl font-semibold text-amber-300 sm:text-2xl">
-            <Chip className="h-5 w-5 sm:h-6 sm:w-6" amount={inputValue} />
-            <span className="type-num leading-none">{inputValue}</span>
-          </div>
-          <div className="flex flex-row flex-wrap items-center justify-center gap-1">
-            <button
-              className={button()}
-              onClick={() =>
-                setInputValue(betValidator(minRaise, minRaise, allInTotal))
-              }
-            >
-              {t("min")}
-            </button>
-            <button
-              className={button()}
-              onClick={() =>
-                setInputValue(betValidator(half, minRaise, allInTotal))
-              }
-            >
-              {t("halfPot")}
-            </button>
-            <button
-              className={button()}
-              onClick={() =>
-                setInputValue(betValidator(full, minRaise, allInTotal))
-              }
-            >
-              {t("pot")}
-            </button>
-            <button
-              className={button()}
-              onClick={() =>
-                setInputValue(betValidator(double, minRaise, allInTotal))
-              }
-            >
-              {t("twoPot")}
-            </button>
-          </div>
-          <div className="w-44 pb-1 sm:w-72">
-            <Slider
-              value={inputValue}
-              onChange={setInputValue}
-              min={minRaise}
-              max={allInTotal}
-              step={1}
-              color="cyan"
-              thumbLabel={t("bet")}
-              showLabelOnHover={false}
-              size="md"
-              radius="xl"
-            />
+    <div
+      className="gp-raise-panel animate-fade-in"
+      role="dialog"
+      aria-label="加注"
+    >
+      <div className="gp-raise-panel__topline" aria-hidden="true" />
+
+      <header className="gp-raise-panel__header">
+        <div className="gp-raise-panel__title">
+          <img src="/assets/ui/buttons/bet/bet_icon.svg" alt="" />
+          <div>
+            <strong>加注</strong>
+            <span>RAISE</span>
           </div>
         </div>
-        <div className="flex flex-col gap-1.5">
-          <InputButton
-            kind={isAllIn ? "allin" : "bet"}
-            label={isAllIn ? "ALL-IN" : "加注"}
-            subLabel={isAllIn ? "" : "BET"}
-            disabled={inputValue < minRaise || inputValue > allInTotal}
-            onClick={() =>
-              handleRaise(appState.username, inputValue - currentBet)
-            }
-          />
+
+        <div className="gp-raise-panel__pot">
+          <Chip className="gp-raise-panel__pot-chip" amount={currentPot} />
+          <div>
+            <span>当前底池</span>
+            <strong className="type-num">{currentPot}</strong>
+          </div>
+        </div>
+
+        <button
+          type="button"
+          className="gp-raise-panel__close"
+          onClick={onClose}
+          aria-label="关闭"
+        >
+          ×
+        </button>
+      </header>
+
+      <div className="gp-raise-panel__divider" />
+
+      <div className="gp-raise-panel__presets">
+        {(Object.keys(PRESET_TEXT) as Preset[]).map((preset) => (
           <button
-            onClick={() => setShowRaise(!showRaise)}
-            className="btn btn-room-control"
+            type="button"
+            key={preset}
+            className={classNames(
+              "gp-preset",
+              selected === preset && "is-selected"
+            )}
+            onClick={() => setAmount(presetValue[preset])}
           >
-            <FiX size="1rem" />
-            {t("close")}
+            <strong>{PRESET_TEXT[preset].zh}</strong>
+            <span>{PRESET_TEXT[preset].en}</span>
+          </button>
+        ))}
+      </div>
+
+      <section className="gp-raise-panel__amount-section">
+        <div className="gp-raise-panel__amount-copy">
+          <strong>加注金额</strong>
+          <span>AMOUNT</span>
+          <small className="type-num">
+            {minRaise} - {allInTotal}
+          </small>
+        </div>
+
+        <div className="gp-raise-panel__slider-wrap">
+          <input
+            className="gp-raise-slider"
+            type="range"
+            min={minRaise}
+            max={allInTotal}
+            step={1}
+            value={value}
+            onChange={(e) => setAmount(Number(e.target.value))}
+            style={{ ["--fill" as string]: fill }}
+            aria-label="加注金额"
+          />
+        </div>
+
+        <div className="gp-raise-panel__controls">
+          <button
+            type="button"
+            onClick={() => setAmount(clamp(value - step))}
+            disabled={value <= minRaise}
+            aria-label="减少"
+          >
+            −
+          </button>
+          <div className="gp-raise-panel__value">
+            <Chip className="gp-raise-panel__value-chip" amount={value} />
+            <strong className="type-num">{value}</strong>
+          </div>
+          <button
+            type="button"
+            onClick={() => setAmount(clamp(value + step))}
+            disabled={value >= allInTotal}
+            aria-label="增加"
+          >
+            +
           </button>
         </div>
-      </div>
+      </section>
+
+      <footer className="gp-raise-panel__footer">
+        <InputButton
+          kind={isAllIn ? "allin" : "bet"}
+          label={isAllIn ? "ALL-IN" : "确认加注"}
+          subLabel={isAllIn ? "" : "RAISE"}
+          onClick={confirm}
+        />
+      </footer>
+
+      <span className="gp-raise-panel__pointer" aria-hidden="true" />
     </div>
   );
 }

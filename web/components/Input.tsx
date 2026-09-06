@@ -1,4 +1,4 @@
-import { useState, useContext } from "react";
+import { useState, useContext, useEffect } from "react";
 import { AppContext } from "../providers/AppStore";
 import {
   playerCall,
@@ -26,19 +26,30 @@ export default function Input() {
     }
   };
 
-  if (!appState.game || appState.game.betting == false) return null;
+  const game = appState.game;
+  const action =
+    !!game &&
+    game.betting &&
+    game.action < game.players.length &&
+    appState.clientID === game.players[game.action].uuid;
+  // The raise panel is a per-turn thing: it closes as soon as the turn moves
+  // on (the component stays mounted, so the state must be reset here).
+  useEffect(() => {
+    if (!action) {
+      setShowRaise(false);
+    }
+  }, [action]);
+
+  if (!game || game.betting == false) return null;
 
   // A player who is all-in cannot act.
-  const me = appState.game.players.find((p) => p.uuid === appState.clientID);
+  const me = game.players.find((p) => p.uuid === appState.clientID);
   if (me && me.in && me.stack === 0) {
     return null;
   }
 
-  const action =
-    appState.clientID === appState.game.players[appState.game.action].uuid;
-
-  const player = appState.game.players[appState.game.action];
-  const playerBets = appState.game.players.map((player) => player.bet);
+  const player = game.players[game.action];
+  const playerBets = game.players.map((player) => player.bet);
   const maxBet = Math.max(...playerBets);
 
   const canCheck = player.bet >= maxBet;
@@ -77,12 +88,12 @@ export default function Input() {
   if (!action) {
     return null;
   }
-  if (showRaise) {
-    return <RaiseInput setShowRaise={setShowRaise} showRaise={showRaise} />;
-  }
 
+  // The raise panel opens above the bar (the bar stays put underneath, its
+  // 加注 key toggles the panel).
   return (
-    <div className="pointer-events-auto flex w-full justify-center px-2 pt-2 pb-[10dvh]">
+    <div className="pointer-events-auto flex w-full flex-col items-center gap-4 px-2 pt-2 pb-[10dvh]">
+      {showRaise && <RaiseInput onClose={() => setShowRaise(false)} />}
       <div
         className="gp-action-bar animate-fade-in"
         role="group"
@@ -99,7 +110,7 @@ export default function Input() {
             kind="bet"
             label="加注"
             subLabel="BET"
-            onClick={() => setShowRaise(!showRaise)}
+            onClick={() => setShowRaise((s) => !s)}
           />
         )}
         {!callOnly && (

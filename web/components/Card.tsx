@@ -128,21 +128,16 @@ export default function Card({ card, placeholder, folded, hidden }: cardProps) {
   // censored hole cards arrive as 0 (see GameView.CensorFor), which has no
   // valid suit, but the back must still be drawn.
   if (hidden) {
-    if (folded) {
-      return (
-        <div
-          className={
-            "animate-fold-away flex h-14 w-9 items-center justify-center rounded-md border-4 border border-white bg-red-900 sm:h-24 sm:w-16"
-          }
-        ></div>
-      );
-    }
     return (
-      <div
-        className={
-          "flex h-14 w-9 items-center justify-center rounded-md border-4 border border-white bg-red-900 sm:h-24 sm:w-16"
-        }
-      ></div>
+      <img
+        src="/assets/ui/seat/card_back.svg"
+        alt=""
+        draggable={false}
+        className={classNames(
+          "block h-14 w-9 select-none rounded-md shadow-md sm:h-24 sm:w-16",
+          folded && "animate-fold-away"
+        )}
+      />
     );
   }
   const c = cardToString(card);

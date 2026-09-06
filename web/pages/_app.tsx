@@ -8,6 +8,8 @@ import "../styles/base.css";
 import "../styles/shared.css";
 import "../styles/game.css";
 import "../styles/actionbar.css";
+import "../styles/raisepanel.css";
+import "../styles/seat.css";
 import "../styles/utilities.css";
 
 function MyApp({ Component, pageProps }: AppProps) {

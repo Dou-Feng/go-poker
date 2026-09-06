@@ -1,0 +1,407 @@
+/* Player seat (components/Seat.tsx, occupied seats).
+ *
+ * Adapted from the designer's PlayerSeat pack (tmp/new_seat): avatar disc on
+ * the left straddling the top edge of a bevelled dark panel, the two hole
+ * cards fanned above the panel, the bet pill above everything, and D / SB /
+ * BB as small badges on the avatar (a position badge, not a seat state, so
+ * it stacks with TURN / ALL-IN / FOLDED).
+ *
+ * Sizes are re-cut to the room's existing footprints so the table layout does
+ * not move: phone seats are 128px wide (cards 36x56, as drawn by Card.tsx),
+ * desktop seats 224px (cards 64x96). Type sizes match the old seat: name
+ * 14/16px, stack 15/18px. Everything hangs off the custom properties below.
+ */
+.gps-seat {
+  --gps-w: 128px;
+  --gps-avatar: 44px;
+  --gps-card-h: 56px; /* Card.tsx h-14 */
+  --gps-panel-h: 50px;
+  --gps-overlap: 14px; /* how far the cards sit down into the panel */
+  --gps-panel-left: 12px;
+  --gps-name: 14px;
+  --gps-stack: 15px;
+  --gps-chip: 14px;
+  --gps-status: 7px;
+  --gps-badge: 20px;
+  --gps-bet: 11px;
+
+  position: relative;
+  width: var(--gps-w);
+  height: calc(var(--gps-card-h) + var(--gps-panel-h) - var(--gps-overlap));
+  color: #dce6ec;
+  cursor: pointer;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  filter: drop-shadow(0 8px 12px rgba(0, 0, 0, 0.34));
+  transition: opacity 200ms ease, filter 200ms ease;
+}
+
+@media (min-width: 640px) {
+  .gps-seat {
+    --gps-w: 224px;
+    --gps-avatar: 56px;
+    --gps-card-h: 96px; /* Card.tsx sm:h-24 */
+    --gps-panel-h: 62px;
+    --gps-overlap: 18px;
+    --gps-panel-left: 16px;
+    --gps-name: 16px;
+    --gps-stack: 18px;
+    --gps-chip: 18px;
+    --gps-status: 8px;
+    --gps-badge: 24px;
+    --gps-bet: 13px;
+  }
+}
+
+/* Between hands there are no cards: the seat is just the panel with the
+   avatar riding its top edge. */
+.gps-seat--idle {
+  height: calc(var(--gps-panel-h) + var(--gps-avatar) / 2);
+}
+
+/* ---- bet pill (this street's bet), above the seat. The wrapper centres, the
+   inner pill animates (chip-pop transforms would otherwise fight the
+   centring translate). ---- */
+.gps-seat__bet {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(-1 * (var(--gps-bet) + 14px));
+  z-index: 8;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.gps-seat__bet-pill {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: rgba(6, 20, 28, 0.9);
+  border: 1px solid rgba(211, 177, 102, 0.28);
+  color: #f3d99d;
+  font-size: var(--gps-bet);
+  font-weight: 800;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.gps-seat__chip {
+  width: var(--gps-chip);
+  height: var(--gps-chip);
+  flex: 0 0 auto;
+}
+
+/* ---- avatar disc ---- */
+.gps-seat__avatar {
+  position: absolute;
+  left: 0;
+  top: calc(100% - var(--gps-panel-h) - var(--gps-avatar) / 2);
+  width: var(--gps-avatar);
+  height: var(--gps-avatar);
+  z-index: 5;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  overflow: visible;
+  background: linear-gradient(180deg, #263946, #0f1d27);
+  border: 2px solid rgba(124, 154, 174, 0.48);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 4px 10px rgba(0, 0, 0, 0.34);
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+
+/* Avatar.tsx sizes itself inline; the disc decides the size here. */
+.gps-seat__avatar > img {
+  width: 100% !important;
+  height: 100% !important;
+  border-radius: 50%;
+}
+
+.gps-seat__avatar > span:first-child {
+  font-size: calc(var(--gps-avatar) * 0.58) !important;
+  line-height: 1 !important;
+}
+
+/* D / SB / BB badge on the avatar's lower-left. */
+.gps-seat__role {
+  position: absolute;
+  left: calc(var(--gps-badge) * -0.3);
+  bottom: calc(var(--gps-badge) * -0.2);
+  z-index: 7;
+  min-width: var(--gps-badge);
+  height: var(--gps-badge);
+  padding: 0 5px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  font-size: calc(var(--gps-badge) * 0.42);
+  line-height: 1;
+  font-weight: 900;
+  letter-spacing: 0.02em;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.gps-seat__role--dealer {
+  background: linear-gradient(#f7fafc, #dbe3e8);
+  color: #15212a;
+  border-color: rgba(255, 255, 255, 0.75);
+}
+
+.gps-seat__role--sb {
+  background: linear-gradient(#4779b8, #274f86);
+  color: #eef6ff;
+  border-color: rgba(145, 190, 245, 0.55);
+}
+
+.gps-seat__role--bb {
+  background: linear-gradient(#53697f, #314456);
+  color: #eef5f9;
+  border-color: rgba(157, 181, 201, 0.45);
+}
+
+/* Small round markers on the avatar's upper corners: mic state (right) and
+   the bot-removal cross (left). */
+.gps-seat__mic,
+.gps-seat__x {
+  position: absolute;
+  top: -4px;
+  z-index: 9;
+  width: 18px;
+  height: 18px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 1px solid rgba(14, 19, 25, 0.4);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+  color: #e8edf1;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.gps-seat__mic {
+  right: -6px;
+}
+
+.gps-seat__mic.is-live {
+  background: #059669;
+}
+
+.gps-seat__mic.is-muted {
+  background: #e11d48;
+}
+
+.gps-seat__x {
+  left: -6px;
+  background: #e11d48;
+}
+
+/* ---- hole cards, fanned above the panel ---- */
+.gps-seat__cards {
+  position: absolute;
+  left: calc(var(--gps-avatar) + 2px);
+  top: 0;
+  z-index: 4;
+  display: flex;
+  gap: 4px;
+}
+
+@media (min-width: 640px) {
+  .gps-seat__cards {
+    gap: 5px;
+  }
+}
+
+/* ---- info panel ---- */
+.gps-seat__panel {
+  position: absolute;
+  left: var(--gps-panel-left);
+  right: 0;
+  bottom: 0;
+  height: var(--gps-panel-h);
+  padding: calc(var(--gps-overlap) + 3px) 6px 4px
+    calc(var(--gps-avatar) + 6px - var(--gps-panel-left));
+  border-radius: 14px;
+  text-align: left;
+  background: radial-gradient(
+      circle at 25% 0%,
+      rgba(255, 255, 255, 0.025),
+      transparent 36%
+    ),
+    linear-gradient(180deg, rgba(20, 35, 46, 0.99), rgba(7, 17, 24, 0.99));
+  border: 1px solid rgba(109, 139, 158, 0.4);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.025);
+  transition: border-color 150ms ease, box-shadow 150ms ease,
+    background 150ms ease;
+}
+
+/* Idle seats have no cards eating the top of the panel. */
+.gps-seat--idle .gps-seat__panel {
+  padding-top: 9px;
+}
+
+@media (min-width: 640px) {
+  .gps-seat__panel {
+    border-radius: 18px;
+    padding-right: 8px;
+  }
+
+  .gps-seat--idle .gps-seat__panel {
+    padding-top: 12px;
+  }
+}
+
+.gps-seat__row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px;
+}
+
+.gps-seat__name {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--gps-name);
+  line-height: 1.05;
+  font-weight: 700;
+  color: #e8edf1;
+}
+
+.gps-seat__status {
+  flex: 0 0 auto;
+  color: #8ea2af;
+  font-size: var(--gps-status);
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  line-height: 1;
+}
+
+.gps-seat__stack {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 4px;
+  color: #f3d99d;
+  font-size: var(--gps-stack);
+  font-weight: 700;
+  line-height: 1;
+}
+
+/* "Ready" veil over the panel between hands. */
+.gps-seat__ready {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  display: grid;
+  place-items: center;
+  border-radius: inherit;
+  background: rgba(0, 0, 0, 0.55);
+  color: rgba(232, 237, 241, 0.92);
+  font-size: var(--gps-name);
+  font-weight: 700;
+}
+
+/* ---- states ---- */
+.gps-seat--hero .gps-seat__panel {
+  border-color: rgba(229, 177, 76, 0.82);
+  box-shadow: 0 0 14px rgba(226, 154, 45, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+
+.gps-seat--hero .gps-seat__avatar {
+  border-color: #dca948;
+  box-shadow: 0 0 0 3px rgba(220, 169, 72, 0.1),
+    0 0 12px rgba(220, 169, 72, 0.2);
+}
+
+.gps-seat--active .gps-seat__panel {
+  border-color: rgba(224, 154, 45, 0.75);
+}
+
+.gps-seat--active .gps-seat__avatar {
+  border-color: #e9b34d;
+  animation: gps-turn-glow 1.4s ease-in-out infinite;
+}
+
+.gps-seat--active .gps-seat__status {
+  color: #f0c26d;
+}
+
+@keyframes gps-turn-glow {
+  0%,
+  100% {
+    box-shadow: 0 0 0 4px rgba(224, 154, 45, 0.12),
+      0 0 18px rgba(224, 154, 45, 0.38), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgba(224, 154, 45, 0.22),
+      0 0 26px rgba(224, 154, 45, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  }
+}
+
+.gps-seat--folded {
+  opacity: 0.52;
+  filter: saturate(0.45) drop-shadow(0 8px 12px rgba(0, 0, 0, 0.24));
+}
+
+.gps-seat--folded .gps-seat__status {
+  color: #a96d74;
+}
+
+.gps-seat--allin .gps-seat__panel {
+  border-color: rgba(235, 182, 80, 0.95);
+  background: radial-gradient(
+      circle at 30% 0%,
+      rgba(255, 213, 124, 0.08),
+      transparent 34%
+    ),
+    linear-gradient(180deg, rgba(48, 38, 24, 0.99), rgba(21, 20, 18, 0.99));
+  box-shadow: 0 0 15px rgba(226, 154, 45, 0.15),
+    inset 0 1px 0 rgba(255, 240, 202, 0.08);
+}
+
+.gps-seat--allin .gps-seat__status {
+  color: #f3d99d;
+}
+
+/* Hand won: the old amber winner glow, on the new panel. */
+.gps-seat--winner .gps-seat__panel {
+  border-color: #fcd34d;
+  background: linear-gradient(180deg, #fde68a, #f5c85a);
+  box-shadow: 0 0 0 2px rgba(253, 224, 71, 0.35),
+    0 0 40px 10px rgba(250, 204, 21, 0.35);
+}
+
+.gps-seat--winner .gps-seat__name,
+.gps-seat--winner .gps-seat__status {
+  color: #0e1319;
+}
+
+.gps-seat--winner .gps-seat__stack {
+  color: #5a3a06;
+}
+
+.gps-seat--winner .gps-seat__avatar {
+  border-color: #fcd34d;
+  box-shadow: 0 0 16px rgba(250, 204, 21, 0.5);
+}
+
+/* Left the table (seat released at hand end). */
+.gps-seat--left {
+  opacity: 0.4;
+  filter: grayscale(1);
+}
+
+/* Host's bot-placement mode: this bot can be tapped away. */
+.gps-seat--removable .gps-seat__panel,
+.gps-seat--removable .gps-seat__avatar {
+  box-shadow: 0 0 0 2px #f43f5e;
+}

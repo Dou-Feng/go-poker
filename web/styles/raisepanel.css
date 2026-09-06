@@ -1,0 +1,415 @@
+/* Raise panel (components/RaiseInput.tsx), shown above the action bar on the
+ * player's turn after tapping 加注.
+ *
+ * Adapted from the designer's PokerRaisePanel pack (tmp/new_bet_layout):
+ * dark blue-grey panel with a thin gold edge and a hairline top glint, cool
+ * silver-blue preset keys with the selected one in warm gold, a gold slider
+ * on a dark track, and a pointer at the bottom aimed at the action bar. Sizes
+ * are re-cut to the action bar next to it (actionbar.css): 96x44 keys with a
+ * 13px label and a 7px caption, 15px radius, the same blue-grey gradient.
+ */
+.gp-raise-panel {
+  --panel-gold: rgba(183, 128, 52, 0.7);
+  --gold-text: #f1d28a;
+  --gold-soft: #b99b61;
+  --silver-text: #dce6ec;
+  --muted-text: #91a3b1;
+  --amount-text: #f3d99d;
+
+  position: relative;
+  width: min(480px, calc(100vw - 24px));
+  padding: 12px 14px 12px;
+  color: var(--silver-text);
+  border: 1px solid var(--panel-gold);
+  border-radius: 15px;
+  background: radial-gradient(
+      circle at 22% 0%,
+      rgba(255, 255, 255, 0.025),
+      transparent 28%
+    ),
+    linear-gradient(180deg, rgba(20, 38, 51, 0.98), rgba(8, 19, 27, 0.99));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03),
+    0 14px 36px rgba(0, 0, 0, 0.42);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.gp-raise-panel__topline {
+  position: absolute;
+  left: 16px;
+  right: 16px;
+  top: 0;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 232, 172, 0.16),
+    rgba(255, 202, 103, 0.75),
+    rgba(255, 232, 172, 0.16),
+    transparent
+  );
+}
+
+/* ---- header: title · pot · close ---- */
+.gp-raise-panel__header {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 12px;
+  align-items: center;
+}
+
+.gp-raise-panel__title,
+.gp-raise-panel__pot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.gp-raise-panel__title img {
+  width: 22px;
+  height: 22px;
+  flex: 0 0 auto;
+}
+
+.gp-raise-panel__title div,
+.gp-raise-panel__pot div {
+  display: flex;
+  flex-direction: column;
+  line-height: 1;
+}
+
+.gp-raise-panel__title strong {
+  color: var(--gold-text);
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.gp-raise-panel__title span,
+.gp-raise-panel__pot span {
+  margin-top: 4px;
+  color: var(--muted-text);
+  font-size: 7px;
+  font-weight: 600;
+  letter-spacing: 0.09em;
+}
+
+.gp-raise-panel__pot strong {
+  color: var(--amount-text);
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.gp-raise-panel__pot-chip {
+  width: 20px;
+  height: 20px;
+}
+
+.gp-raise-panel__close {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: #b8c9d4;
+  cursor: pointer;
+  font-size: 24px;
+  line-height: 1;
+  transition: background 120ms ease, color 120ms ease, transform 90ms ease;
+}
+
+.gp-raise-panel__close:hover {
+  background: rgba(255, 255, 255, 0.035);
+  color: #e3edf3;
+}
+
+.gp-raise-panel__close:active {
+  transform: translateY(1px) scale(0.96);
+}
+
+.gp-raise-panel__divider {
+  height: 1px;
+  margin: 10px 0;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(127, 157, 176, 0.22) 15%,
+    rgba(127, 157, 176, 0.22) 85%,
+    transparent
+  );
+}
+
+/* ---- quick amounts ---- */
+.gp-raise-panel__presets {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+
+.gp-preset {
+  height: 44px;
+  padding: 0 4px;
+  border-radius: 10px;
+  border: 1px solid rgba(106, 133, 150, 0.34);
+  background: linear-gradient(
+    180deg,
+    rgba(31, 50, 63, 0.97),
+    rgba(13, 28, 39, 0.97)
+  );
+  color: var(--silver-text);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.025),
+    0 5px 12px rgba(0, 0, 0, 0.17);
+  transition: transform 90ms ease, border-color 120ms ease,
+    box-shadow 120ms ease, filter 120ms ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.gp-preset strong {
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.gp-preset span {
+  margin-top: 4px;
+  font-size: 7px;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  color: var(--muted-text);
+  white-space: nowrap;
+}
+
+.gp-preset:hover {
+  transform: translateY(-1px);
+  border-color: rgba(168, 208, 233, 0.5);
+}
+
+.gp-preset:active {
+  transform: translateY(1px) scale(0.988);
+}
+
+.gp-preset.is-selected {
+  border-color: rgba(238, 184, 84, 0.95);
+  background: radial-gradient(
+      circle at 40% 0%,
+      rgba(255, 218, 137, 0.13),
+      transparent 40%
+    ),
+    linear-gradient(180deg, rgba(58, 49, 31, 0.98), rgba(26, 28, 28, 0.98));
+  box-shadow: inset 0 1px 0 rgba(255, 241, 205, 0.18),
+    0 0 0 1px rgba(255, 195, 82, 0.08), 0 0 14px rgba(226, 154, 45, 0.14);
+}
+
+.gp-preset.is-selected strong {
+  color: var(--gold-text);
+}
+
+.gp-preset.is-selected span {
+  color: var(--gold-soft);
+}
+
+/* ---- amount: label · slider · − value + ---- */
+.gp-raise-panel__amount-section {
+  margin-top: 12px;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 12px;
+  align-items: center;
+}
+
+.gp-raise-panel__amount-copy {
+  display: flex;
+  flex-direction: column;
+  line-height: 1;
+}
+
+.gp-raise-panel__amount-copy strong {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.gp-raise-panel__amount-copy span {
+  margin-top: 4px;
+  color: var(--muted-text);
+  font-size: 7px;
+  letter-spacing: 0.08em;
+}
+
+.gp-raise-panel__amount-copy small {
+  margin-top: 6px;
+  color: #657b8b;
+  font-size: 9px;
+}
+
+.gp-raise-panel__slider-wrap {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+}
+
+/* Native range input; --fill is the filled fraction (0-1), set inline. */
+.gp-raise-slider {
+  width: 100%;
+  margin: 0;
+  appearance: none;
+  -webkit-appearance: none;
+  height: 8px;
+  border-radius: 99px;
+  background: linear-gradient(
+    90deg,
+    #d7a64e 0,
+    #e8ba5d calc(var(--fill, 0) * 100%),
+    #2a4150 calc(var(--fill, 0) * 100%),
+    #20333f 100%
+  );
+  outline: none;
+  cursor: pointer;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.55),
+    0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.gp-raise-slider::-webkit-slider-thumb {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 1px solid #f2c76f;
+  background: linear-gradient(180deg, #ffe3a0, #d89d3d);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.42),
+    0 2px 6px rgba(0, 0, 0, 0.4), 0 0 10px rgba(231, 165, 58, 0.18);
+}
+
+.gp-raise-slider::-moz-range-thumb {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 1px solid #f2c76f;
+  background: linear-gradient(180deg, #ffe3a0, #d89d3d);
+}
+
+.gp-raise-panel__controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.gp-raise-panel__controls > button {
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border-radius: 9px;
+  border: 1px solid rgba(100, 130, 149, 0.38);
+  background: linear-gradient(180deg, #203440, #10232e);
+  color: #bed0dc;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.gp-raise-panel__controls > button:hover {
+  border-color: rgba(171, 210, 232, 0.48);
+}
+
+.gp-raise-panel__controls > button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.gp-raise-panel__value {
+  height: 34px;
+  min-width: 84px;
+  padding: 0 10px;
+  border-radius: 9px;
+  border: 1px solid rgba(104, 135, 153, 0.45);
+  background: linear-gradient(
+    180deg,
+    rgba(10, 24, 33, 0.98),
+    rgba(8, 18, 25, 0.98)
+  );
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.gp-raise-panel__value-chip {
+  width: 16px;
+  height: 16px;
+}
+
+.gp-raise-panel__value strong {
+  color: var(--amount-text);
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+/* ---- confirm: the action bar's own BET / ALL-IN key ---- */
+.gp-raise-panel__footer {
+  margin-top: 12px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.gp-raise-panel__pointer {
+  position: absolute;
+  left: 50%;
+  bottom: -9px;
+  width: 18px;
+  height: 18px;
+  background: #0a151d;
+  border-right: 1px solid var(--panel-gold);
+  border-bottom: 1px solid var(--panel-gold);
+  transform: translateX(-50%) rotate(45deg);
+}
+
+/* ---- phones: same widths as the compact action bar ---- */
+@media (max-width: 760px) {
+  .gp-raise-panel {
+    width: calc(100vw - 22px);
+    max-width: 420px;
+    padding: 10px 10px 10px;
+  }
+
+  .gp-raise-panel__header {
+    gap: 8px;
+  }
+
+  .gp-raise-panel__presets {
+    gap: 6px;
+  }
+
+  .gp-preset {
+    height: 40px;
+  }
+
+  .gp-preset strong {
+    font-size: 12px;
+  }
+
+  .gp-raise-panel__amount-section {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .gp-raise-panel__amount-copy {
+    display: none;
+  }
+
+  .gp-raise-panel__controls {
+    justify-content: center;
+  }
+
+  .gp-raise-panel__footer {
+    justify-content: center;
+  }
+}
