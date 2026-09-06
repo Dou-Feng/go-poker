@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>GoPoker All-In Burst</title>
+<style>
+*{box-sizing:border-box}html,body{margin:0;min-height:100%;font-family:Inter,"PingFang SC",sans-serif;background:#0E1319;color:#DCE6EC}
+body{display:grid;place-items:center;min-height:100vh;padding:24px;background:radial-gradient(circle at 50% 30%,rgba(44,98,78,.18),transparent 35%),linear-gradient(#111922,#081017)}
+.stage{width:min(760px,100%);overflow:hidden;border:1px solid rgba(255,255,255,.06);border-radius:28px;background:#0A1117;box-shadow:0 30px 70px rgba(0,0,0,.4)}
+.table{position:relative;min-height:460px;display:grid;place-items:center;background:radial-gradient(circle at 50% 42%,rgba(255,255,255,.035),transparent 32%),repeating-linear-gradient(135deg,rgba(255,255,255,.012) 0 2px,transparent 2px 7px),linear-gradient(#17382E,#102C25)}
+.table:before{content:"";position:absolute;left:8%;right:8%;top:10%;height:70%;border-radius:50%;border:14px solid #2C2016;box-shadow:inset 0 3px 0 rgba(244,202,120,.08),0 12px 30px rgba(0,0,0,.32)}
+.head{position:absolute;top:22px;text-align:center;z-index:5}.head h1{font-size:18px;margin:0 0 5px}.head p{font-size:11px;color:#8093A0;letter-spacing:.08em;margin:0}
+.wrap{position:relative;z-index:3;width:240px;height:200px;display:grid;place-items:center}
+.seat{position:relative;width:182px;height:144px;transform-origin:center 70%;filter:drop-shadow(0 14px 18px rgba(0,0,0,.38))}
+.bet{position:absolute;top:-28px;left:50%;transform:translateX(-50%);z-index:8;padding:5px 11px;border-radius:999px;background:rgba(6,18,25,.94);border:1px solid rgba(231,174,68,.28);color:#F3D99D;font-size:11px;font-weight:900}
+.avatar{position:absolute;left:2px;top:34px;width:61px;height:61px;border-radius:50%;display:grid;place-items:center;z-index:6;font-size:34px;background:linear-gradient(#2B3B45,#101D25);border:2px solid #E5AF47;box-shadow:0 0 0 3px rgba(231,177,74,.13),0 0 16px rgba(231,177,74,.22)}
+.cards{position:absolute;left:58px;top:9px;display:flex;gap:5px;z-index:4}.card{width:49px;height:67px;padding:5px;border-radius:7px;background:#F8F9FA;color:#11161A;font-size:15px;box-shadow:0 5px 12px rgba(0,0,0,.28)}.card span{display:block;font-size:21px;margin-top:4px}
+.panel{position:absolute;left:18px;right:0;bottom:0;height:78px;padding:27px 12px 10px 47px;border-radius:19px;text-align:center;overflow:hidden;background:radial-gradient(circle at 28% -5%,rgba(255,214,128,.08),transparent 34%),linear-gradient(#2D261D,#171714 58%,#0E1112);border:1px solid rgba(237,183,80,.95);box-shadow:0 0 18px rgba(231,159,49,.15),inset 0 1px 0 rgba(255,239,202,.08)}
+.sweep{position:absolute;inset:-30% auto -30% -60%;width:35%;transform:skewX(-22deg);background:linear-gradient(90deg,transparent,rgba(255,244,204,.24),transparent);opacity:0}
+.name{font-size:13px;font-weight:800}.stack{margin-top:7px;color:#F3D99D;font-size:17px;font-weight:900}
+.tag{position:absolute;right:-12px;top:48px;z-index:9;min-width:86px;padding:7px 10px 6px;border-radius:10px;transform:rotate(-3deg);color:#201507;background:linear-gradient(#FFF0B8,#EAB54C 55%,#B87620);border:1px solid rgba(255,239,190,.7);box-shadow:0 5px 12px rgba(0,0,0,.3),0 0 15px rgba(232,167,60,.25),inset 0 1px 0 rgba(255,255,255,.48);font-size:12px;font-weight:1000;letter-spacing:.08em;text-align:center}.tag small{display:block;font-size:7px;letter-spacing:.14em;opacity:.65}
+.wave{position:absolute;width:150px;height:90px;border-radius:24px;border:2px solid transparent;opacity:0}
+.p{position:absolute;left:50%;top:50%;width:6px;height:6px;margin:-3px;border-radius:50%;background:#F6D984;opacity:0;box-shadow:0 0 8px rgba(246,217,132,.7)}
+.p1{--x:-92px;--y:-55px}.p2{--x:86px;--y:-44px}.p3{--x:-76px;--y:45px}.p4{--x:94px;--y:52px}.p5{--x:-18px;--y:-82px}.p6{--x:31px;--y:78px}.p7{--x:110px;--y:8px}.p8{--x:-110px;--y:7px}
+.controls{display:flex;align-items:center;justify-content:center;gap:12px;padding:16px;background:#0D151C;border-top:1px solid rgba(255,255,255,.05)}button{border:0;cursor:pointer;padding:10px 16px;border-radius:11px;background:linear-gradient(#F2D28A,#C9983B);color:#10130F;font-weight:900;box-shadow:inset 0 1px 0 rgba(255,255,255,.35),0 4px 0 #76501D}.hint{font-size:11px;color:#748995}
+.burst .seat{animation:seatPop .72s cubic-bezier(.2,.9,.18,1)}.burst .avatar{animation:avatarFlash .9s ease}.burst .panel{animation:panelFlash .9s ease}.burst .sweep{animation:sweep .62s .08s ease-out}.burst .tag{animation:tagPop .68s cubic-bezier(.15,1.4,.25,1)}.burst .bet{animation:betPop .62s cubic-bezier(.2,1.4,.3,1)}.burst .wave{animation:wave .72s ease-out}.burst .p{animation:particle .68s ease-out}
+@keyframes seatPop{0%{transform:scale(.96)}24%{transform:scale(1.10) translateY(-4px)}48%{transform:scale(1.025)}72%{transform:scale(1.05)}100%{transform:scale(1)}}
+@keyframes avatarFlash{0%,100%{box-shadow:0 0 0 3px rgba(231,177,74,.13),0 0 16px rgba(231,177,74,.22)}30%{box-shadow:0 0 0 7px rgba(255,219,130,.2),0 0 36px rgba(255,194,65,.58)}}
+@keyframes panelFlash{0%,100%{filter:brightness(1)}26%{filter:brightness(1.5)}55%{filter:brightness(1.12)}}
+@keyframes sweep{0%{left:-60%;opacity:0}18%{opacity:1}100%{left:130%;opacity:0}}
+@keyframes tagPop{0%{transform:rotate(-3deg) scale(.4);opacity:0}42%{transform:rotate(-5deg) scale(1.28);opacity:1}70%{transform:rotate(-2deg) scale(.95)}100%{transform:rotate(-3deg) scale(1)}}
+@keyframes betPop{0%{transform:translateX(-50%) scale(.8)}45%{transform:translateX(-50%) scale(1.25)}100%{transform:translateX(-50%) scale(1)}}
+@keyframes wave{0%{transform:scale(.75);opacity:.9;border-color:rgba(248,213,126,.9)}100%{transform:scale(1.75);opacity:0;border-color:transparent}}
+@keyframes particle{0%{opacity:0;transform:translate(0,0) scale(.4)}20%{opacity:1}100%{opacity:0;transform:translate(var(--x),var(--y)) scale(1)}}
+.steady .panel{animation:breath 2.2s ease-in-out infinite}.steady .tag{animation:tagBreath 2.2s ease-in-out infinite}
+@keyframes breath{0%,100%{box-shadow:0 0 14px rgba(231,159,49,.12),inset 0 1px 0 rgba(255,239,202,.08)}50%{box-shadow:0 0 28px rgba(231,159,49,.26),inset 0 1px 0 rgba(255,239,202,.1)}}@keyframes tagBreath{0%,100%{filter:brightness(1)}50%{filter:brightness(1.13)}}
+@media(max-width:520px){.table{min-height:400px}.wrap{transform:scale(.9)}.controls{flex-direction:column}}
+</style>
+</head>
+<body>
+<div class="stage">
+  <div class="table">
+    <div class="head"><h1>ALL-IN · Burst → Steady</h1><p>700ms 爆发，然后进入黑金呼吸稳态</p></div>
+    <div class="wrap steady" id="wrap">
+      <div class="wave"></div>
+      <i class="p p1"></i><i class="p p2"></i><i class="p p3"></i><i class="p p4"></i><i class="p p5"></i><i class="p p6"></i><i class="p p7"></i><i class="p p8"></i>
+      <div class="seat">
+        <div class="bet">🪙 760</div>
+        <div class="avatar">🥷</div>
+        <div class="cards"><div class="card"><b>A</b><span>♠</span></div><div class="card"><b>K</b><span>♠</span></div></div>
+        <div class="panel"><div class="sweep"></div><div class="name">RiverMan</div><div class="stack">0</div></div>
+        <div class="tag"><small>NO TURNING BACK</small>ALL-IN</div>
+      </div>
+    </div>
+  </div>
+  <div class="controls"><button id="replay">REPLAY ALL-IN</button><span class="hint">点击反复看爆发强度</span></div>
+</div>
+<script>
+const w=document.getElementById('wrap');
+function run(){w.classList.remove('burst','steady');void w.offsetWidth;w.classList.add('burst');setTimeout(()=>{w.classList.remove('burst');w.classList.add('steady')},820)}
+document.getElementById('replay').onclick=run;setTimeout(run,450);
+</script>
+</body>
+</html>

@@ -1,5 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="94" height="128" viewBox="0 0 94 128">
-<defs><pattern id="p" width="12" height="12" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="6" height="12" fill="#8f2933"/><rect x="6" width="6" height="12" fill="#aa3b46"/></pattern></defs>
-<rect x="2" y="2" width="90" height="124" rx="11" fill="#efe6e0"/>
-<rect x="6" y="6" width="82" height="116" rx="8" fill="url(#p)" stroke="#6f2029" stroke-width="2"/>
-<rect x="12" y="12" width="70" height="104" rx="6" fill="none" stroke="#f0c9c8" stroke-opacity=".35" stroke-width="2"/></svg>
