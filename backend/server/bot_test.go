@@ -149,6 +149,52 @@ func TestVoteSettleIgnoresBots(t *testing.T) {
 	}
 }
 
+// Settlement ends the session for the room's bots too: once the table is
+// reset every bot client is dropped, so a player sitting down for the next
+// session does not find the previous session's bots popping back onto the
+// empty seats (and blocking them).
+func TestSettlementDropsBotsForFreshSession(t *testing.T) {
+	tbl, _ := botTable(t)
+	hub := newSessionHub(tbl)
+	human := newTestClient(hub, "acc-h")
+	human.table = tbl
+	human.username = "acc-h"
+	tbl.registerClient(human)
+	human.uuid = seat(t, tbl, "acc-h", 1, false)
+	for i := 0; i < 3; i++ {
+		if _, err := tbl.addBot(0); err != nil {
+			t.Fatalf("add bot: %v", err)
+		}
+	}
+	if n := len(tbl.botClients()); n != 3 {
+		t.Fatalf("setup: want 3 bots, got %d", n)
+	}
+
+	// One human of one is a majority: between hands the vote settles at once.
+	tbl.voteSettle(human)
+	if n := len(tbl.game.GenerateOmniView().Players); n != 0 {
+		t.Fatalf("settle must clear every seat, %d still occupied", n)
+	}
+	if n := len(tbl.botClients()); n != 0 {
+		t.Fatalf("settle must drop the session's bots for the fresh session, %d survive", n)
+	}
+
+	// The human starts the next session by sitting down again; the bot tick
+	// must not re-seat any of the previous session's bots over them.
+	human.uuid = seat(t, tbl, "acc-h", 2, false)
+	tbl.broadcastGame() // arms (and would re-seat) the bots
+	time.Sleep(20 * time.Millisecond)
+	for _, p := range tbl.game.GenerateOmniView().Players {
+		if p.AccountUUID == human.accountUUID {
+			continue
+		}
+		t.Fatalf("leftover bot %q must not sit in the fresh session", p.Username)
+	}
+	if n := len(tbl.botClients()); n != 0 {
+		t.Fatalf("no bot may return after settlement, %d registered", n)
+	}
+}
+
 // Only the host manages bots; the role passes to another human when the host
 // leaves; the host may pick the bot's seat, and a taken seat is refused.
 func TestHostOnlyBotManagementAndSeatChoice(t *testing.T) {

@@ -528,6 +528,9 @@ func (t *table) settle() {
 	t.broadcast <- createSettlement(results, biggestWinner, view.BiggestPotAmt)
 	t.game.Reset()
 	t.resetSession()
+	// The session's bots died with it: drop them so they cannot reappear on
+	// the empty seats when a player sits down for the next session.
+	t.dropAllBots()
 	t.broadcast <- createUpdatedGameBytes(t)
 }
 

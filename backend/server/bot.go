@@ -350,6 +350,18 @@ func (t *table) dropBotClient(bot *Client) {
 	bot.closeSend()
 }
 
+// dropAllBots removes every server-played seat at once. It is called when a
+// whole session ends (settlement) or the room is fully reset: the bots belong
+// to the session that just finished, and although the reset cleared their game
+// seats they would otherwise stay registered and the next bot tick would
+// re-seat them into the fresh session the moment a human sits down again.
+func (t *table) dropAllBots() {
+	t.stopBots()
+	for _, bot := range t.botClients() {
+		t.dropBotClient(bot)
+	}
+}
+
 // ---- pacing --------------------------------------------------------------
 
 // scheduleBots arms a single timer for the next bot task, replacing any

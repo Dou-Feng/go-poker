@@ -813,6 +813,9 @@ func autoStartIfReady(t *table) bool {
 func handleResetGame(c *Client) {
 	c.table.game.Reset()
 	c.table.resetSession()
+	// A full room reset clears every seat, so the bots seated on them must go
+	// too (otherwise they linger as ghosts and pop back on a re-seat).
+	c.table.dropAllBots()
 	c.table.broadcastGame()
 }
 
