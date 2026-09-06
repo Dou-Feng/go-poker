@@ -306,6 +306,16 @@
   color: #e8edf1;
 }
 
+/* The amount just won, standing in for the name during the showdown. */
+.gps-seat__name--win {
+  color: #f3d99d;
+  font-weight: 800;
+}
+
+.gps-seat--winner .gps-seat__name--win {
+  color: #3b2a05;
+}
+
 .gps-seat__status {
   flex: 0 0 auto;
   color: #8ea2af;

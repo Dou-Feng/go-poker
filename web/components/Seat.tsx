@@ -26,6 +26,9 @@ type seatProps = {
   id: number;
   visualId?: number;
   reveal: boolean;
+  /** Chips this seat just won; while set (the showdown window) it replaces
+   *  the name as "+amount", then the name comes back. */
+  winAmount?: number;
 };
 
 // Localized name for a showdown hand category ("full house" etc).
@@ -50,7 +53,13 @@ export function useHandLabel() {
   };
 }
 
-export default function Seat({ player, id, visualId, reveal }: seatProps) {
+export default function Seat({
+  player,
+  id,
+  visualId,
+  reveal,
+  winAmount,
+}: seatProps) {
   const { appState, dispatch } = useContext(AppContext);
   const socket = useSocket();
   const { t } = useTranslation();
@@ -246,7 +255,18 @@ export default function Seat({ player, id, visualId, reveal }: seatProps) {
 
           <div className="gps-seat__panel">
             <div className="gps-seat__row">
-              <strong className="gps-seat__name">{player.username}</strong>
+              {winAmount !== undefined ? (
+                <strong
+                  key="win"
+                  className="gps-seat__name gps-seat__name--win animate-fade-in type-num"
+                >
+                  +{winAmount}
+                </strong>
+              ) : (
+                <strong key="name" className="gps-seat__name">
+                  {player.username}
+                </strong>
+              )}
               {status && <span className="gps-seat__status">{status}</span>}
             </div>
             <div className="gps-seat__stack">

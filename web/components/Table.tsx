@@ -535,20 +535,13 @@ export default function Table() {
       {/* Showdown toast at the bottom of the screen (above the chat tabs;
           the action bar is hidden while betting is over), leaving the
           revealed cards and hand labels on the table unobstructed. */}
-      {(winners.length > 0 || forfeited) && (
+      {/* Winners are not announced in a toast: each winning seat shows its
+          "+amount" in place of the name for the showdown window (see Seat).
+          A forfeited pot has no seat to show it on, so it keeps a notice. */}
+      {forfeited && (
         <div className="pointer-events-none absolute inset-x-0 bottom-14 z-30 flex items-end justify-center px-2 sm:bottom-20">
           <div className="animate-winner-pop rounded-2xl border-2 border-amber-300 bg-tablehi/90 px-8 py-4 text-center shadow-2xl">
-            <p className="type-heading">
-              {forfeited ? t("chipsForfeited") : t("winner")}
-            </p>
-            {winners.map((w) => (
-              <p
-                key={w.player.position}
-                className="text-3xl font-bold text-amber-300"
-              >
-                {w.player.username} +{w.amount}
-              </p>
-            ))}
+            <p className="type-heading">{t("chipsForfeited")}</p>
           </div>
         </div>
       )}
@@ -621,6 +614,12 @@ export default function Table() {
                 visualId={visualIndex + 1}
                 reveal={
                   player ? revealedPositions.includes(player.position) : false
+                }
+                winAmount={
+                  player
+                    ? winners.find((w) => w.player.position === player.position)
+                        ?.amount
+                    : undefined
                 }
               />
             </div>
