@@ -73,3 +73,5 @@ data/
 .claude/
 
 certs/
+
+tmp/

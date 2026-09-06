@@ -1,0 +1,463 @@
+.gp-action-bar {
+  --bar-bg: rgba(12, 24, 33, .94);
+  --bar-border: rgba(133, 157, 174, .19);
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+
+  width: fit-content;
+  max-width: calc(100vw - 24px);
+  padding: 8px;
+
+  border: 1px solid var(--bar-border);
+  border-radius: 15px;
+
+  background:
+    linear-gradient(180deg, rgba(18, 33, 44, .96), rgba(9, 20, 29, .96)),
+    var(--bar-bg);
+
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.025),
+    0 12px 32px rgba(0,0,0,.32);
+
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.gp-action-btn {
+  position: relative;
+  width: 96px;
+  height: 44px;
+
+  flex: 0 0 auto;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #edf4f8;
+  cursor: pointer;
+  isolation: isolate;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+
+  transition:
+    transform 90ms cubic-bezier(.2,.8,.2,1),
+    filter 120ms ease;
+}
+
+/* ALL-IN reads as the "big" action: slightly longer than the others. */
+.gp-action-btn--allin {
+  width: 112px;
+}
+
+.gp-action-btn__shadow,
+.gp-action-btn__surface,
+.gp-action-btn__highlight,
+.gp-action-btn__inner-shadow,
+.gp-action-btn__border,
+.gp-action-btn__disabled-wash {
+  position: absolute;
+  pointer-events: none;
+  background-repeat: no-repeat;
+  background-size: 100% 100%;
+}
+
+.gp-action-btn__surface,
+.gp-action-btn__highlight,
+.gp-action-btn__inner-shadow,
+.gp-action-btn__border,
+.gp-action-btn__disabled-wash {
+  inset: 0;
+  border-radius: 10px;
+}
+
+.gp-action-btn__shadow {
+  z-index: 0;
+  inset: -9px -10px -12px;
+  opacity: .42;
+}
+
+.gp-action-btn__surface { z-index: 1; }
+.gp-action-btn__highlight { z-index: 2; opacity: .52; mix-blend-mode: screen; }
+.gp-action-btn__inner-shadow { z-index: 3; opacity: .52; }
+.gp-action-btn__border { z-index: 4; }
+
+/* Directional edge light on the border: top-left bright, bottom-right dark,
+   so the edge reads as beveled metal/enamel rather than a flat outline. */
+.gp-action-btn__border::before,
+.gp-action-btn__border::after {
+  content: "";
+  position: absolute;
+  inset: 1px;
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+.gp-action-btn__border::before {
+  border-top: 1px solid rgba(255, 244, 204, 0.55);
+  border-left: 1px solid rgba(255, 230, 166, 0.32);
+}
+
+.gp-action-btn__border::after {
+  border-right: 1px solid rgba(73, 43, 16, 0.42);
+  border-bottom: 1px solid rgba(73, 43, 16, 0.58);
+}
+
+.gp-action-btn__content {
+  position: relative;
+  z-index: 6;
+
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+
+  padding: 0 10px;
+  text-shadow: 0 1px 2px rgba(0,0,0,.42);
+}
+
+.gp-action-btn__icon-wrap {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 20px;
+  display: grid;
+  place-items: center;
+  color: #dce8ef;
+}
+
+.gp-action-btn__icon {
+  width: 18px;
+  height: 18px;
+  display: block;
+}
+
+.gp-action-btn__divider {
+  width: 1px;
+  height: 22px;
+  flex: 0 0 1px;
+  background: linear-gradient(
+    to bottom,
+    transparent,
+    rgba(174,196,211,.18) 22%,
+    rgba(174,196,211,.18) 78%,
+    transparent
+  );
+}
+
+.gp-action-btn__text {
+  min-width: 40px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  line-height: 1;
+}
+
+.gp-action-btn__text strong {
+  font-size: 13px;
+  line-height: 1.08;
+  font-weight: 700;
+  letter-spacing: .01em;
+  white-space: nowrap;
+}
+
+.gp-action-btn__text small {
+  margin-top: 4px;
+  min-height: 10px;
+  font-size: 7px;
+  line-height: 1;
+  font-weight: 600;
+  letter-spacing: .09em;
+  color: #91a3b1;
+}
+
+/* Per-action text colours (primary / English sub-label). */
+.gp-action-btn--check .gp-action-btn__text strong { color: #DCE6EC; }
+.gp-action-btn--check .gp-action-btn__text small { color: #91A3B1; }
+
+.gp-action-btn--bet .gp-action-btn__text strong { color: #F1D28A; }
+.gp-action-btn--bet .gp-action-btn__text small { color: #B99B61; }
+
+.gp-action-btn--allin .gp-action-btn__text strong { color: #F3D99D; }
+.gp-action-btn--allin .gp-action-btn__text small { color: #B9965E; }
+
+.gp-action-btn--fold .gp-action-btn__text strong { color: #E7A2A8; }
+.gp-action-btn--fold .gp-action-btn__text small { color: #A96D74; }
+
+/* Each button points to the same layer naming convention */
+.gp-action-btn--check .gp-action-btn__surface {
+  background-image: url("/assets/ui/buttons/check/button_bg.png");
+}
+.gp-action-btn--check .gp-action-btn__highlight {
+  background-image: url("/assets/ui/buttons/check/button_highlight.png");
+}
+.gp-action-btn--check .gp-action-btn__inner-shadow {
+  background-image: url("/assets/ui/buttons/check/button_inner_shadow.png");
+}
+.gp-action-btn--check .gp-action-btn__shadow {
+  background-image: url("/assets/ui/buttons/check/button_shadow.png");
+}
+.gp-action-btn--check .gp-action-btn__border {
+  background-image: url("/assets/ui/buttons/check/button_border_normal.png");
+}
+
+.gp-action-btn--bet .gp-action-btn__surface {
+  background-image: url("/assets/ui/buttons/bet/button_bg.png");
+}
+.gp-action-btn--bet .gp-action-btn__highlight {
+  background-image: url("/assets/ui/buttons/bet/button_highlight.png");
+}
+.gp-action-btn--bet .gp-action-btn__inner-shadow {
+  background-image: url("/assets/ui/buttons/bet/button_inner_shadow.png");
+}
+.gp-action-btn--bet .gp-action-btn__shadow {
+  background-image: url("/assets/ui/buttons/bet/button_shadow.png");
+}
+.gp-action-btn--bet .gp-action-btn__border {
+  background-image: url("/assets/ui/buttons/bet/button_border_normal.png");
+}
+
+.gp-action-btn--allin .gp-action-btn__surface {
+  background-image: url("/assets/ui/buttons/allin/button_bg.png");
+}
+.gp-action-btn--allin .gp-action-btn__highlight {
+  background-image: url("/assets/ui/buttons/allin/button_highlight.png");
+}
+.gp-action-btn--allin .gp-action-btn__inner-shadow {
+  background-image: url("/assets/ui/buttons/allin/button_inner_shadow.png");
+}
+.gp-action-btn--allin .gp-action-btn__shadow {
+  background-image: url("/assets/ui/buttons/allin/button_shadow.png");
+}
+.gp-action-btn--allin .gp-action-btn__border {
+  background-image: url("/assets/ui/buttons/allin/button_border_normal.png");
+}
+
+.gp-action-btn--fold .gp-action-btn__surface {
+  background-image: url("/assets/ui/buttons/fold/button_bg.png");
+}
+.gp-action-btn--fold .gp-action-btn__highlight {
+  background-image: url("/assets/ui/buttons/fold/button_highlight.png");
+}
+.gp-action-btn--fold .gp-action-btn__inner-shadow {
+  background-image: url("/assets/ui/buttons/fold/button_inner_shadow.png");
+}
+.gp-action-btn--fold .gp-action-btn__shadow {
+  background-image: url("/assets/ui/buttons/fold/button_shadow.png");
+}
+.gp-action-btn--fold .gp-action-btn__border {
+  background-image: url("/assets/ui/buttons/fold/button_border_normal.png");
+}
+
+/* hover */
+.gp-action-btn:not(:disabled):hover {
+  transform: translateY(-1px);
+}
+.gp-action-btn:not(:disabled):hover .gp-action-btn__highlight {
+  opacity: .72;
+}
+.gp-action-btn:not(:disabled):hover .gp-action-btn__shadow {
+  opacity: .58;
+}
+.gp-action-btn:not(:disabled):hover .gp-action-btn__border::before {
+  border-top-color: rgba(255, 250, 220, 0.85);
+  border-left-color: rgba(255, 235, 180, 0.5);
+}
+
+.gp-action-btn--check:not(:disabled):hover .gp-action-btn__border {
+  background-image: url("/assets/ui/buttons/check/button_border_hover.png");
+}
+.gp-action-btn--bet:not(:disabled):hover .gp-action-btn__border {
+  background-image: url("/assets/ui/buttons/bet/button_border_hover.png");
+}
+.gp-action-btn--allin:not(:disabled):hover .gp-action-btn__border {
+  background-image: url("/assets/ui/buttons/allin/button_border_hover.png");
+}
+.gp-action-btn--fold:not(:disabled):hover .gp-action-btn__border {
+  background-image: url("/assets/ui/buttons/fold/button_border_hover.png");
+}
+
+/* pressed */
+.gp-action-btn:not(:disabled):active {
+  transform: translateY(2px) scale(.985);
+  filter: brightness(.94);
+}
+.gp-action-btn:not(:disabled):active .gp-action-btn__highlight {
+  opacity: .24;
+}
+.gp-action-btn:not(:disabled):active .gp-action-btn__shadow {
+  opacity: .22;
+  transform: translateY(-1px) scale(.985);
+}
+
+.gp-action-btn--check:not(:disabled):active .gp-action-btn__border {
+  background-image: url("/assets/ui/buttons/check/button_border_pressed.png");
+}
+.gp-action-btn--bet:not(:disabled):active .gp-action-btn__border {
+  background-image: url("/assets/ui/buttons/bet/button_border_pressed.png");
+}
+.gp-action-btn--allin:not(:disabled):active .gp-action-btn__border {
+  background-image: url("/assets/ui/buttons/allin/button_border_pressed.png");
+}
+.gp-action-btn--fold:not(:disabled):active .gp-action-btn__border {
+  background-image: url("/assets/ui/buttons/fold/button_border_pressed.png");
+}
+
+/* disabled */
+.gp-action-btn:disabled {
+  cursor: default;
+  filter: saturate(.45) brightness(.82);
+  color: #8b97a0;
+}
+.gp-action-btn:disabled .gp-action-btn__highlight { opacity: .17; }
+.gp-action-btn:disabled .gp-action-btn__shadow { opacity: .12; }
+
+.gp-action-btn__disabled-wash {
+  z-index: 7;
+  display: none;
+}
+
+.gp-action-btn:disabled .gp-action-btn__disabled-wash {
+  display: block;
+}
+
+.gp-action-btn--check:disabled .gp-action-btn__border {
+  background-image: url("/assets/ui/buttons/check/button_border_disabled.png");
+}
+.gp-action-btn--check:disabled .gp-action-btn__disabled-wash {
+  background-image: url("/assets/ui/buttons/check/button_disabled_wash.png");
+}
+.gp-action-btn--bet:disabled .gp-action-btn__border {
+  background-image: url("/assets/ui/buttons/bet/button_border_disabled.png");
+}
+.gp-action-btn--bet:disabled .gp-action-btn__disabled-wash {
+  background-image: url("/assets/ui/buttons/bet/button_disabled_wash.png");
+}
+.gp-action-btn--allin:disabled .gp-action-btn__border {
+  background-image: url("/assets/ui/buttons/allin/button_border_disabled.png");
+}
+.gp-action-btn--allin:disabled .gp-action-btn__disabled-wash {
+  background-image: url("/assets/ui/buttons/allin/button_disabled_wash.png");
+}
+.gp-action-btn--fold:disabled .gp-action-btn__border {
+  background-image: url("/assets/ui/buttons/fold/button_border_disabled.png");
+}
+.gp-action-btn--fold:disabled .gp-action-btn__disabled-wash {
+  background-image: url("/assets/ui/buttons/fold/button_disabled_wash.png");
+}
+
+.gp-action-btn:focus-visible,
+.gp-action-bar__more:focus-visible {
+  outline: 2px solid rgba(190,228,250,.95);
+  outline-offset: 3px;
+}
+
+/* more */
+.gp-action-bar__more {
+  width: 48px;
+  height: 68px;
+  flex: 0 0 48px;
+
+  display: grid;
+  place-items: center;
+
+  border-radius: 14px;
+  border: 1px solid rgba(118,144,162,.22);
+  background:
+    linear-gradient(180deg, rgba(40,55,68,.92), rgba(15,28,39,.94));
+
+  cursor: pointer;
+  transition: transform 90ms ease, border-color 120ms ease, background 120ms ease;
+}
+
+.gp-action-bar__more img {
+  width: 28px;
+  height: 28px;
+  opacity: .74;
+}
+
+.gp-action-bar__more:hover {
+  transform: translateY(-1px);
+  border-color: rgba(168,207,231,.45);
+  background: linear-gradient(180deg, rgba(48,65,78,.96), rgba(18,32,43,.98));
+}
+
+.gp-action-bar__more:active {
+  transform: translateY(2px) scale(.97);
+}
+
+/* compact version for your current portrait poker layout */
+@media (max-width: 760px) {
+  .gp-action-bar {
+    display: grid;
+    grid-template-columns: repeat(2, 96px);
+    width: fit-content;
+    max-width: calc(100vw - 22px);
+    gap: 8px;
+    padding: 7px;
+    border-radius: 15px;
+  }
+
+  .gp-action-btn {
+    min-width: 0;
+    height: 46px;
+  }
+
+  .gp-action-btn--allin {
+    width: 96px;
+  }
+
+  .gp-action-btn__content {
+    gap: 5px;
+    padding: 0 7px;
+  }
+
+  .gp-action-btn__icon-wrap {
+    width: 18px;
+    height: 18px;
+    flex-basis: 18px;
+  }
+
+  .gp-action-btn__icon {
+    width: 16px;
+    height: 16px;
+  }
+
+  .gp-action-btn__divider {
+    height: 20px;
+  }
+
+  .gp-action-btn__text {
+    min-width: 0;
+  }
+
+  .gp-action-btn__text strong {
+    font-size: 13px;
+  }
+
+  .gp-action-btn__text small {
+    font-size: 7px;
+    margin-top: 3px;
+  }
+
+  .gp-action-btn__surface,
+  .gp-action-btn__highlight,
+  .gp-action-btn__inner-shadow,
+  .gp-action-btn__border,
+  .gp-action-btn__disabled-wash {
+    border-radius: 9px;
+  }
+
+  .gp-action-bar__more {
+    width: 38px;
+    height: 60px;
+    flex-basis: 38px;
+    border-radius: 12px;
+  }
+
+  .gp-action-bar__more img {
+    width: 23px;
+    height: 23px;
+  }
+}

@@ -115,7 +115,7 @@ export default function Game() {
           bottom edge is for core actions and the system gesture area);
           chat/log move to the table's left edge. Desktop keeps the chat
           tabs bottom-left. */}
-      <div className="absolute inset-x-0 bottom-0 z-10 flex flex-col sm:block">
+      <div className="absolute inset-x-0 bottom-0 z-50 flex flex-col sm:block">
         <div className="w-full sm:pointer-events-none sm:absolute sm:inset-x-0 sm:bottom-0 sm:z-20">
           <Input />
         </div>

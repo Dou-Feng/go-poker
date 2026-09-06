@@ -7,6 +7,7 @@ import "../styles/index.css";
 import "../styles/base.css";
 import "../styles/shared.css";
 import "../styles/game.css";
+import "../styles/actionbar.css";
 import "../styles/utilities.css";
 
 function MyApp({ Component, pageProps }: AppProps) {

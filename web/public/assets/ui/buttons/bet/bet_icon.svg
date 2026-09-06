@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 64 64">
+<defs>
+ <linearGradient id="gold" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#FFE59A"/><stop offset=".42" stop-color="#E9BC55"/><stop offset="1" stop-color="#9B671F"/></linearGradient>
+ <filter id="s"><feDropShadow dx="0" dy="1.4" stdDeviation="1.2" flood-color="#100A00" flood-opacity=".75"/></filter>
+</defs>
+<g filter="url(#s)">
+ <circle cx="32" cy="32" r="21" fill="#B17A28" stroke="url(#gold)" stroke-width="3"/>
+ <circle cx="32" cy="32" r="9" fill="#16242D" stroke="#F5CF70" stroke-width="3"/>
+ <g stroke="#FFE08A" stroke-width="4" stroke-linecap="round">
+  <path d="M32 11v7M32 46v7M11 32h7M46 32h7"/>
+  <path d="M17.2 17.2l5 5M41.8 41.8l5 5M46.8 17.2l-5 5M22.2 41.8l-5 5"/>
+ </g>
+ <path d="M20 18a19 19 0 0 1 25 0" fill="none" stroke="#FFF1BE" stroke-opacity=".5" stroke-width="1.4"/>
+</g>
+</svg>

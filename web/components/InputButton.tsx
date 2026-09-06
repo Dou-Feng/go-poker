@@ -1,46 +1,63 @@
-import { MouseEventHandler, ReactNode } from "react";
-import classNames from "classnames";
+import { MouseEventHandler } from "react";
 
-// Game action keys (call / bet / all-in / fold). They are deliberately their
-// own small system (see `.action-key*` in styles/game.css) rather than the
-// toolbar `btn` variants: thumb-sized targets, dark-gold edged charcoal, and
-// one risk colour per action so the bar reads at a glance. A small icon
-// (16–20px) sits before the label to lower recognition effort.
-export type ActionVariant = "call" | "bet" | "allin" | "fold" | "neutral";
+export type ActionKind = "check" | "bet" | "allin" | "fold";
 
-type buttonProps = {
-  action: MouseEventHandler<HTMLButtonElement>;
-  title: string;
-  disabled: boolean;
-  variant?: ActionVariant;
-  icon?: ReactNode;
-  className?: string;
-  /** Legacy alias for variant="fold". */
-  danger?: boolean;
+const ICON_PATH: Record<ActionKind, string> = {
+  check: "/assets/ui/buttons/check/check_icon.svg",
+  bet: "/assets/ui/buttons/bet/bet_icon.svg",
+  allin: "/assets/ui/buttons/allin/allin_icon.svg",
+  fold: "/assets/ui/buttons/fold/fold_icon.svg",
 };
 
+type InputButtonProps = {
+  kind: ActionKind;
+  label: string;
+  /** Small English caption shown under the label. */
+  subLabel?: string;
+  disabled?: boolean;
+  onClick?: MouseEventHandler<HTMLButtonElement>;
+  className?: string;
+};
+
+// Game action keys (check / bet / all-in / fold), rendered as layered material
+// buttons (see styles/actionbar.css). The label is the primary text and
+// subLabel is the small English caption under it.
 export default function InputButton({
-  action,
-  title,
-  disabled,
-  variant,
-  icon,
-  className,
-  danger = false,
-}: buttonProps) {
-  const v: ActionVariant = variant ?? (danger ? "fold" : "call");
+  kind,
+  label,
+  subLabel = "",
+  disabled = false,
+  onClick,
+  className = "",
+}: InputButtonProps) {
   return (
     <button
-      className={classNames("action-key", `action-key-${v}`, className)}
-      onClick={action}
+      type="button"
+      className={`gp-action-btn gp-action-btn--${kind} ${className}`}
       disabled={disabled}
+      onClick={onClick}
+      aria-label={label}
     >
-      {icon && (
-        <span className="flex h-4 w-4 items-center justify-center sm:h-5 sm:w-5">
-          {icon}
+      <span className="gp-action-btn__shadow" aria-hidden="true" />
+      <span className="gp-action-btn__surface" aria-hidden="true" />
+      <span className="gp-action-btn__highlight" aria-hidden="true" />
+      <span className="gp-action-btn__inner-shadow" aria-hidden="true" />
+      <span className="gp-action-btn__border" aria-hidden="true" />
+
+      <span className="gp-action-btn__content">
+        <span className="gp-action-btn__icon-wrap" aria-hidden="true">
+          <img src={ICON_PATH[kind]} alt="" className="gp-action-btn__icon" />
         </span>
-      )}
-      {title}
+
+        <span className="gp-action-btn__divider" aria-hidden="true" />
+
+        <span className="gp-action-btn__text">
+          <strong>{label}</strong>
+          {subLabel && <small>{subLabel}</small>}
+        </span>
+      </span>
+
+      <span className="gp-action-btn__disabled-wash" aria-hidden="true" />
     </button>
   );
 }

@@ -56,56 +56,6 @@
   color: #f4cf72;
 }
 
-.action-key {
-  @apply inline-flex h-12 min-w-[5.5rem] items-center justify-center gap-1.5 rounded-[14px] border px-4 text-sm font-semibold shadow-md transition disabled:cursor-not-allowed disabled:opacity-40 sm:h-14 sm:min-w-[7rem] sm:px-5 sm:text-base;
-  border-color: rgba(212, 161, 27, 0.35);
-  color: #f8fafc;
-  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.45);
-  background-image: linear-gradient(
-    180deg,
-    rgba(255, 255, 255, 0.08) 0%,
-    rgba(255, 255, 255, 0) 45%,
-    rgba(0, 0, 0, 0.2) 100%
-  );
-}
-
-.action-key:not(:disabled):hover {
-  filter: brightness(1.08);
-}
-
-.action-key:not(:disabled):active {
-  transform: scale(0.97);
-  box-shadow: 0 0 0 2px rgba(241, 199, 90, 0.6), 0 6px 16px rgba(0, 0, 0, 0.4);
-}
-
-.action-key-call {
-  background-color: #3b4a5c;
-  color: #f4f7fa;
-}
-
-.action-key-bet {
-  background-color: #7a5a1f;
-  color: #fff4d6;
-  border-color: rgba(241, 199, 90, 0.55);
-}
-
-.action-key-allin {
-  background-color: #c2601a;
-  color: #fff8ee;
-  border-color: rgba(255, 200, 120, 0.6);
-}
-
-.action-key-fold {
-  background-color: #5a1f24;
-  color: #ffd9dd;
-  border-color: rgba(190, 60, 70, 0.5);
-}
-
-.action-key-neutral {
-  background-color: #262f38;
-  color: #d5dce4;
-}
-
 @keyframes chip-pop {
   0% {
     transform: scale(0.4);

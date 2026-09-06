@@ -8,13 +8,13 @@ import InputButton from "./InputButton";
 import Chip from "./Chip";
 import { Slider } from "@mantine/core";
 import classNames from "classnames";
-import { FiArrowUpCircle, FiX, FiZap } from "react-icons/fi";
+import { FiX } from "react-icons/fi";
 
 type raiseProps = {
   showRaise: boolean;
   setShowRaise: React.Dispatch<React.SetStateAction<boolean>>;
 };
-// Quick-amount chips (min / ½ pot / ¾ pot / pot): flat toolbar buttons.
+// Quick-amount chips (min / ½ pot / pot / 2× pot): flat toolbar buttons.
 function button() {
   return classNames("btn btn-secondary px-2.5 py-1 text-xs sm:text-sm");
 }
@@ -33,7 +33,7 @@ export default function RaiseInput({ showRaise, setShowRaise }: raiseProps) {
   const currentBet = appState.game.players[appState.game.action].bet; // active player's bet
   const currentStack = appState.game.players[appState.game.action].stack; // active player's stack
   const playerBets = appState.game.players.map((player) => player.bet); // array of all players' bets
-  const maxBet = Math.max(...playerBets); // largest bet out of all player's bets
+  const maxBet = Math.max(...playerBets); // largest bet out of all players' bets
   const minRaise = maxBet + appState.game.minRaise;
 
   const currentPot =
@@ -76,7 +76,7 @@ export default function RaiseInput({ showRaise, setShowRaise }: raiseProps) {
   };
 
   return (
-    <div className="pointer-events-auto flex w-full justify-center px-2 pt-2 pb-[max(1.5rem,env(safe-area-inset-bottom))] sm:p-6">
+    <div className="pointer-events-auto flex w-full justify-center px-2 pt-2 pb-[10dvh]">
       <div className="animate-fade-in flex flex-row flex-wrap items-center justify-center gap-2 rounded-2xl border border-amber-700/40 bg-tablehi/95 p-2.5 shadow-lg sm:gap-3 sm:p-3">
         <div className="flex flex-col items-center justify-center gap-1.5 rounded-lg bg-card px-3 py-2">
           <div className="flex items-center justify-center gap-1.5 text-xl font-semibold text-amber-300 sm:text-2xl">
@@ -134,23 +134,21 @@ export default function RaiseInput({ showRaise, setShowRaise }: raiseProps) {
         </div>
         <div className="flex flex-col gap-1.5">
           <InputButton
-            action={() =>
+            kind={isAllIn ? "allin" : "bet"}
+            label={isAllIn ? "ALL-IN" : "加注"}
+            subLabel={isAllIn ? "" : "BET"}
+            disabled={inputValue < minRaise || inputValue > allInTotal}
+            onClick={() =>
               handleRaise(appState.username, inputValue - currentBet)
             }
-            title={isAllIn ? t("allIn") : t("bet")}
-            disabled={inputValue < minRaise || inputValue > allInTotal}
-            variant={isAllIn ? "allin" : "bet"}
-            icon={
-              isAllIn ? <FiZap size="1em" /> : <FiArrowUpCircle size="1em" />
-            }
           />
-          <InputButton
-            action={() => setShowRaise(!showRaise)}
-            title={t("close")}
-            disabled={false}
-            variant="neutral"
-            icon={<FiX size="1em" />}
-          />
+          <button
+            onClick={() => setShowRaise(!showRaise)}
+            className="btn btn-room-control"
+          >
+            <FiX size="1rem" />
+            {t("close")}
+          </button>
         </div>
       </div>
     </div>
