@@ -2,9 +2,9 @@ import CommunityCards from "./CommunityCards";
 import Pot from "./Pot";
 import { TableLayout } from "../lib/tableLayout";
 
-type FeltContentsProps = { layout: TableLayout; onClick: () => void };
+type FeltContentsProps = { layout: TableLayout };
 
-export function FeltContents({ layout, onClick }: FeltContentsProps) {
+export function FeltContents({ layout }: FeltContentsProps) {
   const large = layout.large;
   const boardScale = Math.min(
     (layout.width * (layout.portrait ? 0.52 : 0.38)) / (large ? 356 : 216),
@@ -16,7 +16,6 @@ export function FeltContents({ layout, onClick }: FeltContentsProps) {
       <div
         className="poker-table-pot"
         style={{ left: `${layout.pot.x}%`, top: `${layout.pot.y}%` }}
-        onClick={onClick}
       >
         <Pot />
       </div>
@@ -27,7 +26,6 @@ export function FeltContents({ layout, onClick }: FeltContentsProps) {
           top: `${layout.board.y}%`,
           transform: `translate(-50%, -50%) scale(${boardScale})`,
         }}
-        onClick={onClick}
       >
         <CommunityCards />
       </div>

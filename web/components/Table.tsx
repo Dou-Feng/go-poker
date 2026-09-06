@@ -148,15 +148,12 @@ export default function Table() {
   // Board view popup: the felt is small on a phone and a neighbouring seat can
   // overlap the player's own hole cards, so the community cards (and the
   // player's hole cards when seated) can be shown enlarged in the centre.
-  // Two ways to open it: hold a finger / the mouse button anywhere on the
-  // table (shown while held; the delay keeps ordinary taps on seats and
-  // buttons unaffected), or tap the felt itself to pin it open until the
-  // next tap.
+  // Opened with a long press anywhere on the table (shown while held; the
+  // delay keeps ordinary taps on seats and buttons unaffected).
   const [peeking, setPeeking] = useState(false);
-  const [pinned, setPinned] = useState(false);
   const peekTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Set when a hold produced the popup, so the click that follows the
-  // release does not also toggle the pinned state.
+  // release does not act on whatever was under the finger.
   const heldRef = useRef(false);
   const myCards =
     !!game?.running && !!me && me.cards.length > 0 && me.cards[0] !== "?"
@@ -224,22 +221,12 @@ export default function Table() {
       e.preventDefault();
     }
   };
-  const toggleBoardView = () => {
-    if (heldRef.current) {
-      heldRef.current = false;
-      return;
-    }
-    if (canPeek) {
-      setPinned((p) => !p);
-    }
-  };
   useEffect(() => {
     if (!canPeek) {
       endPeek();
-      setPinned(false);
     }
   }, [canPeek]);
-  const showBoardView = !!game && (peeking || pinned);
+  const showBoardView = !!game && peeking;
 
   const maxPlayers = game?.config.maxPlayers ?? 6;
 
@@ -447,42 +434,8 @@ export default function Table() {
         }
       }}
     >
-      {/* A pinned (tap-opened) board view closes on a tap anywhere: this
-          transparent backdrop covers the whole room, so a second tap on the
-          felt is never required (small phones may have no reachable felt
-          left under the popup). The held variant needs no backdrop. */}
-      {pinned && game && (
-        <div
-          className="absolute inset-0 z-40"
-          onClick={() => setPinned(false)}
-          aria-label={t("close")}
-        />
-      )}
       {showBoardView && game && (
-        <div
-          className={classNames(
-            // Anchored to the top of the table, not the centre: the finger
-            // that is holding the table would otherwise cover the popup.
-            // Below the room's top toolbars (leave/vote row, hands pill,
-            // wallet column) so it never overlaps them; it may cover the
-            // top seats, which is fine for a transient popup.
-            "absolute inset-x-0 top-28 z-40 flex items-start justify-center sm:top-24",
-            // While held the popup is see-through to pointer events so the
-            // release is always caught by the table; when pinned, a tap on
-            // it (or the backdrop) closes it.
-            pinned ? "pointer-events-auto" : "pointer-events-none"
-          )}
-          onClick={() => setPinned(false)}
-        >
-          {pinned && (
-            <button
-              onClick={() => setPinned(false)}
-              className="btn btn-text absolute right-3 -top-1 z-50 text-base"
-              aria-label={t("close")}
-            >
-              ✕
-            </button>
-          )}
+        <div className="pointer-events-none absolute inset-x-0 top-28 z-40 flex items-start justify-center sm:top-24">
           {peekPlayer ? (
             // Held on a seat: that player's cards, large. Hidden unless the
             // viewer owns them or they are shown down / voluntarily revealed
@@ -601,18 +554,10 @@ export default function Table() {
         className="poker-table-scene"
         data-layout={layout.portrait ? "portrait" : "landscape"}
       >
-        <div
-          className={classNames(
-            "poker-table-surface",
-            canPeek && "cursor-pointer"
-          )}
-          onClick={toggleBoardView}
-          role={canPeek ? "button" : undefined}
-          aria-label={canPeek ? t("boardView") : undefined}
-        >
+        <div className="poker-table-surface">
           <Felt />
         </div>
-        <FeltContents layout={layout} onClick={toggleBoardView} />
+        <FeltContents layout={layout} />
         {game && (
           <TableFx game={game} maxPlayers={maxPlayers} layout={layout} />
         )}
