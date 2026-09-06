@@ -350,11 +350,13 @@
   line-height: 1;
 }
 
-/* "Ready" veil over the panel between hands. */
+/* "Ready" veil over the panel between hands. It fills the info panel below
+   the avatar disc, so it must stay under the disc (z 5) — the avatar rides
+   the panel's top edge and must never be covered by the veil's frame. */
 .gps-seat__ready {
   position: absolute;
   inset: 0;
-  z-index: 10;
+  z-index: 3;
   display: grid;
   place-items: center;
   border-radius: inherit;
