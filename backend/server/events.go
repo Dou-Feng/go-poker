@@ -448,7 +448,7 @@ func normalizeRoomConfig(sb, bb, buyIn, maxBuy, maxPlayers, handsLimit uint, tou
 	return roomConfig{sb, bb, buyIn, maxBuy, maxPlayers, handsLimit}
 }
 
-func handleCreateTable(c *Client, tablename string, password string, sb uint, bb uint, buyIn uint, maxBuy uint, maxPlayers uint, handsLimit uint, tournament bool) {
+func handleCreateTable(c *Client, tablename string, password string, sb uint, bb uint, buyIn uint, maxBuy uint, maxPlayers uint, handsLimit uint, tournament bool, actionTimeout uint) {
 	table, created, err := c.hub.createTableIfAbsent(tablename, password)
 	if err != nil {
 		c.send <- createResult(actionCreateResult, false, err.Error(), "")
@@ -465,6 +465,7 @@ func handleCreateTable(c *Client, tablename string, password string, sb uint, bb
 
 	cfg := normalizeRoomConfig(sb, bb, buyIn, maxBuy, maxPlayers, handsLimit, tournament)
 	poker.Configure(table.game, cfg.sb, cfg.bb, cfg.buyIn, cfg.maxBuy, cfg.maxPlayers, cfg.handsLimit)
+	table.clock.timeout = normalizeActionTimeout(actionTimeout)
 
 	c.table = table
 	table.register <- c
@@ -1200,12 +1201,15 @@ func createNewLog(message string) []byte {
 // yields the spectator view).
 func createUpdatedGame(c *Client) []byte {
 	view := c.table.game.GenerateOmniView()
+	timeoutSec, remainingMs := c.table.actionClockState()
 	game := updateGame{
-		base{actionUpdateGame},
-		view.CensorFor(view.ViewerNum(c.uuid)),
-		c.table.reservations(),
-		c.table.settleVoteList(),
-		c.table.hostAccount(),
+		base:              base{actionUpdateGame},
+		Game:              view.CensorFor(view.ViewerNum(c.uuid)),
+		Reserved:          c.table.reservations(),
+		SettleVotes:       c.table.settleVoteList(),
+		Host:              c.table.hostAccount(),
+		ActionTimeout:     timeoutSec,
+		ActionRemainingMs: remainingMs,
 	}
 
 	resp, err := json.Marshal(game)
@@ -1220,12 +1224,15 @@ func createUpdatedGame(c *Client) []byte {
 // Redis channel; the per-client censoring happens at the fan-out
 // (table.broadcastToClients), never on the socket.
 func createUpdatedGameBytes(t *table) []byte {
+	timeoutSec, remainingMs := t.actionClockState()
 	game := updateGame{
-		base{actionUpdateGame},
-		t.game.GenerateOmniView(),
-		t.reservations(),
-		t.settleVoteList(),
-		t.hostAccount(),
+		base:              base{actionUpdateGame},
+		Game:              t.game.GenerateOmniView(),
+		Reserved:          t.reservations(),
+		SettleVotes:       t.settleVoteList(),
+		Host:              t.hostAccount(),
+		ActionTimeout:     timeoutSec,
+		ActionRemainingMs: remainingMs,
 	}
 
 	resp, err := json.Marshal(game)

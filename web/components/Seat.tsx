@@ -1,4 +1,4 @@
-import { useContext } from "react";
+import { useContext, useEffect, useState } from "react";
 import { AppContext } from "../providers/AppStore";
 import { Player } from "../interfaces/index";
 import Card from "./Card";
@@ -53,6 +53,24 @@ export function useHandLabel() {
   };
 }
 
+// Fraction of the action clock left for the current turn (1 -> 0), ticking
+// ten times a second; 0 when there is no deadline.
+function useClockFraction(deadline: number | null, total: number): number {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (deadline === null) {
+      return;
+    }
+    setNow(Date.now());
+    const id = window.setInterval(() => setNow(Date.now()), 100);
+    return () => window.clearInterval(id);
+  }, [deadline]);
+  if (deadline === null || total <= 0) {
+    return 0;
+  }
+  return Math.max(0, Math.min(1, (deadline - now) / (total * 1000)));
+}
+
 export default function Seat({
   player,
   id,
@@ -68,6 +86,18 @@ export default function Seat({
 
   const game = appState.game;
   const running = game?.running ?? false;
+  // Action clock for the seat to act (null = no clock or nobody to act).
+  const onClock =
+    !!game &&
+    !!player &&
+    running &&
+    game.betting &&
+    player.position === game.action &&
+    game.actionDeadline !== null;
+  const clockFraction = useClockFraction(
+    onClock ? game.actionDeadline : null,
+    game?.actionTimeout ?? 0
+  );
   // Bot placement mode (host only, between hands, not yet readied): empty
   // seats become "+" to add a bot there, seated bots become removable.
   const isHost = !!game && !!appState.uuid && game.host === appState.uuid;
@@ -277,6 +307,16 @@ export default function Seat({
               <div className="gps-seat__ready">{t("ready")}</div>
             )}
           </div>
+          {/* Action clock: drains left to right while this player is to act,
+              turning red for the last quarter. */}
+          {onClock && (
+            <div className="gps-seat__timer" aria-hidden>
+              <span
+                className={classNames(clockFraction < 0.25 && "is-low")}
+                style={{ width: `${clockFraction * 100}%` }}
+              />
+            </div>
+          )}
         </div>
 
         {canShow && (

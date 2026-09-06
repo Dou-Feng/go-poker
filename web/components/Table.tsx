@@ -603,7 +603,7 @@ export default function Table() {
               className={classNames(
                 "absolute -translate-x-1/2 -translate-y-1/2 transition-transform duration-300",
                 isMine && "z-10",
-                shrink && "scale-[0.82] sm:scale-90"
+                shrink && "seat-shrunk scale-[0.82] sm:scale-90"
               )}
               style={{ left: pos.left, top: pos.top }}
               data-seat-position={player ? player.position : undefined}

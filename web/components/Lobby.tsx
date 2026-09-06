@@ -57,6 +57,9 @@ export default function Lobby() {
   const [tournament, setTournament] = useState(false);
   const [maxPlayers, setMaxPlayers] = useState("6");
   const [handsLimit, setHandsLimit] = useState("20");
+  // 操作时限: seconds each player has to act before the server checks or
+  // folds for them; 0 = no clock.
+  const [actionTimeout, setActionTimeout] = useState("40");
   const { t } = useTranslation();
 
   useEffect(() => {
@@ -144,6 +147,7 @@ export default function Lobby() {
       tournament,
       maxPlayers: parseNumber(maxPlayers, 6, 2, 8),
       handsLimit: parseNumber(handsLimit, 20, 0),
+      actionTimeout: parseNumber(actionTimeout, 40, 0, 300),
     });
   };
 
@@ -471,6 +475,17 @@ export default function Lobby() {
                     inputMode="numeric"
                     value={handsLimit}
                     onChange={(e) => setHandsLimit(e.target.value)}
+                  />
+                  <small>0 = {t("unlimited")}</small>
+                </label>
+                <label className={ui.field}>
+                  {t("actionTimeout")}
+                  <input
+                    className={ui.input}
+                    type="text"
+                    inputMode="numeric"
+                    value={actionTimeout}
+                    onChange={(e) => setActionTimeout(e.target.value)}
                   />
                   <small>0 = {t("unlimited")}</small>
                 </label>

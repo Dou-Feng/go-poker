@@ -170,6 +170,10 @@ export type Game = {
   settleVotes: string[];
   /** Account UUID of the room host (the only one who manages bots). */
   host: string;
+  /** Seconds each player gets to act; 0 = no clock (server clock.go). */
+  actionTimeout: number;
+  /** Local clock time (ms) when the player to act times out, or null. */
+  actionDeadline: number | null;
   handsPlayed: number;
   biggestPotAmt: number;
   biggestPotWinners: number[];

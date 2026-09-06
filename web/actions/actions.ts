@@ -164,6 +164,8 @@ export type CreateTableOptions = {
   handsLimit?: number;
   /** Enforce the buy-in cap (maxBuy); off = unlimited rebuys. */
   tournament?: boolean;
+  /** Seconds each player gets to act; 0 = no clock. */
+  actionTimeout?: number;
 };
 
 export function createTable(

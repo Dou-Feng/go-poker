@@ -73,6 +73,20 @@
   pointer-events: none;
 }
 
+/* Other players' seats are drawn at 82% (90% on desktop) by the table; the
+   bet amount matters too much to shrink with them, so the pill is scaled
+   back up to the hero's size (about its bottom centre, growing upward). */
+.seat-shrunk .gps-seat__bet {
+  transform: scale(1.22);
+  transform-origin: 50% 100%;
+}
+
+@media (min-width: 640px) {
+  .seat-shrunk .gps-seat__bet {
+    transform: scale(1.111);
+  }
+}
+
 .gps-seat__bet-pill {
   display: flex;
   align-items: center;
@@ -348,6 +362,40 @@
   color: rgba(232, 237, 241, 0.92);
   font-size: var(--gps-name);
   font-weight: 700;
+}
+
+/* ---- action clock, along the panel's bottom edge ---- */
+.gps-seat__timer {
+  position: absolute;
+  left: calc(var(--gps-avatar) * 0.6);
+  right: 8px;
+  bottom: -3px;
+  height: 4px;
+  z-index: 9;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #071119;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35);
+}
+
+.gps-seat__timer span {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, #d7932f, #f0c165);
+  box-shadow: 0 0 8px rgba(235, 175, 73, 0.5);
+  transition: width 100ms linear, background 300ms ease;
+}
+
+.gps-seat__timer span.is-low {
+  background: linear-gradient(90deg, #b3202c, #ef4d5c);
+  box-shadow: 0 0 8px rgba(239, 77, 92, 0.6);
+}
+
+@media (min-width: 640px) {
+  .gps-seat__timer {
+    height: 5px;
+    bottom: -4px;
+  }
 }
 
 /* ---- states ---- */

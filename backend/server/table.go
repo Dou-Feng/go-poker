@@ -67,6 +67,8 @@ type table struct {
 	persist   func(SessionRecord) error
 	// Server-played seats and their pacing timer (see bot.go).
 	botState
+	// Per-turn action clock (see clock.go); zero timeout = off.
+	clock actionClock
 }
 
 // newTable creates a new table
@@ -134,6 +136,7 @@ func (t *table) shutdown() {
 		t.offlineMu.Unlock()
 
 		t.stopBots()
+		t.stopActionClock()
 		close(t.stop)
 	})
 }
@@ -366,11 +369,13 @@ func (t *table) broadcastToClients(message []byte) {
 // the personalized copy cannot be marshaled.
 func (m *updateGame) censoredFor(viewerUUID string) []byte {
 	game := updateGame{
-		base:        m.base,
-		Game:        m.Game.CensorFor(m.Game.ViewerNum(viewerUUID)),
-		Reserved:    m.Reserved,
-		SettleVotes: m.SettleVotes,
-		Host:        m.Host,
+		base:              m.base,
+		Game:              m.Game.CensorFor(m.Game.ViewerNum(viewerUUID)),
+		Reserved:          m.Reserved,
+		SettleVotes:       m.SettleVotes,
+		Host:              m.Host,
+		ActionTimeout:     m.ActionTimeout,
+		ActionRemainingMs: m.ActionRemainingMs,
 	}
 
 	resp, err := json.Marshal(game)
@@ -433,6 +438,9 @@ func (t *table) broadcastGame() {
 		return
 	}
 	t.autoSpectateBusted()
+	// Arm (or keep, or clear) the action clock for the turn the view is in,
+	// so the update carries the right remaining time.
+	t.armActionClock(t.game.GenerateOmniView())
 	t.broadcast <- createUpdatedGameBytes(t)
 	t.scheduleBots()
 }

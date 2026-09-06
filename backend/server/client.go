@@ -456,7 +456,7 @@ func (c *Client) processEvents(rawMessage []byte) error {
 		if err != nil {
 			return err
 		}
-		handleCreateTable(c, table.Tablename, table.Password, table.SB, table.BB, table.BuyIn, table.MaxBuy, table.MaxPlayers, table.HandsLimit, table.Tournament)
+		handleCreateTable(c, table.Tablename, table.Password, table.SB, table.BB, table.BuyIn, table.MaxBuy, table.MaxPlayers, table.HandsLimit, table.Tournament, table.ActionTimeout)
 		return nil
 
 	case actionAddChips:

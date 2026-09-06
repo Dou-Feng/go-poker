@@ -196,6 +196,9 @@ type createTable struct {
 	// two buy-ins): players who bust with no buy-ins left are benched. Off
 	// (the default) means unlimited rebuys.
 	Tournament bool `json:"tournament"`
+	// ActionTimeout is the seconds each player gets to act (0 = no clock);
+	// see clock.go.
+	ActionTimeout uint `json:"actionTimeout"`
 }
 
 type addChips struct {
@@ -330,6 +333,10 @@ type updateGame struct {
 	Reserved    []seatReservation `json:"reserved"`
 	SettleVotes []string          `json:"settleVotes"`
 	Host        string            `json:"host,omitempty"` // account UUID of the room host (manages bots)
+	// Action clock (clock.go): the room's per-turn seconds, and how many
+	// milliseconds the player to act has left at the time of this update.
+	ActionTimeout     int   `json:"actionTimeout,omitempty"`
+	ActionRemainingMs int64 `json:"actionRemainingMs,omitempty"`
 }
 
 type updatePlayerUUID struct {
