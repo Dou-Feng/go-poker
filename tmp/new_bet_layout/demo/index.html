@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>GoPoker Raise Panel Preview</title>
+<link rel="preconnect" href="https://fonts.gstatic.com">
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%;font-family:Inter,"PingFang SC","Microsoft YaHei",sans-serif;background:#0e1319;color:#dce6ec}
+body{min-height:100vh;display:grid;place-items:center}
+.stage{width:100%;min-height:100vh;padding:35px 18px 55px;display:flex;flex-direction:column;align-items:center;justify-content:center;
+background:radial-gradient(ellipse at 50% 20%,rgba(23,85,69,.32),transparent 33%),linear-gradient(180deg,#111b23,#091219)}
+.table{width:min(760px,88vw);height:210px;border-radius:50%;border:11px solid #694937;background:radial-gradient(ellipse,#1c7657,#0c4b39 75%);box-shadow:inset 0 0 50px #0007,0 20px 50px #0006;margin-bottom:28px}
+.panel{position:relative;width:min(880px,calc(100vw - 24px));padding:22px 24px 20px;border:1px solid #b78034b3;border-radius:24px;background:linear-gradient(#142633,#08131b);box-shadow:inset 0 1px #ffffff08,0 18px 45px #0007}
+.topline{position:absolute;left:22px;right:22px;top:0;height:1px;background:linear-gradient(90deg,transparent,#ffd375aa,transparent)}
+.header{display:grid;grid-template-columns:1fr auto auto;gap:26px;align-items:center}.title,.pot{display:flex;align-items:center;gap:12px}.title img{width:42px}.title div,.pot div{display:flex;flex-direction:column}.title strong{color:#f1d28a;font-size:28px}.title span,.pot span{margin-top:5px;color:#7f94a3;font-size:11px}.pot img{width:38px}.pot strong{color:#f3d99d;font-size:31px}.close{width:44px;height:44px;border:0;border-radius:12px;background:transparent;color:#b8c9d4;font-size:34px;cursor:pointer}.close:hover{background:#ffffff08}
+.divider{height:1px;margin:18px 0;background:linear-gradient(90deg,transparent,#7f9db038,transparent)}
+.presets{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}.preset{min-height:68px;border-radius:14px;border:1px solid #6a859657;background:linear-gradient(#1f323f,#0d1c27);color:#dce6ec;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center}.preset strong{font-size:18px}.preset span{margin-top:5px;color:#8095a4;font-size:9px}.preset.active{border-color:#eeb854;background:linear-gradient(#3a311f,#1a1c1c);box-shadow:inset 0 1px #fff0cd2e,0 0 14px #e29a2d24}.preset.active strong{color:#f1d28a}.preset.active span{color:#b99b61}
+.amount{margin-top:20px;display:grid;grid-template-columns:132px 1fr auto;gap:20px;align-items:center}.copy{display:flex;flex-direction:column}.copy strong{font-size:20px}.copy span{margin-top:4px;color:#8297a6;font-size:10px}.copy small{margin-top:10px;color:#657b8b}
+input[type=range]{width:100%;appearance:none;height:10px;border-radius:99px;background:linear-gradient(90deg,#d7a64e 0 35%,#20333f 35%);outline:none}input[type=range]::-webkit-slider-thumb{appearance:none;width:28px;height:28px;border-radius:50%;border:1px solid #f2c76f;background:linear-gradient(#ffe3a0,#d89d3d);box-shadow:0 2px 6px #0008}
+.controls{display:flex;align-items:center;gap:10px}.controls button{width:46px;height:46px;border-radius:12px;border:1px solid #64829561;background:linear-gradient(#203440,#10232e);color:#bed0dc;font-size:26px;cursor:pointer}.value{height:46px;min-width:118px;padding:0 14px;border-radius:12px;border:1px solid #68879973;background:linear-gradient(#0a1821,#081219);display:flex;align-items:center;justify-content:center;gap:10px}.value img{width:26px}.value strong{color:#f3d99d;font-size:24px}
+.footer{margin-top:18px;display:flex;justify-content:flex-end}.confirm{min-width:210px;height:58px;padding:0 22px;border-radius:14px;border:1px solid #ebb650e6;background:radial-gradient(circle at 45% 0%,#ffe2a122,transparent 42%),linear-gradient(#5a431f,#2a281f);color:#f1d28a;display:flex;align-items:center;justify-content:center;gap:12px;cursor:pointer;box-shadow:inset 0 1px #fff0cb2e,0 7px 18px #0007}.confirm img{width:34px}.confirm div{display:flex;flex-direction:column;align-items:flex-start}.confirm strong{font-size:18px}.confirm span{margin-top:5px;color:#b99b61;font-size:9px}.pointer{position:absolute;left:50%;bottom:-12px;width:24px;height:24px;background:#0a151d;border-right:1px solid #b78034b3;border-bottom:1px solid #b78034b3;transform:translateX(-50%) rotate(45deg)}
+.actionbar{margin-top:25px;display:flex;gap:10px;padding:10px;border:1px solid #7890a230;border-radius:20px;background:linear-gradient(#13232d,#09141c)}.abtn{width:150px;height:65px;border-radius:14px;border:1px solid #7890a24a;background:linear-gradient(#20323f,#101e28);color:#dce6ec;font-weight:750;font-size:18px}.abtn.bet{border-color:#d59f48;color:#f1d28a;background:linear-gradient(#4c3a20,#221e18)}.abtn.allin{border-color:#d5a24d;color:#f3d99d;background:linear-gradient(#6a4b25,#382819)}.abtn.fold{border-color:#9b404b;color:#e7a2a8;background:linear-gradient(#5b222c,#2b1017)}
+@media(max-width:760px){.presets{grid-template-columns:repeat(2,1fr)}.amount{grid-template-columns:1fr}.footer{justify-content:stretch}.confirm{width:100%}.actionbar{width:100%}.abtn{width:auto;flex:1;font-size:14px}}
+</style>
+</head>
+<body>
+<div class="stage">
+<div class="table"></div>
+
+<div class="panel">
+<div class="topline"></div>
+<div class="header">
+  <div class="title"><img src="../public/assets/ui/buttons/bet/bet_icon.svg"><div><strong>加注</strong><span>RAISE</span></div></div>
+  <div class="pot"><img src="../public/assets/ui/buttons/common/chip_silver.svg"><div><span>当前底池</span><strong>20</strong></div></div>
+  <button class="close" onclick="document.querySelector('.panel').style.display='none'">×</button>
+</div>
+<div class="divider"></div>
+<div class="presets">
+  <button class="preset active" data-v="20"><strong>最小</strong><span>MIN</span></button>
+  <button class="preset" data-v="10"><strong>1/2 底池</strong><span>1/2 POT</span></button>
+  <button class="preset" data-v="20"><strong>满池</strong><span>POT</span></button>
+  <button class="preset" data-v="40"><strong>2 倍底池</strong><span>2 × POT</span></button>
+</div>
+<div class="amount">
+  <div class="copy"><strong>加注金额</strong><span>AMOUNT</span><small>范围：20 - 400</small></div>
+  <input id="slider" type="range" min="20" max="400" value="40">
+  <div class="controls"><button id="minus">−</button><div class="value"><img src="../public/assets/ui/buttons/common/chip_silver.svg"><strong id="value">40</strong></div><button id="plus">+</button></div>
+</div>
+<div class="footer"><button class="confirm" id="confirm"><img src="../public/assets/ui/buttons/bet/bet_icon.svg"><div><strong>确认加注</strong><span>RAISE</span></div></button></div>
+<span class="pointer"></span>
+</div>
+
+<div class="actionbar">
+  <button class="abtn">过牌</button>
+  <button class="abtn bet">加注</button>
+  <button class="abtn allin">ALL-IN</button>
+  <button class="abtn fold">弃牌</button>
+</div>
+</div>
+<script>
+const slider=document.getElementById('slider');
+const value=document.getElementById('value');
+const presets=[...document.querySelectorAll('.preset')];
+function setValue(v){v=Math.max(20,Math.min(400,Math.round(v)));slider.value=v;value.textContent=v}
+slider.oninput=()=>{setValue(+slider.value);presets.forEach(p=>p.classList.remove('active'))}
+document.getElementById('minus').onclick=()=>setValue(+value.textContent-1)
+document.getElementById('plus').onclick=()=>setValue(+value.textContent+1)
+presets.forEach(p=>p.onclick=()=>{presets.forEach(x=>x.classList.remove('active'));p.classList.add('active');setValue(+p.dataset.v)})
+document.getElementById('confirm').onclick=()=>alert('Raise: '+value.textContent)
+</script>
+</body>
+</html>

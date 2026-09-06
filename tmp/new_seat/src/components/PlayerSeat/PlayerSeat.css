@@ -1,0 +1,98 @@
+.gps-seat{
+  --gps-seat-w:168px;
+  position:relative;
+  width:var(--gps-seat-w);
+  height:136px;
+  color:#dce6ec;
+  font-family:Inter,"PingFang SC","Microsoft YaHei",sans-serif;
+  filter:drop-shadow(0 10px 14px rgba(0,0,0,.34));
+}
+.gps-seat *{box-sizing:border-box}
+.gps-seat__bet{
+  position:absolute;left:50%;top:-29px;transform:translateX(-50%);
+  z-index:8;display:flex;align-items:center;gap:4px;
+  padding:4px 9px;border-radius:999px;
+  background:rgba(6,20,28,.9);border:1px solid rgba(211,177,102,.18);
+  color:#f3d99d;font-size:11px;font-weight:800;
+}
+.gps-seat__bet img{width:17px;height:17px}
+.gps-seat__avatar{
+  position:absolute;left:2px;top:32px;width:58px;height:58px;border-radius:50%;
+  z-index:5;display:grid;place-items:center;
+  background:linear-gradient(180deg,#263946,#0f1d27);
+  border:2px solid rgba(124,154,174,.48);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 4px 10px rgba(0,0,0,.34);
+  font-size:32px;
+}
+.gps-seat__position{
+  position:absolute;left:-9px;bottom:-6px;z-index:7;
+  min-width:28px;height:28px;padding:0 6px;border-radius:999px;
+  display:grid;place-items:center;font-size:10px;line-height:1;font-weight:900;
+  border:1px solid rgba(255,255,255,.22);
+  box-shadow:0 3px 8px rgba(0,0,0,.28),inset 0 1px 0 rgba(255,255,255,.08);
+}
+.gps-seat__position--dealer{background:linear-gradient(#f7fafc,#dbe3e8);color:#15212a;border-color:rgba(255,255,255,.75)}
+.gps-seat__position--sb{background:linear-gradient(#4779b8,#274f86);color:#eef6ff;border-color:rgba(145,190,245,.55)}
+.gps-seat__position--bb{background:linear-gradient(#53697f,#314456);color:#eef5f9;border-color:rgba(157,181,201,.45)}
+.gps-seat__cards{position:absolute;left:54px;top:10px;z-index:4;display:flex;gap:5px}
+.gps-card{width:47px;height:64px;border-radius:6px;overflow:hidden;box-shadow:0 4px 9px rgba(0,0,0,.25)}
+.gps-card--back img{display:block;width:100%;height:100%;object-fit:cover}
+.gps-card--face{
+  padding:5px;display:flex;flex-direction:column;
+  background:#f7f8f9;border:1px solid rgba(255,255,255,.8);
+  color:#101318;font-size:15px;line-height:1;
+}
+.gps-card--face span{font-size:20px;margin-top:4px}
+.gps-card__red{color:#c44351}
+.gps-seat__panel{
+  position:absolute;left:16px;right:0;bottom:0;height:74px;
+  padding:25px 12px 10px 45px;border-radius:18px;text-align:center;
+  background:
+    radial-gradient(circle at 25% 0%,rgba(255,255,255,.025),transparent 36%),
+    linear-gradient(180deg,rgba(20,35,46,.99),rgba(7,17,24,.99));
+  border:1px solid rgba(109,139,158,.4);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.025);
+}
+.gps-seat__status{position:absolute;right:8px;top:7px;color:#8ea2af;font-size:8px;font-weight:800;letter-spacing:.08em}
+.gps-seat__name{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;line-height:1;font-weight:750}
+.gps-seat__stack{display:flex;align-items:center;justify-content:center;gap:4px;margin-top:6px;color:#f3d99d;font-size:16px}
+.gps-seat__stack img{width:17px;height:17px}
+.gps-seat__timer{
+  position:absolute;left:27px;right:10px;bottom:-3px;height:5px;z-index:9;
+  overflow:hidden;border-radius:999px;background:#071119;
+}
+.gps-seat__timer span{
+  display:block;height:100%;
+  background:linear-gradient(90deg,#d7932f,#f0c165);
+  box-shadow:0 0 8px rgba(235,175,73,.5);
+}
+.gps-seat--hero .gps-seat__panel{
+  border-color:rgba(229,177,76,.82);
+  box-shadow:0 0 14px rgba(226,154,45,.12),inset 0 1px 0 rgba(255,255,255,.03);
+}
+.gps-seat--hero .gps-seat__avatar{
+  border-color:#dca948;
+  box-shadow:0 0 0 3px rgba(220,169,72,.1),0 0 12px rgba(220,169,72,.2);
+}
+.gps-seat--active .gps-seat__panel{border-color:rgba(224,154,45,.75)}
+.gps-seat--active .gps-seat__avatar{
+  border-color:#e9b34d;
+  box-shadow:0 0 0 4px rgba(224,154,45,.12),0 0 18px rgba(224,154,45,.38),inset 0 1px 0 rgba(255,255,255,.08);
+}
+.gps-seat--active .gps-seat__status{color:#f0c26d}
+.gps-seat--folded{opacity:.52;filter:saturate(.45) drop-shadow(0 8px 12px rgba(0,0,0,.24))}
+.gps-seat--folded .gps-seat__status{color:#a96d74}
+.gps-seat--allin .gps-seat__panel{
+  border-color:rgba(235,182,80,.95);
+  background:
+    radial-gradient(circle at 30% 0%,rgba(255,213,124,.08),transparent 34%),
+    linear-gradient(180deg,rgba(48,38,24,.99),rgba(21,20,18,.99));
+  box-shadow:0 0 15px rgba(226,154,45,.15),inset 0 1px 0 rgba(255,240,202,.08);
+}
+.gps-seat--allin .gps-seat__status{color:#f3d99d}
+
+/* Optional compact mobile variant */
+.gps-seat--compact{
+  transform:scale(.82);
+  transform-origin:center center;
+}
