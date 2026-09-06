@@ -151,3 +151,143 @@ export async function getSfxDurationMs(name: SfxName): Promise<number> {
     return 0;
   }
 }
+
+// ---- background music ----------------------------------------------------
+// Looping music for the lobby and the game room (bg_lobby.mp3 / bg_room.mp3),
+// sharing the SFX AudioContext. Browsers block audio until a user gesture, so
+// the context is resumed on the first click/tap. Volume is stored separately
+// from the SFX volume (gopoker-bgm-volume).
+
+export type BgmTrack = "lobby" | "room";
+
+const BGM_FILES: Record<BgmTrack, string> = {
+  lobby: "/bg_lobby.mp3",
+  room: "/bg_room.mp3",
+};
+
+const BGM_KEY = "gopoker-bgm-volume";
+const bgmBuffers = new Map<string, AudioBuffer>();
+
+let cachedBgmVolume: number | null = null;
+let bgmTrack: BgmTrack | null = null;
+let bgmSource: AudioBufferSourceNode | null = null;
+let bgmGain: GainNode | null = null;
+let audioUnlocked = false;
+
+export function getBgmVolume(): number {
+  if (cachedBgmVolume !== null) {
+    return cachedBgmVolume;
+  }
+  let v = 0.15;
+  if (typeof window !== "undefined") {
+    const raw = window.localStorage.getItem(BGM_KEY);
+    if (raw !== null) {
+      const parsed = Number(raw);
+      if (Number.isFinite(parsed) && parsed >= 0 && parsed <= 1) {
+        v = parsed;
+      }
+    }
+  }
+  cachedBgmVolume = v;
+  return v;
+}
+
+export function setBgmVolume(volume: number) {
+  const v = Math.min(1, Math.max(0, volume));
+  cachedBgmVolume = v;
+  if (typeof window !== "undefined") {
+    window.localStorage.setItem(BGM_KEY, String(v));
+  }
+  // Live-update a track that is already looping.
+  if (bgmGain && audioCtx) {
+    bgmGain.gain.value = v;
+  }
+}
+
+function unlockAudioOnGesture() {
+  if (audioUnlocked) {
+    return;
+  }
+  audioUnlocked = true;
+  const resume = () => {
+    const ctx = getCtx();
+    if (ctx && ctx.state === "suspended") {
+      void ctx.resume();
+    }
+  };
+  document.addEventListener("pointerdown", resume, { once: true });
+  document.addEventListener("keydown", resume, { once: true });
+}
+
+// Start looping music for a screen. Starting the same track again is a no-op;
+// switching tracks swaps the loop. Fire-and-forget, never throws.
+export function startBgm(track: BgmTrack) {
+  try {
+    if (bgmTrack === track && bgmSource) {
+      return;
+    }
+    stopBgm();
+    bgmTrack = track;
+    const ctx = getCtx();
+    if (!ctx) {
+      return;
+    }
+    unlockAudioOnGesture();
+    if (ctx.state === "suspended") {
+      void ctx.resume();
+    }
+    const key = "bgm:" + track;
+    void (async () => {
+      try {
+        let buf = bgmBuffers.get(key);
+        if (!buf) {
+          const res = await fetch(BGM_FILES[track]);
+          if (!res.ok) {
+            return;
+          }
+          const data = await res.arrayBuffer();
+          buf = await ctx.decodeAudioData(data);
+          bgmBuffers.set(key, buf);
+        }
+        if (bgmTrack !== track || !audioCtx) {
+          return; // switched or stopped while decoding
+        }
+        const source = audioCtx.createBufferSource();
+        source.buffer = buf;
+        source.loop = true;
+        const gain = audioCtx.createGain();
+        gain.gain.value = getBgmVolume();
+        source.connect(gain);
+        gain.connect(audioCtx.destination);
+        source.start();
+        bgmSource = source;
+        bgmGain = gain;
+      } catch {
+        // ignore: music is best-effort
+      }
+    })();
+  } catch {
+    // ignore: music is best-effort
+  }
+}
+
+export function stopBgm() {
+  try {
+    bgmTrack = null;
+    if (bgmSource) {
+      try {
+        bgmSource.stop();
+      } catch {
+        // already stopped
+      }
+      bgmSource.disconnect();
+    }
+    bgmSource = null;
+    if (bgmGain) {
+      bgmGain.disconnect();
+    }
+    bgmGain = null;
+  } catch {
+    // ignore: music is best-effort
+  }
+}

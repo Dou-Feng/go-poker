@@ -15,6 +15,7 @@ import { useTranslation } from "../hooks/useTranslation";
 import { leaveTable, voteSettle } from "../actions/actions";
 import { clearSession } from "../lib/session";
 import { voice } from "../lib/voice";
+import { startBgm, stopBgm } from "../lib/sfx";
 import { FiCheckCircle, FiCircle, FiFlag, FiLogOut } from "react-icons/fi";
 
 export default function Game() {
@@ -34,6 +35,12 @@ export default function Game() {
   }, [roomName, accountUuid]);
   useEffect(() => {
     return () => voice.leaveRoom();
+  }, []);
+
+  // Room background music while on the table (the lobby runs its own track).
+  useEffect(() => {
+    startBgm("room");
+    return () => stopBgm();
   }, []);
 
   const handleLeave = () => {

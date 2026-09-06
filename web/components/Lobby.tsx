@@ -18,6 +18,7 @@ import {
   clearUser,
 } from "../lib/session";
 import Settings from "./Settings";
+import { startBgm, stopBgm } from "../lib/sfx";
 import Avatar from "./Avatar";
 import History from "./History";
 
@@ -69,6 +70,12 @@ export default function Lobby() {
       getHistory(socket);
     }
   }, [socket]);
+
+  // Lobby background music (the game room plays its own track).
+  useEffect(() => {
+    startBgm("lobby");
+    return () => stopBgm();
+  }, []);
 
   const join = (name: string, password?: string) => {
     if (!socket) {

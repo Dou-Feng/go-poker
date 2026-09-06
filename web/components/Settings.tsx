@@ -1,7 +1,13 @@
 import { useState } from "react";
 import { FiSettings, FiX } from "react-icons/fi";
 import { useTranslation } from "../hooks/useTranslation";
-import { getSfxVolume, setSfxVolume, playSfx } from "../lib/sfx";
+import {
+  getSfxVolume,
+  setSfxVolume,
+  getBgmVolume,
+  setBgmVolume,
+  playSfx,
+} from "../lib/sfx";
 import { useVoice } from "../hooks/useVoice";
 import { voice } from "../lib/voice";
 import MicIcon from "./MicIcon";
@@ -20,6 +26,9 @@ export default function Settings({ buttonClassName }: SettingsProps) {
   const { language, setLanguage, t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [volume, setVolume] = useState(() => Math.round(getSfxVolume() * 100));
+  const [bgmVolume, setBgmVolumeState] = useState(() =>
+    Math.round(getBgmVolume() * 100)
+  );
   const v = useVoice();
   const micPct = Math.round(v.micVolume * 100);
   const outPct = Math.round(v.outputVolume * 100);
@@ -32,6 +41,11 @@ export default function Settings({ buttonClassName }: SettingsProps) {
   const applyVolume = (v: number) => {
     setVolume(v);
     setSfxVolume(v / 100);
+  };
+
+  const applyBgm = (v: number) => {
+    setBgmVolumeState(v);
+    setBgmVolume(v / 100);
   };
 
   return (
@@ -108,6 +122,34 @@ export default function Settings({ buttonClassName }: SettingsProps) {
                     className="btn btn-icon"
                   >
                     <SpeakerIcon off={volume === 0} className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+
+              <div className="mt-4 flex flex-col gap-2">
+                <div className="flex flex-row items-center justify-between">
+                  <p className="type-caption">{t("bgm")}</p>
+                  <p className="type-caption font-mono">{bgmVolume}%</p>
+                </div>
+                <div className="flex flex-row items-center gap-2">
+                  <input
+                    type="range"
+                    min={0}
+                    max={100}
+                    step={5}
+                    aria-label={t("bgm")}
+                    value={bgmVolume}
+                    onChange={(e) => applyBgm(Number(e.target.value))}
+                    className={sliderClass}
+                  />
+                  <button
+                    onClick={() => applyBgm(bgmVolume === 0 ? 15 : 0)}
+                    title={t("bgm")}
+                    aria-label={t("bgm")}
+                    aria-pressed={bgmVolume === 0}
+                    className="btn btn-icon"
+                  >
+                    <SpeakerIcon off={bgmVolume === 0} className="h-4 w-4" />
                   </button>
                 </div>
               </div>
