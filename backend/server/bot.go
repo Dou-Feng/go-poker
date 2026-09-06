@@ -55,8 +55,9 @@ var defaultBotDelays = botDelays{
 }
 
 const (
-	msgHostOnly  = "only the host can manage bots"
-	msgSeatTaken = "seat is taken"
+	msgHostOnly          = "only the host can manage bots"
+	msgSeatTaken         = "seat is taken"
+	msgCannotAddBotReady = "cannot add bot while ready"
 )
 
 var (
@@ -429,7 +430,6 @@ func (t *table) botTick() {
 				// sit back down if the room allows, otherwise leave.
 				if err := t.seatBot(b, 0); err != nil {
 					t.dropBotClient(b)
-					t.broadcast <- createNewLog(fmt.Sprintf("%s left the table", b.username))
 				}
 				changed = true
 			case p.Stack == 0:
@@ -440,7 +440,6 @@ func (t *table) botTick() {
 				} else {
 					t.evictPlayer(b.uuid)
 					t.dropBotClient(b)
-					t.broadcast <- createNewLog(fmt.Sprintf("%s is out of buy-ins and left", b.username))
 				}
 				changed = true
 			case !p.Ready && !p.Left:

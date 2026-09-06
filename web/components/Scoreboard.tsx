@@ -2,6 +2,8 @@ import { useTranslation } from "../hooks/useTranslation";
 import Avatar from "./Avatar";
 import Portal from "./Portal";
 import RankBadge, { rankAt } from "./RankBadge";
+import { FiX } from "react-icons/fi";
+import ui from "../styles/Dialog.module.css";
 
 // One row per account: total buy-in, current chips and net for this room
 // session. Used live from the "战绩" button and, unchanged, as the final
@@ -54,19 +56,19 @@ export default function Scoreboard({
 
   return (
     <Portal>
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-        <div className="max-h-[calc(100dvh-2rem)] w-full max-w-md overflow-auto rounded-lg bg-card p-4 shadow-2xl sm:p-6">
-          <div className="mb-4 flex flex-row items-center justify-between">
+      <div className={ui.overlay}>
+        <div className={ui.dialog}>
+          <div className={ui.dialogHeader}>
             <div className="min-w-0">
-              <p className="type-heading">{title}</p>
+              <h2>{title}</h2>
               {subtitle && <p className="type-caption truncate">{subtitle}</p>}
             </div>
             <button
               onClick={onClose}
               aria-label={t("close")}
-              className="btn btn-text"
+              className={ui.iconButton}
             >
-              ✕
+              <FiX />
             </button>
           </div>
 

@@ -1,10 +1,10 @@
 import { useContext, useEffect } from "react";
 import ChatLog from "./ChatLog";
-import Chip from "./Chip";
 import GameInfo from "./GameInfo";
 import Input from "./Input";
 import Table from "./Table";
 import Wallet from "./Wallet";
+import Stack from "./Stack";
 import Settlement from "./Settlement";
 import Settings from "./Settings";
 import RoomMenu from "./RoomMenu";
@@ -49,18 +49,21 @@ export default function Game() {
   const me = game?.players.find((p) => p.uuid === appState.clientID);
 
   // Bot placement mode is a between-hands affair: leave it when a hand
-  // starts or when this client stops being the host.
+  // starts, when this client stops being the host, or once the host readies.
   const running = !!game?.running;
   const isHost = !!game && !!appState.uuid && game.host === appState.uuid;
+  const hostReady = !!me?.ready;
   useEffect(() => {
-    if (appState.botMode && (running || !isHost)) {
+    if (appState.botMode && (running || !isHost || hostReady)) {
       dispatch({ type: "setBotMode", payload: false });
     }
-  }, [appState.botMode, running, isHost, dispatch]);
+  }, [appState.botMode, running, isHost, hostReady, dispatch]);
 
   // A session is active once it has started running or finished a hand.
   const showVotes = !!game && (game.running || game.handsPlayed > 0);
   const myVoted = !!game && game.settleVotes.includes(appState.username ?? "");
+  // Bots never vote: the surrender tally only counts real players.
+  const humanPlayers = game ? game.players.filter((p) => !p.bot) : [];
 
   return (
     <div
@@ -80,7 +83,7 @@ export default function Game() {
                   seated" count on phones so the pill stays narrow enough
                   not to reach the toolbars on either side. */}
               <div className="hidden flex-row items-center gap-1.5 sm:flex">
-                {game.players.map((p) => (
+                {humanPlayers.map((p) => (
                   <span key={p.position} className="text-lg leading-none">
                     {game.settleVotes.includes(p.username) ? (
                       <FiCheckCircle className="text-emerald-400" />
@@ -92,7 +95,7 @@ export default function Game() {
               </div>
               <span className="flex flex-row items-center gap-1 text-xs text-muted sm:hidden">
                 <FiCheckCircle className="text-emerald-400" />
-                {game.settleVotes.length}/{game.players.length}
+                {game.settleVotes.length}/{humanPlayers.length}
               </span>
             </>
           )}
@@ -105,8 +108,8 @@ export default function Game() {
           </span>
         </div>
       )}
-      {/* Secondary controls (rebuy / spectate / stats) live behind the "..."
-          button; the room name sits in the chat tab row. */}
+      {/* Bottom-right controls: stats / rebuy / spectate sit in the open,
+          with host-only bot management behind the "..." button. */}
       <RoomMenu />
       {/* Bottom of the room: on phones only the action keys live here (the
           bottom edge is for core actions and the system gesture area);
@@ -158,12 +161,7 @@ export default function Game() {
           <Settings />
         </div>
         <Wallet />
-        {me && game && (
-          <div className="inline-flex w-20 flex-row items-center justify-between rounded-md bg-card/90 px-2.5 py-1 text-sm text-amber-300">
-            <Chip className="h-4 w-4" amount={me.stack} />
-            <span className="type-num leading-none">{me.stack}</span>
-          </div>
-        )}
+        <Stack />
       </div>
       <div className="absolute top-0 right-0 z-10 hidden flex-col items-end gap-2 p-2 sm:flex">
         <div className="flex flex-row items-center gap-1">
@@ -172,12 +170,7 @@ export default function Game() {
         </div>
         <GameInfo />
         <Wallet />
-        {me && game && (
-          <div className="inline-flex w-20 flex-row items-center justify-between rounded-md bg-card/90 px-2.5 py-1 text-sm text-amber-300 shadow">
-            <Chip className="h-4 w-4" amount={me.stack} />
-            <span className="type-num leading-none">{me.stack}</span>
-          </div>
-        )}
+        <Stack />
       </div>
       <Settlement />
     </div>

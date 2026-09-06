@@ -1,7 +1,6 @@
 import { useContext, useEffect, useState } from "react";
 import { useSocket } from "../hooks/useSocket";
 import { AppContext } from "../providers/AppStore";
-import Chip from "./Chip";
 import styles from "../styles/Lobby.module.css";
 import ui from "../styles/Dialog.module.css";
 import {
@@ -212,7 +211,7 @@ export default function Lobby() {
             onClick={() => setShowRecharge(true)}
             aria-label={t("recharge")}
           >
-            <Chip amount={appState.chips} className="h-5 w-5" />
+            <img src="/dollar.svg" alt="" aria-hidden className="h-4 w-4" />
             <span>{appState.chips ?? 0}</span>
             <FiCreditCard aria-hidden="true" />
           </button>
@@ -237,7 +236,7 @@ export default function Lobby() {
           >
             <FiClock />
           </button>
-          <Settings buttonClassName={ui.iconButton} />
+          <Settings buttonClassName={`${ui.iconButton} w-full`} />
           <button
             onClick={logout}
             title={t("logout")}
@@ -284,7 +283,9 @@ export default function Lobby() {
                   <div className={styles.roomText}>
                     <h3>
                       {room.name}
-                      {room.locked && <FiLock aria-label={t("roomPassword")} />}
+                      {room.locked && (
+                        <FiLock aria-hidden="true" title={t("roomPassword")} />
+                      )}
                     </h3>
                     {room.tournament && (
                       <span

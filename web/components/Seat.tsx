@@ -102,10 +102,12 @@ export default function Seat({ player, id, visualId, reveal }: seatProps) {
 
   const game = appState.game;
   const running = game?.running ?? false;
-  // Bot placement mode (host only, between hands): empty seats become "+"
-  // to add a bot there, seated bots become removable.
+  // Bot placement mode (host only, between hands, not yet readied): empty
+  // seats become "+" to add a bot there, seated bots become removable.
   const isHost = !!game && !!appState.uuid && game.host === appState.uuid;
-  const botMode = appState.botMode && isHost && !running;
+  const hostReady =
+    !!game?.players.find((p) => p.uuid === appState.clientID)?.ready;
+  const botMode = appState.botMode && isHost && !running && !hostReady;
 
   // Occupied seat.
   if (player && game) {

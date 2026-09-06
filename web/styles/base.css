@@ -72,6 +72,12 @@ input[type="number"] {
   width: 8px;
   height: 8px;
 }
+/* Modern overlay scrollbar: hide the up/down arrow buttons entirely. */
+*::-webkit-scrollbar-button {
+  display: none;
+  width: 0;
+  height: 0;
+}
 *::-webkit-scrollbar-track {
   background: transparent;
 }

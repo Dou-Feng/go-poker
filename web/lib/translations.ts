@@ -203,6 +203,7 @@ export const translations = {
     botModeHint: "Tap an empty seat to add a bot, tap a bot to remove it",
     noBots: "no bots at the table",
     hostOnly: "only the room host can manage bots",
+    cannotAddBotReady: "cannot add bot while ready",
     seatTaken: "that seat is taken",
     tournament: "Tournament",
     tournamentHint:
@@ -419,6 +420,7 @@ export const translations = {
     botModeHint: "点击空位添加机器人，点击机器人将其移除",
     noBots: "牌桌上没有机器人",
     hostOnly: "只有房主可以管理机器人",
+    cannotAddBotReady: "准备状态下不能添加机器人",
     seatTaken: "该座位已被占用",
     tournament: "锦标赛",
     tournamentHint: "限制每人总买入，输光者转观战；关闭则不限补码",
@@ -474,6 +476,7 @@ export const errorKeyByMessage: Record<string, TranslationKey> = {
   "no bots at the table": "noBots",
   "record not found": "sessionNotFound",
   "only the host can manage bots": "hostOnly",
+  "cannot add bot while ready": "cannotAddBotReady",
   "seat is taken": "seatTaken",
   "busted: no buy-ins left": "bustedOut",
 };

@@ -1,57 +1,22 @@
-import { useContext, useEffect, useRef, useState } from "react";
-import { FiCheck, FiCpu, FiMoreHorizontal, FiX } from "react-icons/fi";
+import { useContext, useEffect, useState } from "react";
+import { FiCheck, FiMoreHorizontal, FiX } from "react-icons/fi";
 import classNames from "classnames";
 import { AppContext } from "../providers/AppStore";
 import { useSocket } from "../hooks/useSocket";
 import { useTranslation } from "../hooks/useTranslation";
 import { spectate } from "../actions/actions";
 import EyeIcon from "./EyeIcon";
-import Rebuy from "./Rebuy";
 import RoomStats from "./RoomStats";
 
-// The "..." menu in the room's bottom-right corner. It gathers the
-// secondary controls (rebuy, spectate, room stats) that used to sit as
-// separate floating buttons. The menu is closed by default and stacks above
-// the action bar, so a player taps "..." again to clear the way when it is
-// their turn.
+// Bottom-right room controls. Stats and spectate sit out in the open as a
+// compact, right-aligned vertical stack; the host-only bot management stays
+// tucked behind the "..." button. Opening "..." expands it in place and
+// pushes the buttons above it upward; it is a manual toggle only.
 export default function RoomMenu() {
   const { appState, dispatch } = useContext(AppContext);
   const socket = useSocket();
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
-  // Closing plays a short fade-out before the panel unmounts.
-  const [closing, setClosing] = useState(false);
-  const menuRef = useRef<HTMLDivElement | null>(null);
-  const close = () => {
-    if (!open || closing) {
-      return;
-    }
-    setClosing(true);
-    window.setTimeout(() => {
-      setClosing(false);
-      setOpen(false);
-    }, 160);
-  };
-
-  // Tap anywhere outside the menu (seats, felt, other buttons) and it fades
-  // away, so it never has to be dismissed explicitly before acting.
-  useEffect(() => {
-    if (!open) {
-      return;
-    }
-    const onPointerDown = (e: PointerEvent) => {
-      const el = menuRef.current;
-      if (el && e.target instanceof Node && !el.contains(e.target)) {
-        close();
-      }
-    };
-    document.addEventListener("pointerdown", onPointerDown, true);
-    return () =>
-      document.removeEventListener("pointerdown", onPointerDown, true);
-    // close() reads the latest state via closure each time the effect runs.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, closing]);
-  // Whether the player has reserved to spectate once the current hand ends.
   const [reservedSpectate, setReservedSpectate] = useState(false);
 
   const game = appState.game;
@@ -66,92 +31,82 @@ export default function RoomMenu() {
     return null;
   }
 
-  // Bots are seats played by the server. Only the room's host manages them,
-  // between hands, through a placement mode: while it is on, empty seats show
-  // "+" (tap to seat a bot there) and seated bots can be tapped to remove.
   const isHost = !!appState.uuid && game.host === appState.uuid;
   const botMode = appState.botMode;
   const botCount = game.players.filter((p) => p.bot).length;
+  const hostReady = !!me?.ready;
 
   return (
-    <div
-      ref={menuRef}
-      className="absolute bottom-28 right-2 z-40 flex flex-col items-end gap-1 sm:bottom-32"
-    >
-      {open && (
-        <div
+    <div className="absolute bottom-6 right-2 z-40 flex flex-col items-end gap-1 sm:bottom-8">
+      <RoomStats className="min-w-[4.5rem]" />
+      {me && (
+        <button
+          onClick={() => {
+            if (!socket) {
+              return;
+            }
+            setReservedSpectate(!reservedSpectate);
+            spectate(socket);
+          }}
+          aria-pressed={reservedSpectate}
           className={classNames(
-            "flex flex-col items-stretch gap-1 rounded-lg border border-muted/30 bg-tablehi/95 p-1.5 shadow-lg",
-            closing ? "animate-fade-out" : "animate-fade-in"
+            "btn btn-room-control min-w-[4.5rem]",
+            reservedSpectate && "is-active"
           )}
         >
-          {me && <Rebuy className="w-full justify-center" />}
-          {me && (
-            <button
-              onClick={() => {
-                if (!socket) {
-                  return;
-                }
-                setReservedSpectate(!reservedSpectate);
-                spectate(socket);
-              }}
-              className={classNames(
-                "btn w-full justify-center",
-                reservedSpectate
-                  ? "btn-accent border border-amber-500"
-                  : "btn-ghost"
-              )}
-            >
-              {reservedSpectate ? (
-                <span className="flex h-4 w-4 items-center justify-center leading-none">
-                  ✓
-                </span>
-              ) : (
-                <EyeIcon className="h-4 w-4" />
-              )}
-              {t("spectate")}
-            </button>
+          {reservedSpectate ? (
+            <span className="flex h-4 w-4 items-center justify-center leading-none">
+              ✓
+            </span>
+          ) : (
+            <EyeIcon className="h-4 w-4" />
           )}
-          <RoomStats className="w-full justify-center" />
-          {isHost && (
-            <button
-              onClick={() =>
-                dispatch({ type: "setBotMode", payload: !botMode })
-              }
-              disabled={game.running}
-              title={
-                game.running
-                  ? t("gameAlreadyRunning")
-                  : botMode
-                  ? t("botModeDone")
-                  : t("botModeHint")
-              }
-              aria-pressed={botMode}
-              className={classNames(
-                "btn w-full justify-center",
-                botMode ? "btn-confirm" : "btn-ghost"
-              )}
-            >
-              {botMode ? <FiCheck size="1rem" /> : <FiCpu size="1rem" />}
-              {botMode ? t("botModeDone") : t("addBot")}
-              {botCount > 0 && !botMode && (
-                <span className="type-caption">🤖 {botCount}</span>
-              )}
-            </button>
-          )}
-        </div>
+          {t("spectate")}
+        </button>
       )}
-      <button
-        onClick={() => (open ? close() : setOpen(true))}
-        aria-expanded={open}
-        title={t("more")}
-        className={classNames(
-          "btn btn-ghost h-8 w-10 bg-tablehi/80 px-0",
-          open && "bg-floor"
-        )}
-      >
-        {open ? <FiX size="1rem" /> : <FiMoreHorizontal size="1rem" />}
-      </button>
+      {open && isHost && (
+        <button
+          onClick={() => dispatch({ type: "setBotMode", payload: !botMode })}
+          disabled={game.running || hostReady}
+          title={
+            game.running
+              ? t("gameAlreadyRunning")
+              : hostReady
+              ? t("cannotAddBotReady")
+              : botMode
+              ? t("botModeDone")
+              : t("botModeHint")
+          }
+          aria-pressed={botMode}
+          className={classNames(
+            "btn btn-room-control relative min-w-[4.5rem]",
+            botMode && "is-active"
+          )}
+        >
+          {botMode ? (
+            <FiCheck size="1rem" />
+          ) : (
+            <img src="/robot.svg" alt="" aria-hidden className="h-4 w-4" />
+          )}
+          {botMode ? t("botModeDone") : t("addBot")}
+          {botCount > 0 && !botMode && (
+            <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-emerald-600 text-[10px] font-semibold leading-none text-ink">
+              {botCount}
+            </span>
+          )}
+        </button>
+      )}
+      {isHost && (
+        <button
+          onClick={() => setOpen(!open)}
+          aria-expanded={open}
+          aria-label={open ? t("close") : t("more")}
+          title={open ? t("close") : t("more")}
+          className="btn btn-room-control min-w-[4.5rem]"
+        >
+          {open ? <FiX size="1rem" /> : <FiMoreHorizontal size="1rem" />}
+        </button>
+      )}
     </div>
   );
 }

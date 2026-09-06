@@ -11,6 +11,8 @@ import Avatar from "./Avatar";
 import AvatarPicker from "./AvatarPicker";
 import MicIcon from "./MicIcon";
 import PlusIcon from "./PlusIcon";
+import { FiX } from "react-icons/fi";
+import ui from "../styles/Dialog.module.css";
 
 function rate(n: number, d: number): string {
   if (d === 0) {
@@ -76,9 +78,9 @@ export default function Profile() {
   return (
     // Above the scoreboards (z-50, some rendered through a body portal) so a
     // player tapped on a session board opens on top of it.
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4">
-      <div className="max-h-[calc(100dvh-2rem)] w-full max-w-sm overflow-y-auto rounded-lg bg-card p-4 shadow-2xl sm:p-6">
-        <div className="mb-4 flex flex-row items-center justify-between">
+    <div className={ui.overlay} style={{ zIndex: 60 }}>
+      <div className={ui.dialog}>
+        <div className={ui.dialogHeader}>
           <div className="flex flex-row items-center gap-3">
             <button
               onClick={
@@ -105,7 +107,7 @@ export default function Profile() {
               />
             </button>
             <div>
-              <p className="type-heading">{profile.username}</p>
+              <h2>{profile.username}</h2>
               {isSession && (
                 <p className="type-label">
                   {t("buyInLabel")}: {profile.buyIn} · {t("net")}:{" "}
@@ -178,9 +180,9 @@ export default function Profile() {
                 dispatch({ type: "setProfile", payload: null });
               }}
               aria-label={t("close")}
-              className="btn btn-text"
+              className={ui.iconButton}
             >
-              ✕
+              <FiX />
             </button>
           </div>
         </div>
@@ -205,7 +207,7 @@ export default function Profile() {
                     setShowChangeUsername(false);
                     setNewUsername("");
                   }}
-                  className="btn btn-confirm"
+                  className={ui.primary}
                 >
                   {t("change")}
                 </button>
@@ -215,7 +217,7 @@ export default function Profile() {
                     setNewUsername("");
                   }}
                   aria-label={t("cancel")}
-                  className="btn btn-secondary"
+                  className={ui.secondary}
                 >
                   ✕
                 </button>
@@ -223,7 +225,7 @@ export default function Profile() {
             ) : (
               <button
                 onClick={() => setShowChangeUsername(true)}
-                className="btn btn-secondary w-full"
+                className={`${ui.secondary} w-full`}
               >
                 {t("changeUsername")}
               </button>

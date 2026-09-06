@@ -13,11 +13,11 @@ export default function WalletButton({ onOpen }: WalletButtonProps) {
   return (
     <button
       onClick={onOpen}
-      aria-label={`${t("recharge")}: ${appState.chips ?? 0} ${t("chips")}`}
-      className="inline-flex w-20 flex-row items-center justify-between rounded-md bg-card/90 px-2.5 py-1 text-sm font-medium text-amber-300 shadow hover:bg-floor"
+      aria-label={`${t("chips")}: ${appState.chips ?? 0}`}
+      className="inline-flex w-20 flex-row items-center justify-between rounded-md bg-card/60 px-2.5 py-1 text-sm font-medium text-amber-300 shadow hover:bg-cardhi/60"
     >
       <img
-        src="/wallet.svg"
+        src="/dollar.svg"
         alt=""
         draggable={false}
         aria-hidden

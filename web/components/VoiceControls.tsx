@@ -54,6 +54,7 @@ export default function VoiceControls({ className }: voiceControlsProps) {
       <button
         onClick={() => void voice.setMic(!v.micOn)}
         title={micTitle}
+        aria-label={micTitle}
         aria-pressed={v.micOn}
         className={button(v.micOn, !v.micAvailable)}
       >
@@ -62,6 +63,7 @@ export default function VoiceControls({ className }: voiceControlsProps) {
       <button
         onClick={() => voice.setSpeaker(!v.speakerOn)}
         title={v.speakerOn ? t("speakerOn") : t("speakerOff")}
+        aria-label={v.speakerOn ? t("speakerOn") : t("speakerOff")}
         aria-pressed={v.speakerOn}
         className={button(v.speakerOn)}
       >

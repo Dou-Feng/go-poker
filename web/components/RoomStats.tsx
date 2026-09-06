@@ -71,7 +71,7 @@ export default function RoomStats({ className }: roomStatsProps) {
       <button
         onClick={() => setShow(true)}
         title={t("roomStats")}
-        className={classNames("btn btn-ghost", className)}
+        className={classNames("btn btn-room-control", className)}
       >
         <FiBarChart2 size="1rem" />
         {t("roomStats")}

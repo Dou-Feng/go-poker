@@ -23,17 +23,17 @@
   @apply min-h-[40px] rounded-lg px-2.5;
   border: 0;
   color: #b7c4cf;
-  background: linear-gradient(180deg, #26343ee6, #1b2730e6);
+  background: linear-gradient(180deg, #26343e99, #1b273099);
   box-shadow: inset 0 1px 0 #ffffff08, 0 2px 5px #0000001a;
 }
 
 .btn-room-control:hover {
   color: #e3ebf1;
-  background: linear-gradient(180deg, #30414d, #24333e);
+  background: linear-gradient(180deg, #30414db3, #24333eb3);
 }
 
 .btn-room-control:active {
-  background: #17232d;
+  background: #17232db3;
   box-shadow: inset 0 2px 4px #00000033;
 }
 
@@ -48,7 +48,12 @@
 
 .btn-room-surrender[aria-pressed="true"] {
   color: #a5c7bd;
-  background: #253a37;
+  background: #253a37b3;
+}
+
+/* Toggled room-control state (spectate reserved, bot placement on). */
+.btn-room-control.is-active {
+  color: #f4cf72;
 }
 
 .action-key {

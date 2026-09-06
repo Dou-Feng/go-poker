@@ -125,6 +125,7 @@ export default function RaiseInput({ showRaise, setShowRaise }: raiseProps) {
               max={allInTotal}
               step={1}
               color="cyan"
+              thumbLabel={t("bet")}
               showLabelOnHover={false}
               size="md"
               radius="xl"

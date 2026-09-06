@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { FiSettings } from "react-icons/fi";
+import { FiSettings, FiX } from "react-icons/fi";
 import { useTranslation } from "../hooks/useTranslation";
 import { getSfxVolume, setSfxVolume, playSfx } from "../lib/sfx";
 import { useVoice } from "../hooks/useVoice";
@@ -7,6 +7,7 @@ import { voice } from "../lib/voice";
 import MicIcon from "./MicIcon";
 import SpeakerIcon from "./SpeakerIcon";
 import Portal from "./Portal";
+import ui from "../styles/Dialog.module.css";
 
 const sliderClass =
   "h-1.5 w-full cursor-pointer appearance-none rounded-full bg-cardhi accent-cyan-700";
@@ -46,16 +47,16 @@ export default function Settings({ buttonClassName }: SettingsProps) {
 
       {open && (
         <Portal>
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-            <div className="max-h-[calc(100dvh-2rem)] w-full max-w-xs overflow-y-auto rounded-lg bg-card p-5 shadow-2xl">
-              <div className="mb-4 flex flex-row items-center justify-between">
-                <p className="type-heading">{t("settings")}</p>
+          <div className={ui.overlay}>
+            <div className={ui.dialog}>
+              <div className={ui.dialogHeader}>
+                <h2>{t("settings")}</h2>
                 <button
                   onClick={() => setOpen(false)}
                   aria-label={t("close")}
-                  className="btn btn-text"
+                  className={ui.iconButton}
                 >
-                  ✕
+                  <FiX />
                 </button>
               </div>
 
@@ -106,7 +107,7 @@ export default function Settings({ buttonClassName }: SettingsProps) {
                     aria-pressed={volume === 0}
                     className="btn btn-icon"
                   >
-                    {volume === 0 ? "🔇" : "🔊"}
+                    <SpeakerIcon off={volume === 0} className="h-4 w-4" />
                   </button>
                 </div>
               </div>

@@ -1020,12 +1020,21 @@ func handleAddBot(c *Client, seatID uint) {
 		c.send <- createError(msgHostOnly)
 		return
 	}
-	bot, err := c.table.addBot(seatID)
+	// Once the host has readied up the table is about to deal: seating a bot
+	// then would disrupt the countdown.
+	view := c.table.game.GenerateOmniView()
+	for _, p := range view.Players {
+		if p.AccountUUID == c.accountUUID && p.Ready {
+			c.send <- createError(msgCannotAddBotReady)
+			return
+		}
+	}
+	_, err := c.table.addBot(seatID)
 	if err != nil {
 		c.send <- createError(err.Error())
 		return
 	}
-	c.table.broadcast <- createNewMessage(gameAdminName, fmt.Sprintf("%s has joined", bot.username))
+	// Bots join silently: no chat announcement, just the refreshed seats.
 	c.table.broadcastGame()
 }
 
@@ -1044,12 +1053,12 @@ func handleRemoveBot(c *Client, uuid string) {
 		c.send <- createError(msgHostOnly)
 		return
 	}
-	name, err := c.table.removeBot(uuid)
+	_, err := c.table.removeBot(uuid)
 	if err != nil {
 		c.send <- createError(err.Error())
 		return
 	}
-	c.table.broadcast <- createNewLog(fmt.Sprintf("%s left the table", name))
+	// Bots leave silently, matching their silent join.
 	c.table.broadcastGame()
 }
 
