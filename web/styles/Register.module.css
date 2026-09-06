@@ -327,18 +327,18 @@
 /* Responsive login wallpaper. */
 
 .page {
-  background-image: url("/bg-1100.webp");
+  background-image: url("/bg/bg-1100.webp");
   background-position: center;
   background-size: cover;
   background-repeat: no-repeat;
 }
 @media (orientation: portrait) {
   .page {
-    background-image: url("/bg-portrait.webp");
+    background-image: url("/bg/bg-portrait.webp");
   }
 }
 @media (min-width: 700px) and (orientation: landscape) {
   .page {
-    background-image: url("/bg-1672.webp");
+    background-image: url("/bg/bg-1672.webp");
   }
 }

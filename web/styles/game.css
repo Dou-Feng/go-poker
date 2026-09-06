@@ -22,7 +22,7 @@
   border-radius: 48% / 32%;
   border: 2px solid #251a12;
   background: linear-gradient(115deg, #efc08b33, #26180b22 48%, #110a0766),
-    url("/table-edge.webp") center / cover no-repeat;
+    url("/textures/table-edge.webp") center / cover no-repeat;
   box-shadow: 0 3px 0 #0c100f, 0 8px 0 #191712, 0 14px 22px #0009,
     inset 0 2px 2px #ffe0ad66, inset 0 -3px 3px #160d09cc;
 }
@@ -34,7 +34,7 @@
   border: 3px solid #102a20;
   background: radial-gradient(ellipse at 48% 38%, #2c89632b, #001a1366 85%),
     linear-gradient(#164d3740, #164d3740),
-    url("/table-felt.webp") center / cover no-repeat;
+    url("/textures/table-felt.webp") center / cover no-repeat;
   box-shadow: 0 0 0 2px #92744766, inset 0 0 0 2px #65967930,
     inset 0 8px 18px #00140ed9, inset 0 0 26px #001c13b3;
 }

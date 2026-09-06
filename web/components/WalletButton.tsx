@@ -17,7 +17,7 @@ export default function WalletButton({ onOpen }: WalletButtonProps) {
       className="inline-flex w-20 flex-row items-center justify-between rounded-md bg-card/60 px-2.5 py-1 text-sm font-medium text-amber-300 shadow hover:bg-cardhi/60"
     >
       <img
-        src="/dollar.svg"
+        src="/icons/dollar.svg"
         alt=""
         draggable={false}
         aria-hidden

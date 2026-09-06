@@ -4,7 +4,7 @@ type iconProps = {
   off?: boolean;
 };
 
-// Source: public/microphone.svg, inlined so it takes the text color.
+// Source: public/icons/microphone.svg, inlined so it takes the text color.
 export default function MicIcon({ className, off }: iconProps) {
   return (
     <svg

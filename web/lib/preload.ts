@@ -141,9 +141,9 @@ export function wallpaperVariant(): WallpaperVariant {
 }
 
 const LOGIN_BG: Record<WallpaperVariant, string> = {
-  portrait: "/bg-portrait.webp",
-  wide: "/bg-1672.webp",
-  small: "/bg-1100.webp",
+  portrait: "/bg/bg-portrait.webp",
+  wide: "/bg/bg-1672.webp",
+  small: "/bg/bg-1100.webp",
 };
 
 // Files the first paint depends on: the two latin fonts, the (large) CJK
@@ -181,24 +181,24 @@ const BUTTON_KINDS = ["check", "bet", "allin", "fold"];
 export function idleAssetUrls(): string[] {
   return [
     // Room wallpapers (all variants; the room may be rotated into any one).
-    "/bg-room-portrait.webp",
-    "/bg-room-1100.webp",
-    "/bg-room-1672.webp",
+    "/bg/bg-room-portrait.webp",
+    "/bg/bg-room-1100.webp",
+    "/bg/bg-room-1672.webp",
     // Table materials (felt + rail).
-    "/table-felt.webp",
-    "/table-edge.webp",
+    "/textures/table-felt.webp",
+    "/textures/table-edge.webp",
     // Action-bar button layers in every state.
     ...BUTTON_KINDS.flatMap((kind) =>
       BUTTON_LAYERS.map((layer) => `/assets/ui/buttons/${kind}/${layer}.png`)
     ),
     // Small UI icons and the card back used while waiting for a hand.
     "/assets/ui/seat/card_back.svg",
-    "/chip.svg",
-    "/dollar.svg",
-    "/wallet.svg",
-    "/robot.svg",
-    "/microphone.svg",
-    "/speaker.svg",
+    "/icons/chip.svg",
+    "/icons/dollar.svg",
+    "/icons/wallet.svg",
+    "/icons/robot.svg",
+    "/icons/microphone.svg",
+    "/icons/speaker.svg",
   ];
 }
 

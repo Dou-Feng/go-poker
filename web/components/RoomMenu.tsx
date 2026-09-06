@@ -85,7 +85,12 @@ export default function RoomMenu() {
           {botMode ? (
             <FiCheck size="1rem" />
           ) : (
-            <img src="/robot.svg" alt="" aria-hidden className="h-4 w-4" />
+            <img
+              src="/icons/robot.svg"
+              alt=""
+              aria-hidden
+              className="h-4 w-4"
+            />
           )}
           {botMode ? t("botModeDone") : t("addBot")}
           {botCount > 0 && !botMode && (

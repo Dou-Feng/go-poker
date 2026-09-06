@@ -161,8 +161,8 @@ export async function getSfxDurationMs(name: SfxName): Promise<number> {
 export type BgmTrack = "lobby" | "room";
 
 const BGM_FILES: Record<BgmTrack, string> = {
-  lobby: "/bg_lobby.mp3",
-  room: "/bg_room.mp3",
+  lobby: "/audio/bg_lobby.mp3",
+  room: "/audio/bg_room.mp3",
 };
 
 const BGM_KEY = "gopoker-bgm-volume";

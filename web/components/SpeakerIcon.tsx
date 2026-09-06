@@ -4,7 +4,7 @@ type iconProps = {
   off?: boolean;
 };
 
-// Source: public/speaker.svg, inlined so it takes the text color.
+// Source: public/icons/speaker.svg, inlined so it takes the text color.
 export default function SpeakerIcon({ className, off }: iconProps) {
   return (
     <svg

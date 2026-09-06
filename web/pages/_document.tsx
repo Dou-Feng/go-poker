@@ -33,21 +33,21 @@ export default function Document() {
         />
         <link
           rel="preload"
-          href="/bg-portrait.webp"
+          href="/bg/bg-portrait.webp"
           as="image"
           type="image/webp"
           media="(orientation: portrait)"
         />
         <link
           rel="preload"
-          href="/bg-1672.webp"
+          href="/bg/bg-1672.webp"
           as="image"
           type="image/webp"
           media="(min-width: 700px) and (orientation: landscape)"
         />
         <link
           rel="preload"
-          href="/bg-1100.webp"
+          href="/bg/bg-1100.webp"
           as="image"
           type="image/webp"
           media="(max-width: 699.98px) and (orientation: landscape)"

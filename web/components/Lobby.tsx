@@ -222,7 +222,12 @@ export default function Lobby() {
             onClick={() => setShowRecharge(true)}
             aria-label={t("recharge")}
           >
-            <img src="/dollar.svg" alt="" aria-hidden className="h-4 w-4" />
+            <img
+              src="/icons/dollar.svg"
+              alt=""
+              aria-hidden
+              className="h-4 w-4"
+            />
             <span>{appState.chips ?? 0}</span>
             <FiCreditCard aria-hidden="true" />
           </button>

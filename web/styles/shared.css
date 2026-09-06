@@ -1,19 +1,19 @@
 /* Shared buttons, typography, in-app wallpaper and panel transitions. */
 
 .room-wallpaper {
-  background-image: url("/bg-room-1100.webp");
+  background-image: url("/bg/bg-room-1100.webp");
   background-position: center;
   background-size: cover;
   background-repeat: no-repeat;
 }
 @media (orientation: portrait) {
   .room-wallpaper {
-    background-image: url("/bg-room-portrait.webp");
+    background-image: url("/bg/bg-room-portrait.webp");
   }
 }
 @media (min-width: 700px) and (orientation: landscape) {
   .room-wallpaper {
-    background-image: url("/bg-room-1672.webp");
+    background-image: url("/bg/bg-room-1672.webp");
   }
 }
 .btn {
