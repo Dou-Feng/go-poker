@@ -80,6 +80,31 @@ async function fetchOne(entry: Entry, report: () => void): Promise<void> {
   }
 }
 
+// Pre-decode an image so a CSS <background-image> with the same URL paints
+// from the already-decoded cache. Fetching alone only warms the HTTP cache:
+// the browser still has to decode a large texture, and while it does a
+// background shows its colour/gradient fallback for a frame - the felt/rail
+// "suddenly turning colour" on room entry.
+async function warmImageDecode(url: string): Promise<void> {
+  if (typeof Image === "undefined") {
+    return;
+  }
+  try {
+    const img = new Image();
+    img.src = url;
+    if (typeof img.decode === "function") {
+      await img.decode();
+    } else {
+      await new Promise<void>((resolve, reject) => {
+        img.onload = () => resolve();
+        img.onerror = () => reject();
+      });
+    }
+  } catch {
+    // ignore: pre-decode is best-effort
+  }
+}
+
 // Preload a list of URLs concurrently and report overall progress as a
 // 0..1 fraction. Never rejects; resolves after every request settles or the
 // batch timeout expires, whichever comes first.
@@ -114,6 +139,19 @@ export async function preloadAssets(
   await Promise.all(
     entries.map(async (e) => {
       await fetchOne(e, report);
+      // Fetching warms the HTTP cache; decoding warms the image cache so the
+      // first paint does not flash the colour fallback while a texture (felt,
+      // rail, wallpapers, button layers) is decoded.
+      const isImage =
+        e.url.toLowerCase().endsWith(".png") ||
+        e.url.toLowerCase().endsWith(".jpg") ||
+        e.url.toLowerCase().endsWith(".jpeg") ||
+        e.url.toLowerCase().endsWith(".webp") ||
+        e.url.toLowerCase().endsWith(".gif") ||
+        e.url.toLowerCase().endsWith(".svg");
+      if (isImage) {
+        await warmImageDecode(e.url);
+      }
       // As soon as at least one length is known, size the unknowns sensibly.
       reweightUnknown(entries);
       report();
@@ -187,9 +225,12 @@ export function idleAssetUrls(): string[] {
     // Table materials (felt + rail).
     "/textures/table-felt.webp",
     "/textures/table-edge.webp",
-    // Action-bar button layers in every state.
+    // Action-bar button layers + the per-key icon, in every state.
     ...BUTTON_KINDS.flatMap((kind) =>
       BUTTON_LAYERS.map((layer) => `/assets/ui/buttons/${kind}/${layer}.png`)
+    ),
+    ...BUTTON_KINDS.map(
+      (kind) => `/assets/ui/buttons/${kind}/${kind}_icon.svg`
     ),
     // Small UI icons and the card back used while waiting for a hand.
     "/assets/ui/seat/card_back.svg",

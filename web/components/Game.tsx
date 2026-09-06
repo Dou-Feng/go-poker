@@ -16,6 +16,7 @@ import { leaveTable, voteSettle } from "../actions/actions";
 import { clearSession } from "../lib/session";
 import { voice } from "../lib/voice";
 import { startBgm, stopBgm } from "../lib/sfx";
+import { idleAssetUrls, preloadAssets } from "../lib/preload";
 import { FiCheckCircle, FiCircle, FiFlag, FiLogOut } from "react-icons/fi";
 
 export default function Game() {
@@ -41,6 +42,15 @@ export default function Game() {
   useEffect(() => {
     startBgm("room");
     return () => stopBgm();
+  }, []);
+
+  // Guarantee the room's paint assets (felt/rail materials, room wallpapers,
+  // action-bar buttons) are cached before the table draws, even when the
+  // startup idle warm-up has not run yet (e.g. a session replay that drops
+  // straight into the room). A no-op once the idle warm-up already cached
+  // them.
+  useEffect(() => {
+    void preloadAssets(idleAssetUrls());
   }, []);
 
   const handleLeave = () => {
