@@ -48,3 +48,29 @@ Regenerate the derivatives (sharp-cli):
 npx sharp-cli -i assets-src/table.png      -o public/table-felt.webp --quality 80 resize 1024
 npx sharp-cli -i assets-src/table_edge.png -o public/table-edge.webp --quality 80 resize 1024
 ```
+
+## Fonts
+
+- `FZLTTHJW.TTF` — FZLanTingHei source font (2.1 MB, full CJK coverage)
+- `nunito-latin.woff2` / `nunito-latin-ext.woff2` — latin subsets, published as-is
+
+`public/fonts/FZLTTHJW-subset.woff2` (served to browsers, referenced by
+`styles/base.css`, preloaded from `pages/_document.tsx`) is a subset of the
+TTF: GB2312 level-1 hanzi (3755 common chars, chosen because usernames,
+room names and chat are unrestricted text) + the punctuation/fullwidth
+blocks + every character used by the UI strings. ~2.1 MB → ~560 KB. Rarer
+characters fall back to the system CJK fonts in the body font stack.
+
+Regenerate the subset (needs `pip install fonttools brotli`; from `web/`):
+
+```bash
+GB2312_LEVEL=1 python3 assets-src/subset_font.py
+pyftsubset assets-src/FZLTTHJW.TTF \
+  --output-file=public/fonts/FZLTTHJW-subset.woff2 \
+  --flavor=woff2 --text-file=assets-src/font-chars.txt --layout-features='*'
+```
+
+Drop `GB2312_LEVEL=1` to also include level-2 hanzi (6763 chars total,
+~1.1 MB) if chat should render in-brand more often. After adding new UI
+strings with characters outside GB2312 level 1, rerun the pipeline —
+`subset_font.py` picks them up from the source scan automatically.

@@ -2,13 +2,15 @@ import Layout from "../components/Layout";
 import Game from "../components/Game";
 import Register from "../components/Register";
 import Lobby from "../components/Lobby";
+import Preloader from "../components/Preloader";
 import Profile from "../components/Profile";
 import SessionBoard from "../components/SessionBoard";
 import Toast from "../components/Toast";
-import { useContext, useEffect } from "react";
+import { useContext, useEffect, useState } from "react";
 import { AppContext } from "../providers/AppStore";
 import { useSocket } from "../hooks/useSocket";
 import { joinTable, reconnectUser } from "../actions/actions";
+import { preloadIdleAssets } from "../lib/preload";
 import {
   loadSession,
   loadUser,
@@ -20,6 +22,31 @@ import { detectLanguage } from "../lib/language";
 export default function IndexPage() {
   const { appState, dispatch } = useContext(AppContext);
   const socket = useSocket();
+  // The preloader gates the whole UI behind the first-paint assets (fonts +
+  // login wallpaper) so the screens are never seen half-styled. Screens
+  // still mount underneath — their own loads run in parallel with the
+  // preloader's, they are just covered until the reveal.
+  const [assetsReady, setAssetsReady] = useState(false);
+
+  // Once the loading screen is gone, warm the browser cache for the
+  // lobby → game-room assets (room wallpapers, table materials, action-bar
+  // button layers) while the user is idle on the login/lobby screen, so
+  // entering a room is instant.
+  useEffect(() => {
+    if (!assetsReady) {
+      return;
+    }
+    const idle =
+      typeof window.requestIdleCallback === "function"
+        ? window.requestIdleCallback
+        : (cb: () => void) => window.setTimeout(cb, 1500);
+    const cancel =
+      typeof window.cancelIdleCallback === "function"
+        ? window.cancelIdleCallback
+        : window.clearTimeout;
+    const handle = idle(() => preloadIdleAssets());
+    return () => cancel(handle);
+  }, [assetsReady]);
 
   // Restore the saved language preference, or detect a default based on
   // the browser locale and IP geolocation for first-time visitors.
@@ -89,6 +116,7 @@ export default function IndexPage() {
 
   return (
     <Layout title="Poker">
+      {!assetsReady && <Preloader onComplete={() => setAssetsReady(true)} />}
       {!appState.username ? (
         <Register />
       ) : !appState.table ? (

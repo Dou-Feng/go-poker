@@ -1,8 +1,13 @@
 /* Fonts, browser defaults, form resets and scrollbars. */
 
+/* FZLTTHJW-subset.woff2 is a GB2312-level-1 subset (3755 common hanzi +
+   punctuation/fullwidth blocks + every char used by the UI strings) of the
+   2.1 MB original TTF, which lives in assets-src/. Rarer characters fall
+   back to the system CJK fonts in the stack below. Regenerate with the
+   commands in assets-src/README.md. */
 @font-face {
   font-family: "FZLanTingHei";
-  src: url("/fonts/FZLTTHJW.TTF") format("truetype");
+  src: url("/fonts/FZLTTHJW-subset.woff2") format("woff2");
   font-weight: 100 900;
   font-style: normal;
   font-display: swap;
@@ -92,4 +97,24 @@ input[type="number"] {
 }
 *::-webkit-scrollbar-corner {
   background: transparent;
+}
+
+/* Preloader (components/Preloader.tsx): gentle pulse for the suit row while
+   the first-paint assets download. Disabled under reduced motion. */
+.gp-preloader-pulse {
+  animation: gp-preloader-pulse 1.6s ease-in-out infinite;
+}
+@keyframes gp-preloader-pulse {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .gp-preloader-pulse {
+    animation: none;
+  }
 }

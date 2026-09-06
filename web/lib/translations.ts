@@ -23,6 +23,7 @@ export const translations = {
     authOtherMethods: "Or continue with",
     authUnavailable: "Social login coming soon",
 
+    loadingAssets: "Loading assets",
     title: "GoPoker",
     username: "username",
     uuid: "uuid",
@@ -246,6 +247,7 @@ export const translations = {
     authOtherMethods: "或使用其他方式",
     authUnavailable: "第三方登录暂未开放",
 
+    loadingAssets: "正在加载资源",
     title: "GoPoker",
     username: "用户名",
     uuid: "用户ID",
