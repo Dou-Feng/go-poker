@@ -1,94 +1,59 @@
 import { useSocket } from "../hooks/useSocket";
 import { addChips } from "../actions/actions";
-import { useTranslation } from "../hooks/useTranslation";
-import { FiX } from "react-icons/fi";
 import ui from "../styles/Dialog.module.css";
 import Portal from "./Portal";
 
-// Each option shows a gem filled to `fraction` (bottom-up) with the recharge
-// amount printed underneath.
-const RECHARGE_OPTIONS = [
-  { fraction: 0.25, amount: 200 },
-  { fraction: 0.5, amount: 500 },
-  { fraction: 0.75, amount: 1000 },
-  { fraction: 1, amount: 2000 },
+// Diamond recharge packs, ported from tmp/recharge (designer preview). The
+// price/amount copy is display-only: tapping a card still grants the diamond
+// amount as chips through the existing mock top-up (addChips).
+type Pack = {
+  img: string;
+  diamonds: number;
+  price: string;
+  desc: string;
+  tag?: string;
+  bonus?: string;
+  legend?: boolean;
+  hot?: boolean;
+};
+
+const PACKS: Pack[] = [
+  {
+    img: "diamond_small.png",
+    diamonds: 200,
+    price: "$1.99",
+    desc: "少量补充，随时畅玩",
+  },
+  {
+    img: "diamond_medium.png",
+    diamonds: 500,
+    price: "$4.99",
+    desc: "超值选择，畅玩更久",
+    tag: "最受欢迎",
+    hot: true,
+  },
+  {
+    img: "diamond_medium.png",
+    diamonds: 1000,
+    price: "$9.99",
+    desc: "更多精彩，更多可能",
+    bonus: "+100 BONUS",
+  },
+  {
+    img: "diamond_large.png",
+    diamonds: 2000,
+    price: "$19.99",
+    desc: "最佳性价比",
+    bonus: "+300 BONUS",
+    legend: true,
+  },
 ];
 
-function GemIcon({ fraction }: { fraction: number }) {
-  const pct = Math.round(fraction * 100);
-  const fillHeight = 84 * fraction;
-  const clipY = 92 - fillHeight;
-
-  return (
-    <svg viewBox="0 0 100 100" width="44" height="44" aria-hidden>
-      <defs>
-        <clipPath id={`gem-clip-${pct}`}>
-          <rect x="0" y={clipY} width="100" height={fillHeight} />
-        </clipPath>
-      </defs>
-      {/* empty gem body */}
-      <polygon points="50,8 92,32 50,92 8,32" fill="#27272a" />
-      {/* filled portion, clipped from the bottom up */}
-      <g clipPath={`url(#gem-clip-${pct})`}>
-        <polygon points="50,8 92,32 50,92 8,32" fill="#22d3ee" />
-      </g>
-      {/* outline and facets */}
-      <polygon
-        points="50,8 92,32 50,92 8,32"
-        fill="none"
-        stroke="#e4e4e7"
-        strokeWidth="2"
-        strokeLinejoin="round"
-      />
-      <line x1="8" y1="32" x2="92" y2="32" stroke="#e4e4e7" strokeWidth="1.5" />
-      <line
-        x1="50"
-        y1="8"
-        x2="50"
-        y2="92"
-        stroke="#e4e4e7"
-        strokeWidth="1"
-        opacity="0.45"
-      />
-      <line
-        x1="50"
-        y1="8"
-        x2="8"
-        y2="32"
-        stroke="#e4e4e7"
-        strokeWidth="1"
-        opacity="0.45"
-      />
-      <line
-        x1="50"
-        y1="8"
-        x2="92"
-        y2="32"
-        stroke="#e4e4e7"
-        strokeWidth="1"
-        opacity="0.45"
-      />
-      <line
-        x1="8"
-        y1="32"
-        x2="50"
-        y2="92"
-        stroke="#e4e4e7"
-        strokeWidth="1"
-        opacity="0.45"
-      />
-      <line
-        x1="92"
-        y1="32"
-        x2="50"
-        y2="92"
-        stroke="#e4e4e7"
-        strokeWidth="1"
-        opacity="0.45"
-      />
-    </svg>
-  );
-}
+const TRUST = [
+  { icon: "🛡️", title: "安全支付", sub: "多重加密保障" },
+  { icon: "⚡", title: "即时到账", sub: "购买后立即生效" },
+  { icon: "🎁", title: "专属福利", sub: "更多活动敬请期待" },
+];
 
 type RechargeProps = {
   onClose: () => void;
@@ -96,11 +61,10 @@ type RechargeProps = {
 
 export default function Recharge({ onClose }: RechargeProps) {
   const socket = useSocket();
-  const { t } = useTranslation();
 
-  const topUp = (amount: number) => {
+  const topUp = (diamonds: number) => {
     if (socket) {
-      addChips(socket, amount);
+      addChips(socket, diamonds);
     }
     onClose();
   };
@@ -108,28 +72,51 @@ export default function Recharge({ onClose }: RechargeProps) {
   return (
     <Portal>
       <div className={ui.overlay}>
-        <div className={ui.dialog}>
-          <div className={ui.dialogHeader}>
-            <h2>{t("recharge")}</h2>
-            <button
-              onClick={onClose}
-              aria-label={t("close")}
-              className={ui.iconButton}
-            >
-              <FiX />
-            </button>
-          </div>
-          <div className="min-[400px]:grid-cols-4 grid grid-cols-2 gap-3">
-            {RECHARGE_OPTIONS.map(({ fraction, amount }) => (
-              <button
-                key={amount}
-                onClick={() => topUp(amount)}
-                aria-label={`${t("recharge")} ${amount} ${t("chips")}`}
-                className="flex flex-col items-center gap-2 rounded-lg bg-floor p-3 hover:bg-cardhi"
+        <div className="recharge-modal">
+          <button
+            onClick={onClose}
+            aria-label="关闭"
+            className="recharge-close"
+          >
+            ×
+          </button>
+          <h1>💎 充值</h1>
+          <p className="recharge-sub">获取钻石，解锁更多精彩内容</p>
+
+          <div className="recharge-cards">
+            {PACKS.map((pack) => (
+              <div
+                key={pack.diamonds}
+                className={`recharge-card${
+                  pack.hot ? " recharge-card--hot" : ""
+                }${pack.legend ? " recharge-card--legend" : ""}`}
               >
-                <GemIcon fraction={fraction} />
-                <p className="text-xs font-medium text-ink">{amount}</p>
-              </button>
+                {pack.tag && <div className="recharge-tag">{pack.tag}</div>}
+                <img
+                  src={`/assets/recharge/diamond/${pack.img}`}
+                  alt=""
+                  aria-hidden
+                />
+                <h2>{pack.diamonds} 💎</h2>
+                {pack.bonus && (
+                  <div className="recharge-bonus">{pack.bonus}</div>
+                )}
+                <p>{pack.desc}</p>
+                <button onClick={() => topUp(pack.diamonds)}>
+                  {pack.price}
+                </button>
+              </div>
+            ))}
+          </div>
+
+          <div className="recharge-footer">
+            {TRUST.map((item) => (
+              <div key={item.title}>
+                <div>
+                  {item.icon} {item.title}
+                </div>
+                <small>{item.sub}</small>
+              </div>
             ))}
           </div>
         </div>
