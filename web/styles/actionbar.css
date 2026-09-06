@@ -461,3 +461,58 @@
     height: 23px;
   }
 }
+
+/* A single row of four compact keys on phones; seat / raise buttons retain
+   their own dimensions. Keep a 44px touch target while reducing width. */
+@media (max-width: 760px) {
+  .room-action-input > .gp-action-bar {
+    display: flex;
+    flex-wrap: nowrap;
+    width: min(100%, 420px);
+    max-width: 100%;
+    gap: 5px;
+    padding: 5px;
+    border-radius: 12px;
+  }
+  .room-action-input > .gp-action-bar > .gp-action-btn {
+    flex: 1 1 0;
+    width: 0;
+    min-width: 0;
+    height: 44px;
+  }
+  .room-action-input > .gp-action-bar .gp-action-btn__content {
+    gap: 4px;
+    padding: 0 5px;
+  }
+  .room-action-input > .gp-action-bar .gp-action-btn__icon-wrap {
+    width: 14px;
+    height: 14px;
+    flex-basis: 14px;
+  }
+  .room-action-input > .gp-action-bar .gp-action-btn__icon {
+    width: 14px;
+    height: 14px;
+  }
+  .room-action-input > .gp-action-bar .gp-action-btn__divider {
+    display: none;
+  }
+  .room-action-input > .gp-action-bar .gp-action-btn__text strong {
+    font-size: 11px;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    line-height: 1.1;
+  }
+  .room-action-input > .gp-action-bar .gp-action-btn__text small {
+    font-size: 6px;
+    margin-top: 3px;
+  }
+}
+@media (max-width: 360px) {
+  .room-action-input > .gp-action-bar .gp-action-btn__icon-wrap {
+    display: none;
+  }
+  .room-action-input > .gp-action-bar .gp-action-btn__text {
+    align-items: center;
+    text-align: center;
+  }
+}

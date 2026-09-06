@@ -9,9 +9,8 @@ import EyeIcon from "./EyeIcon";
 import RoomStats from "./RoomStats";
 
 // Bottom-right room controls. Stats and spectate sit out in the open as a
-// compact, right-aligned vertical stack; the host-only bot management stays
-// tucked behind the "..." button. Opening "..." expands it in place and
-// pushes the buttons above it upward; it is a manual toggle only.
+// compact horizontal row below the action keys. Host-only bot management
+// stays tucked behind the "..." button, expanding the row to the left.
 export default function RoomMenu() {
   const { appState, dispatch } = useContext(AppContext);
   const socket = useSocket();
@@ -37,7 +36,7 @@ export default function RoomMenu() {
   const hostReady = !!me?.ready;
 
   return (
-    <div className="absolute bottom-6 right-2 z-40 flex flex-col items-end gap-1 sm:bottom-8">
+    <div className="room-menu-controls absolute bottom-6 right-2 z-40 flex flex-col items-end gap-1 sm:bottom-8">
       <RoomStats className="min-w-[4.5rem]" />
       {me && (
         <button

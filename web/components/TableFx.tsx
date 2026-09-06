@@ -5,17 +5,7 @@ import { diffTableActions } from "../lib/tableFx";
 import { subscribeFx } from "../lib/fxBus";
 import Chip, { ChipTone, chipToneFor } from "./Chip";
 
-// Geometry mirroring Table.tsx's seat layout (percent within the table
-// container). Pot centre sits a little above the very centre.
-const RX = 34;
-const RY = 37;
-const POT_X = 50;
-const POT_Y = 44;
-
-function seatXY(index: number, total: number): { x: number; y: number } {
-  const angle = Math.PI / 2 + index * ((2 * Math.PI) / total);
-  return { x: 50 + RX * Math.cos(angle), y: 50 + RY * Math.sin(angle) };
-}
+import { TableLayout, tableSeatPoint } from "../lib/tableLayout";
 
 type FlySpec = {
   id: number;
@@ -33,9 +23,11 @@ let fxSeq = 1;
 // One flying chip: mounts at the start point, then transitions to the end.
 function FlyChip({
   chip,
+  size,
   onDone,
 }: {
   chip: FlySpec;
+  size: number;
   onDone: (id: number) => void;
 }) {
   const [phase, setPhase] = useState<"start" | "end">("start");
@@ -58,8 +50,10 @@ function FlyChip({
   const spin = chip.id % 2 ? 160 : -160;
   return (
     <div
-      className="absolute h-5 w-5 drop-shadow-md sm:h-7 sm:w-7"
+      className="poker-flying-chip absolute drop-shadow-md"
       style={{
+        width: size,
+        height: size,
         left: `${phase === "start" ? chip.x1 : chip.x2}%`,
         top: `${phase === "start" ? chip.y1 : chip.y2}%`,
         transform: `translate(-50%, -50%) rotate(${
@@ -77,14 +71,20 @@ function FlyChip({
 type props = {
   game: GameType;
   maxPlayers: number;
+  layout: TableLayout;
 };
 
-export default function TableFx({ game, maxPlayers }: props) {
+export default function TableFx({ game, maxPlayers, layout }: props) {
   const { appState } = useContext(AppContext);
   const me = game?.players.find((p) => p.uuid === appState.clientID);
-  const rotation = me ? me.seatID - 1 : 0;
+  const rotation = game.running && me ? me.seatID - 1 : 0;
+
+  const layoutRef = useRef(layout);
+  layoutRef.current = layout;
 
   const [flies, setFlies] = useState<FlySpec[]>([]);
+  // A rotation/resize changes the anchors: discard chips already in flight.
+  useEffect(() => setFlies([]), [layout.width, layout.height, rotation]);
   // The rotation can settle after the seat is known; read the live value from
   // a ref inside the socket-driven callback instead of a stale closure.
   const rotationRef = useRef(rotation);
@@ -135,14 +135,20 @@ export default function TableFx({ game, maxPlayers }: props) {
       for (const num of pot.winningPlayerNums ?? []) {
         const slot = seatSlot(players, num);
         if (slot === null) continue;
-        const seat = seatXY(slot, maxPlayersRef.current);
+        const seat = tableSeatPoint(
+          layoutRef.current,
+          slot,
+          maxPlayersRef.current
+        );
         // A few chips stream from the pot to each winner, coloured by the
         // size of the pot they carry.
         const tone = chipToneFor(pot.amount);
         for (let i = 0; i < 4; i++) {
           flyBetween(
-            POT_X + (Math.random() - 0.5) * 10,
-            POT_Y + (Math.random() - 0.5) * 10,
+            layoutRef.current.pot.x +
+              (((Math.random() - 0.5) * 24) / layoutRef.current.width) * 100,
+            layoutRef.current.pot.y +
+              (((Math.random() - 0.5) * 12) / layoutRef.current.height) * 100,
             seat.x,
             seat.y,
             tone,
@@ -157,26 +163,58 @@ export default function TableFx({ game, maxPlayers }: props) {
   // loses events: two rapid broadcasts (our bet, the opponent's instant call)
   // are batched into a single render, so the intermediate bet frame vanishes.
   useEffect(() => {
-    let last: GameType | null = null;
-    return subscribeFx((snap) => {
+    // The snapshot that mounted the table was emitted before this effect
+    // subscribed. Seed it here so the very first subsequent bet animates.
+    let last: GameType | null = game;
+    let collectTimer: number | undefined;
+    const unsubscribe = subscribeFx((snap) => {
       const prev = last;
       last = snap;
+      if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
 
       // Bet feedback within a live betting street (PreFlop..River).
       let betAnimated = false;
       for (const ev of diffTableActions(prev, snap)) {
         const slot = seatSlot(snap.players, ev.position);
         if (slot === null) continue;
-        const seat = seatXY(slot, maxPlayersRef.current);
+        const seat = tableSeatPoint(
+          layoutRef.current,
+          slot,
+          maxPlayersRef.current
+        );
         if (ev.kind === "bet") {
           // A short stream of chips flies from the bettor's seat to the pot.
           // No "+amount" tag: the seat's own bet pill already shows the
           // number, so the tag was just noise over the cards.
           betAnimated = true;
           const tone = chipToneFor(ev.amount);
-          flyBetween(seat.x, seat.y, POT_X, POT_Y, tone, 0, 550);
-          flyBetween(seat.x, seat.y, POT_X, POT_Y, tone, 140, 550);
-          flyBetween(seat.x, seat.y, POT_X, POT_Y, tone, 280, 550);
+          flyBetween(
+            seat.x,
+            seat.y,
+            layoutRef.current.pot.x,
+            layoutRef.current.pot.y,
+            tone,
+            0,
+            550
+          );
+          flyBetween(
+            seat.x,
+            seat.y,
+            layoutRef.current.pot.x,
+            layoutRef.current.pot.y,
+            tone,
+            140,
+            550
+          );
+          flyBetween(
+            seat.x,
+            seat.y,
+            layoutRef.current.pot.x,
+            layoutRef.current.pot.y,
+            tone,
+            280,
+            550
+          );
         }
       }
 
@@ -187,21 +225,36 @@ export default function TableFx({ game, maxPlayers }: props) {
         const pots = snap.pots ?? [];
         const players = snap.players ?? [];
         if (betAnimated) {
-          window.setTimeout(() => scheduleCollect(pots, players), 700);
+          collectTimer = window.setTimeout(
+            () => scheduleCollect(pots, players),
+            700
+          );
         } else {
           scheduleCollect(pots, players);
         }
       }
     });
+    return () => {
+      unsubscribe();
+      window.clearTimeout(collectTimer);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   if (!game) return null;
 
   return (
-    <div className="pointer-events-none absolute inset-0 z-30 overflow-visible">
+    <div className="poker-table-effects pointer-events-none absolute inset-0 z-30 overflow-visible">
       {flies.map((c) => (
-        <FlyChip key={c.id} chip={c} onDone={dropChip} />
+        <FlyChip
+          key={c.id}
+          chip={c}
+          size={Math.max(
+            10,
+            Math.min(22, layout.scale * (layout.large ? 24 : 20))
+          )}
+          onDone={dropChip}
+        />
       ))}
     </div>
   );

@@ -31,10 +31,16 @@ npx sharp-cli -i assets-src/bg_room_portal.png -o public/bg-room-portrait.webp -
 - `table.png` — green felt albedo texture (2048×2048)
 - `table_edge.png` — wood rail albedo texture (2048×2048)
 
-Applied as fixed-density tiling backgrounds (`.felt-material` /
-`.rail-material` in `styles/game.css`), not stretched images: the oval
-geometry stays CSS shape (rounded-full + padding) and resizes with the
-viewport while the texture density (`background-size`) never changes.
+`room_new_design.png` is the portrait table reference. The felt and wood
+textures are applied with `cover` (no visible tile seams), under directional
+lighting, inset shadows and bevels in `styles/game.css`. The rail remains a
+responsive CSS shape; no UI or player information is baked into the texture.
+
+`lib/tableLayout.ts` supplies the shared seat/pot coordinates for both Table
+and TableFx. `hooks/useTableLayout.ts` measures the safe playing area when the
+viewport changes. Portrait screens reserve the top toolbar and bottom controls;
+wide screens use a landscape table. Run the boundary checks with
+`node tests/tableLayout.test.cjs` from `web/`.
 
 Regenerate the derivatives (sharp-cli):
 

@@ -1,7 +1,9 @@
 import Seat, { useHandLabel } from "./Seat";
-import Felt from "./Felt";
+import Felt, { FeltContents } from "./Felt";
 import Card from "./Card";
 import TableFx from "./TableFx";
+import useTableLayout from "../hooks/useTableLayout";
+import { tableSeatPoint } from "../lib/tableLayout";
 import classNames from "classnames";
 import { Game as GameType, Player } from "../interfaces";
 import { AppContext } from "../providers/AppStore";
@@ -25,19 +27,6 @@ const Stage = {
 } as const;
 
 type WinnerResult = { player: Player; amount: number };
-
-function seatPosition(
-  index: number,
-  total: number
-): { left: string; top: string } {
-  const angle = Math.PI / 2 + index * ((2 * Math.PI) / total);
-  const rx = 34;
-  const ry = 37;
-  return {
-    left: `${50 + rx * Math.cos(angle)}%`,
-    top: `${50 + ry * Math.sin(angle)}%`,
-  };
-}
 
 function getWinners(game: GameType): WinnerResult[] {
   // Aggregate each player's share across every pot that has been awarded,
@@ -123,6 +112,7 @@ function getRevealedPlayers(game: GameType) {
 
 export default function Table() {
   const socket = useSocket();
+  const { ref: sceneRef, layout } = useTableLayout();
   const { appState } = useContext(AppContext);
   const { t } = useTranslation();
   const game = appState.game;
@@ -545,20 +535,26 @@ export default function Table() {
           </div>
         </div>
       )}
-      <div className="relative mt-10 h-2/3 w-full max-w-screen-xl sm:mt-28 sm:h-3/5">
+      <div
+        ref={sceneRef}
+        className="poker-table-scene"
+        data-layout={layout.portrait ? "portrait" : "landscape"}
+      >
         <div
           className={classNames(
-            "absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2",
+            "poker-table-surface",
             canPeek && "cursor-pointer"
           )}
-          style={{ width: "56%", height: "50%" }}
           onClick={toggleBoardView}
           role={canPeek ? "button" : undefined}
           aria-label={canPeek ? t("boardView") : undefined}
         >
           <Felt />
         </div>
-        {game && <TableFx game={game} maxPlayers={maxPlayers} />}
+        <FeltContents layout={layout} onClick={toggleBoardView} />
+        {game && (
+          <TableFx game={game} maxPlayers={maxPlayers} layout={layout} />
+        )}
         {game && (!appState.clientID || (me && !game.running && !me.ready)) && (
           <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center">
             <div className="pointer-events-auto flex flex-col items-center gap-1 rounded-lg bg-black/50 px-4 py-2 text-center">
@@ -587,7 +583,7 @@ export default function Table() {
         )}
         {seats.map((player, i) => {
           const visualIndex = (i - seatRotation + maxPlayers) % maxPlayers;
-          const pos = seatPosition(visualIndex, maxPlayers);
+          const pos = tableSeatPoint(layout, visualIndex, maxPlayers);
           // The player's own seat is stacked above the neighbours so its
           // hole cards are never hidden by an overlapping seat on narrow
           // screens.
@@ -601,11 +597,17 @@ export default function Table() {
             <div
               key={i}
               className={classNames(
-                "absolute -translate-x-1/2 -translate-y-1/2 transition-transform duration-300",
+                "poker-table-seat absolute",
                 isMine && "z-10",
-                shrink && "seat-shrunk scale-[0.82] sm:scale-90"
+                shrink && "seat-shrunk"
               )}
-              style={{ left: pos.left, top: pos.top }}
+              style={{
+                left: `${pos.x}%`,
+                top: `${pos.y}%`,
+                transform: `translate(-50%, -50%) scale(${
+                  layout.scale * (shrink ? 0.85 : 1)
+                })`,
+              }}
               data-seat-position={player ? player.position : undefined}
             >
               <Seat

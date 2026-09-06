@@ -1,17 +1,141 @@
 /* Game screen: table materials, room controls, betting keys and hand animations. */
 
-.felt-material {
-  background-color: #1a4a33; /* felt base while the texture loads */
-  background-image: url("/table-felt.webp");
-  background-repeat: repeat;
-  background-size: 768px;
+/* Keep controls outside the measured playing area, including phone safe areas. */
+.poker-table-scene {
+  position: absolute;
+  top: max(100px, calc(env(safe-area-inset-top) + 84px));
+  bottom: max(166px, calc(env(safe-area-inset-bottom) + 150px));
+  width: calc(
+    100% - 16px - env(safe-area-inset-left) - env(safe-area-inset-right)
+  );
+  max-width: 1100px;
 }
-
+.poker-table-surface {
+  position: absolute;
+  inset: 12% 13% 13%;
+}
 .rail-material {
-  background-color: #4a3320; /* wood base while the texture loads */
-  background-image: url("/table-edge.webp");
-  background-repeat: repeat;
-  background-size: 768px;
+  position: relative;
+  width: 100%;
+  height: 100%;
+  padding: clamp(10px, 2.8vw, 20px);
+  border-radius: 48% / 32%;
+  border: 2px solid #251a12;
+  background: linear-gradient(115deg, #efc08b33, #26180b22 48%, #110a0766),
+    url("/table-edge.webp") center / cover no-repeat;
+  box-shadow: 0 3px 0 #0c100f, 0 8px 0 #191712, 0 14px 22px #0009,
+    inset 0 2px 2px #ffe0ad66, inset 0 -3px 3px #160d09cc;
+}
+.felt-material {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  border: 3px solid #102a20;
+  background: radial-gradient(ellipse at 48% 38%, #2c89632b, #001a1366 85%),
+    linear-gradient(#164d3740, #164d3740),
+    url("/table-felt.webp") center / cover no-repeat;
+  box-shadow: 0 0 0 2px #92744766, inset 0 0 0 2px #65967930,
+    inset 0 8px 18px #00140ed9, inset 0 0 26px #001c13b3;
+}
+.felt-material::after {
+  content: "";
+  position: absolute;
+  inset: 7px;
+  border-radius: inherit;
+  border: 1px solid #a0c19820;
+  pointer-events: none;
+}
+.poker-table-pot,
+.poker-table-board {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  z-index: 2;
+  cursor: pointer;
+}
+.poker-table-board > div {
+  margin: 0;
+  padding: 0;
+}
+.poker-table-brand {
+  position: absolute;
+  top: 63%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  color: #8cbc9729;
+  text-shadow: 0 1px 0 #b1d7ac20, 0 -1px 1px #001d1a66;
+  pointer-events: none;
+  white-space: nowrap;
+}
+.poker-table-brand strong {
+  font-size: clamp(22px, 5vw, 40px);
+  font-style: italic;
+  font-weight: 900;
+}
+.poker-table-motto {
+  width: clamp(160px, 44vw, 240px);
+  height: auto;
+  margin-top: -6px;
+  overflow: visible;
+  fill: #9dc6a340;
+  font-size: 11px;
+  letter-spacing: 1px;
+}
+.poker-table-seat {
+  transition: left 300ms ease, top 300ms ease, transform 300ms ease;
+}
+/* Empty/reserved seats share the occupied footprint (no outside margins). */
+.poker-table-seat > div > button:not(.gp-seat-action) {
+  margin: 0;
+}
+.poker-table-scene .seat-shrunk .gps-seat__bet {
+  transform: none;
+}
+.poker-table-scene[data-layout="landscape"] .poker-table-surface {
+  inset: 13% 10% 14%;
+}
+.poker-table-scene[data-layout="landscape"] .rail-material {
+  border-radius: 42% / 48%;
+}
+.poker-table-scene[data-layout="landscape"] .poker-table-brand {
+  top: 72%;
+}
+.room-action-input {
+  padding-bottom: max(72px, calc(env(safe-area-inset-bottom) + 60px));
+}
+@media (max-height: 700px) {
+  .poker-table-scene {
+    top: max(88px, env(safe-area-inset-top));
+    bottom: max(144px, calc(env(safe-area-inset-bottom) + 128px));
+  }
+  .room-action-input {
+    padding-bottom: max(64px, calc(env(safe-area-inset-bottom) + 56px));
+  }
+}
+@media (orientation: landscape) and (max-height: 540px) {
+  .poker-table-scene {
+    top: 65px;
+    bottom: 90px;
+  }
+  .room-action-input .gp-action-bar {
+    display: flex;
+  }
+  .room-action-input .gp-action-btn {
+    width: 84px;
+    height: 40px;
+  }
+  .poker-table-brand {
+    display: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .poker-table-seat {
+    transition: none;
+  }
 }
 
 .app-screen {
@@ -155,4 +279,43 @@
 
 .animate-fx-tag {
   animation: fx-tag-pop 0.9s ease-out forwards;
+}
+
+@media (max-width: 760px) and (orientation: portrait) {
+  .poker-table-scene {
+    top: max(88px, calc(env(safe-area-inset-top) + 72px));
+    bottom: max(128px, calc(env(safe-area-inset-bottom) + 112px));
+  }
+  .room-wallpaper .room-action-input {
+    align-items: center;
+    padding-left: max(8px, env(safe-area-inset-left));
+    padding-right: max(8px, env(safe-area-inset-right));
+  }
+  .room-menu-controls .btn-room-control {
+    min-width: 0;
+    min-height: 30px;
+    padding: 4px 8px;
+    font-size: 11px;
+  }
+}
+@media (orientation: landscape) and (max-height: 540px) {
+  .poker-table-scene {
+    width: calc(100% - 190px);
+  }
+}
+
+@media (max-width: 760px) and (orientation: portrait) and (max-height: 700px) {
+  .poker-table-scene {
+    top: max(80px, calc(env(safe-area-inset-top) + 64px));
+    bottom: max(116px, calc(env(safe-area-inset-bottom) + 100px));
+  }
+}
+
+/* Room tools occupy the bottom-right row; primary actions sit above them. */
+.room-wallpaper .room-menu-controls {
+  right: max(8px, env(safe-area-inset-right));
+  bottom: max(10px, calc(env(safe-area-inset-bottom) + 6px));
+  flex-direction: row;
+  max-width: calc(100% - 16px);
+  gap: 5px;
 }
