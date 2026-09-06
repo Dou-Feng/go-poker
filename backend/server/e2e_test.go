@@ -476,6 +476,11 @@ func TestE2ESpectatorClaimsSeatMidHand(t *testing.T) {
 		list, _ := m["reserved"].([]any)
 		return len(list) == 1
 	})
+	// The claimant's own socket sees the claim too.
+	c.await("claim seen by claimant", 3*time.Second, func(m map[string]any) bool {
+		list, _ := m["reserved"].([]any)
+		return m["action"] == actionUpdateGame && len(list) == 1
+	})
 	claim := m["reserved"].([]any)[0].(map[string]any)
 	if claim["seatID"] != float64(3) || claim["username"] != "carol" || claim["accountUuid"] != "carol1" {
 		t.Fatalf("unexpected claim: %v", claim)
