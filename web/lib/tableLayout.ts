@@ -9,6 +9,7 @@ export function createTableLayout(
   large: boolean
 ) {
   const portrait = height >= width * 0.85;
+  const mobilePortrait = portrait && width <= 744;
   const baseWidth = large ? 224 : 128;
   const baseHeight = large ? 148 : 100;
   // Desktop (large) seats grow with the room so they do not look tiny on a
@@ -21,7 +22,7 @@ export function createTableLayout(
   );
   const scale = seatWidth / baseWidth;
   // Include the 1.1x all-in pop, the bet pill above and ready/show below.
-  const insetX = ((seatWidth * 0.56 + 6) / width) * 100;
+  const insetX = ((seatWidth * 0.56 + (mobilePortrait ? 2 : 6)) / width) * 100;
   const top = (((baseHeight * 0.55 + 26) * scale) / height) * 100;
   const bottom = 100 - (((baseHeight * 0.55 + 48) * scale) / height) * 100;
   const centerY = (top + bottom) / 2;
@@ -40,6 +41,7 @@ export function createTableLayout(
     height,
     large,
     portrait,
+    mobilePortrait,
     scale,
     insetX,
     centerY,
@@ -56,10 +58,11 @@ export function tableSeatPoint(
 ): TablePoint {
   const angle = Math.PI / 2 + (index * 2 * Math.PI) / total;
   const cosine = Math.cos(angle);
-  // A slightly squarer orbit moves diagonal seats away from the end seats
-  // on tall tables. Preserve the outer bounds and clockwise seat order.
+  // On phones, bring diagonal seats closer to the side edges to expose
+  // more felt. Keep the same safe outer bounds and clockwise seat order.
   const horizontal = layout.portrait
-    ? Math.sign(cosine) * Math.sqrt(Math.abs(cosine))
+    ? Math.sign(cosine) *
+      Math.pow(Math.abs(cosine), layout.mobilePortrait ? 0.18 : 0.5)
     : cosine;
   return {
     x: 50 + (50 - layout.insetX) * (Math.abs(cosine) < 1e-10 ? 0 : horizontal),

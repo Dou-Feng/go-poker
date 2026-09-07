@@ -748,3 +748,83 @@
     animation: none;
   }
 }
+
+/* Empty seats use the occupied seat's avatar disc and panel geometry. */
+.gps-seat-placeholder {
+  display: block;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  text-shadow: 0 1px 2px #0009;
+}
+.gps-seat-placeholder .gps-seat__panel {
+  gap: 2px;
+}
+.gps-seat-placeholder .gps-seat__avatar {
+  color: #91a3b1;
+}
+.gps-seat-placeholder__icon {
+  width: 55%;
+  height: 55%;
+}
+.gps-seat-placeholder__label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--gps-name);
+  line-height: 1.2;
+  font-weight: 600;
+  color: #91a3b1;
+}
+.gps-seat-placeholder__caption {
+  font-size: calc(var(--gps-name) * 0.75);
+  line-height: 1.15;
+  color: #c8d7e0;
+}
+.gps-seat-placeholder:not(:disabled):hover .gps-seat__panel,
+.gps-seat-placeholder:not(:disabled):hover .gps-seat__avatar {
+  border-color: #d1b16b;
+  box-shadow: inset 0 1px 0 #ffe7ac33, 0 0 16px #d6ac4826;
+}
+.gps-seat-placeholder:not(:disabled):active .gps-seat__panel {
+  box-shadow: inset 0 2px 5px #0008;
+}
+.gps-seat-placeholder:focus-visible {
+  outline: none;
+}
+.gps-seat-placeholder:focus-visible .gps-seat__panel {
+  outline: 2px solid #e4c887;
+  outline-offset: 3px;
+}
+.gps-seat-placeholder:disabled {
+  cursor: default;
+  opacity: 0.4;
+}
+.gps-seat-placeholder--reserved .gps-seat__panel,
+.gps-seat-placeholder--bot .gps-seat__panel {
+  border-color: #b99b617a;
+}
+.gps-seat-placeholder--reserved:disabled {
+  opacity: 0.75;
+}
+.gps-seat-placeholder--reserved .gps-seat-placeholder__label {
+  color: #dce6ec;
+}
+.gps-seat-placeholder--reserved .gps-seat-placeholder__caption,
+.gps-seat-placeholder--bot .gps-seat__avatar {
+  color: #f1d28a;
+}
+.gps-seat-placeholder--claim {
+  opacity: 0.4;
+}
+.gps-seat-placeholder--claim:hover,
+.gps-seat-placeholder--claim:focus-visible {
+  opacity: 1;
+}
+@media (prefers-reduced-motion: reduce) {
+  .gps-seat-placeholder,
+  .gps-seat-placeholder .gps-seat__panel,
+  .gps-seat-placeholder .gps-seat__avatar {
+    transition: none;
+  }
+}

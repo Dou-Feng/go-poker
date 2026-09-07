@@ -315,9 +315,13 @@
 }
 
 @media (max-width: 760px) and (orientation: portrait) {
+  /* Expand the seat orbit 16px at each end, keeping the felt in place. */
+  .poker-table-surface {
+    inset: calc(9% + 13px) 14% calc(10% + 13px);
+  }
   .poker-table-scene {
-    top: max(88px, calc(env(safe-area-inset-top) + 72px));
-    bottom: max(128px, calc(env(safe-area-inset-bottom) + 112px));
+    top: max(56px, calc(env(safe-area-inset-top) + 40px));
+    bottom: max(112px, calc(env(safe-area-inset-bottom) + 96px));
   }
   .room-wallpaper .room-action-input {
     align-items: center;
@@ -339,8 +343,8 @@
 
 @media (max-width: 760px) and (orientation: portrait) and (max-height: 700px) {
   .poker-table-scene {
-    top: max(80px, calc(env(safe-area-inset-top) + 64px));
-    bottom: max(116px, calc(env(safe-area-inset-bottom) + 100px));
+    top: max(56px, calc(env(safe-area-inset-top) + 40px));
+    bottom: max(100px, calc(env(safe-area-inset-bottom) + 84px));
   }
 }
 
@@ -351,4 +355,16 @@
   flex-direction: row;
   max-width: calc(100% - 16px);
   gap: 5px;
+}
+
+/* Trap seat/card/FX stacking inside the table. Even on a short viewport,
+   overlapping seats cannot paint over or intercept the primary controls. */
+.room-table-layer {
+  position: relative;
+  z-index: 0;
+  isolation: isolate;
+}
+.room-action-layer {
+  z-index: 50;
+  isolation: isolate;
 }

@@ -28,24 +28,21 @@ export default function IndexPage() {
   // preloader's, they are just covered until the reveal.
   const [assetsReady, setAssetsReady] = useState(false);
 
-  // Once the loading screen is gone, warm the browser cache for the
-  // lobby → game-room assets (room wallpapers, table materials, action-bar
-  // button layers) while the user is idle on the login/lobby screen, so
-  // entering a room is instant.
+  // Start warming upcoming scenes promptly; a busy main thread must not
+  // indefinitely postpone room/recharge assets until the first click.
   useEffect(() => {
     if (!assetsReady) {
       return;
     }
-    const idle =
-      typeof window.requestIdleCallback === "function"
-        ? window.requestIdleCallback
-        : (cb: () => void) => window.setTimeout(cb, 1500);
-    const cancel =
-      typeof window.cancelIdleCallback === "function"
-        ? window.cancelIdleCallback
-        : window.clearTimeout;
-    const handle = idle(() => preloadIdleAssets());
-    return () => cancel(handle);
+    if (typeof window.requestIdleCallback === "function") {
+      const handle = window.requestIdleCallback(
+        () => void preloadIdleAssets(),
+        { timeout: 1000 }
+      );
+      return () => window.cancelIdleCallback(handle);
+    }
+    const handle = window.setTimeout(() => void preloadIdleAssets(), 0);
+    return () => window.clearTimeout(handle);
   }, [assetsReady]);
 
   // Restore the saved language preference, or detect a default based on

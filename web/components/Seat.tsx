@@ -4,6 +4,7 @@ import { Player } from "../interfaces/index";
 import Card from "./Card";
 import Chip from "./Chip";
 import InputButton from "./InputButton";
+import SeatPlaceholder from "./SeatPlaceholder";
 import { FiCheck, FiX, FiEye } from "react-icons/fi";
 import classNames from "classnames";
 import { useTranslation } from "../hooks/useTranslation";
@@ -412,15 +413,11 @@ export default function Seat({
   // Empty seat.
   if (!game) {
     return (
-      <div>
-        <button
-          disabled
-          className="m-1 h-16 w-32 rounded-2xl border border-muted/40 bg-transparent p-2 text-muted opacity-20 sm:m-4 sm:h-20 sm:w-56"
-        >
-          <p className="text-3xl sm:text-4xl">{t("open")}</p>
-          <h2 className="text-xs opacity-70 sm:text-base">{id}</h2>
-        </button>
-      </div>
+      <SeatPlaceholder
+        disabled
+        label={String(id)}
+        caption={t("waitingToJoin")}
+      />
     );
   }
 
@@ -453,33 +450,23 @@ export default function Seat({
   if (reservation) {
     const mine = reservation.accountUuid === appState.uuid;
     return (
-      <div>
-        <button
-          disabled={!mine}
-          onClick={mine ? sitOrClaim : undefined}
-          title={mine ? t("cancelReservation") : undefined}
-          className={classNames(
-            "m-1 flex h-16 w-32 flex-row items-center justify-center gap-2 rounded-2xl border border-dashed border-amber-300/60 bg-black/30 p-2 sm:m-4 sm:h-20 sm:w-56",
-            mine ? "transition-colors hover:bg-card" : "cursor-default"
-          )}
-        >
-          <div className="opacity-70">
-            <Avatar
-              username={reservation.username}
-              uuid={reservation.accountUuid}
-              emoji={reservation.avatar || "🙂"}
-              hasImage={reservation.avatarImage}
-              size={36}
-            />
-          </div>
-          <div className="flex min-w-0 flex-col items-start leading-tight">
-            <p className="max-w-[4.5rem] truncate text-sm font-medium text-ink sm:max-w-[8rem] sm:text-base">
-              {reservation.username}
-            </p>
-            <p className="type-caption text-amber-300">{t("nextHand")}</p>
-          </div>
-        </button>
-      </div>
+      <SeatPlaceholder
+        disabled={!mine}
+        onClick={mine ? sitOrClaim : undefined}
+        title={mine ? t("cancelReservation") : undefined}
+        variant="reserved"
+        label={reservation.username}
+        caption={t("nextHand")}
+        avatar={
+          <Avatar
+            username={reservation.username}
+            uuid={reservation.accountUuid}
+            emoji={reservation.avatar || "🙂"}
+            hasImage={reservation.avatarImage}
+            size={36}
+          />
+        }
+      />
     );
   }
 
@@ -493,36 +480,29 @@ export default function Seat({
       return null;
     }
     return (
-      <div>
-        <button
-          onClick={sitOrClaim}
-          data-sfx="drop"
-          title={t("reserveSeat")}
-          // A claimable seat a spectator sees while watching is dimmed to
-          // 40% (full again on hover) so it does not distract from the hand.
-          className="m-1 h-16 w-32 rounded-2xl border border-amber-300/50 bg-transparent p-2 text-ink opacity-40 transition-opacity hover:bg-card hover:opacity-100 sm:m-4 sm:h-20 sm:w-56"
-        >
-          <p className="text-3xl sm:text-4xl">{t("open")}</p>
-          <h2 className="text-xs opacity-70 sm:text-base">{t("nextHand")}</h2>
-        </button>
-      </div>
+      <SeatPlaceholder
+        onClick={sitOrClaim}
+        data-sfx="drop"
+        title={t("reserveSeat")}
+        variant="claim"
+        label={String(id)}
+        caption={t("nextHand")}
+      />
     );
   }
 
   // Bot placement: the host taps "+" to seat a bot here.
   if (botMode) {
     return (
-      <div>
-        <button
-          className="m-1 flex h-16 w-32 flex-col items-center justify-center rounded-2xl border-2 border-dashed border-emerald-500/70 bg-emerald-900/20 p-2 text-emerald-300 transition-colors hover:bg-emerald-900/40 sm:m-4 sm:h-20 sm:w-56"
-          onClick={() => socket && addBot(socket, id)}
-          data-sfx="drop"
-          title={t("addBot")}
-        >
-          <PlusIcon className="h-7 w-7 sm:h-9 sm:w-9" />
-          <h2 className="text-xs opacity-70 sm:text-base">{id}</h2>
-        </button>
-      </div>
+      <SeatPlaceholder
+        variant="bot"
+        onClick={() => socket && addBot(socket, id)}
+        data-sfx="drop"
+        title={t("addBot")}
+        label={String(id)}
+        caption={t("addBot")}
+        avatar={<PlusIcon className="gps-seat-placeholder__icon" />}
+      />
     );
   }
 
@@ -546,28 +526,16 @@ export default function Seat({
       }
     };
     return (
-      <div>
-        <button
-          className="m-1 h-16 w-32 rounded-2xl border border-muted/40 bg-transparent p-2 text-ink transition-colors hover:bg-card sm:m-4 sm:h-20 sm:w-56"
-          onClick={handleClick}
-          data-sfx="drop"
-        >
-          <p className="text-3xl sm:text-4xl">{t("open")}</p>
-          <h2 className="text-xs opacity-70 sm:text-base">{id}</h2>
-        </button>
-      </div>
+      <SeatPlaceholder
+        onClick={handleClick}
+        data-sfx="drop"
+        label={String(id)}
+        caption={t("waitingToJoin")}
+      />
     );
   }
 
   return (
-    <div>
-      <button
-        disabled
-        className="m-1 h-16 w-32 rounded-2xl border border-muted/40 bg-transparent p-2 text-muted opacity-20 sm:m-4 sm:h-20 sm:w-56"
-      >
-        <p className="text-3xl sm:text-4xl">{t("open")}</p>
-        <h2 className="text-xs opacity-70 sm:text-base">{id}</h2>
-      </button>
-    </div>
+    <SeatPlaceholder disabled label={String(id)} caption={t("waitingToJoin")} />
   );
 }

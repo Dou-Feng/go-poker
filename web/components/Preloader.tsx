@@ -28,14 +28,16 @@ export default function Preloader({ onComplete }: Props) {
   useEffect(() => {
     let cancelled = false;
     let raf = 0;
+    let latestProgress = 0;
     let finishTimer: ReturnType<typeof setTimeout> | undefined;
 
     const paint = (fraction: number) => {
+      latestProgress = fraction;
       if (!cancelled && raf === 0) {
         raf = requestAnimationFrame(() => {
           raf = 0;
           if (!cancelled) {
-            setProgress(fraction);
+            setProgress(latestProgress);
           }
         });
       }
@@ -44,12 +46,8 @@ export default function Preloader({ onComplete }: Props) {
     const run = async () => {
       try {
         await preloadAssets(criticalAssetUrls(), paint);
-        // The @font-face rules trigger their own loads as soon as the CSS
-        // applies; make sure those have settled too before the reveal, so
-        // the first screen never renders with a fallback font.
-        if (typeof document !== "undefined" && document.fonts?.ready) {
-          await document.fonts.ready;
-        }
+        // FontFaceSet.load is included in the bounded asset tasks, so no
+        // unbounded document.fonts.ready wait is needed here.
       } catch {
         // Best effort only — never trap the user on this screen.
       }

@@ -1,165 +1,122 @@
-// Asset preloader: warms the browser HTTP cache with the files the app needs
-// before a screen is shown, so the UI never appears in its unstyled/late
-// state (fallback fonts, missing wallpaper). Byte-level progress is reported
-// when the server sends Content-Length; files without it fall back to a
-// per-file weight. Everything is best-effort: a failed or stalled fetch is
-// counted as done so the caller can never be blocked forever.
-
+// Shared, best-effort scene preloading. Images use one native request and are
+// ready only after decode; progress counts settled resources, not bytes.
 export type ProgressFn = (fraction: number) => void;
+export type PreloadResult = { failedUrls: string[] };
+const PER_FILE_TIMEOUT_MS = 12_000;
+export const SCENE_TIMEOUT_MS = 8_000;
 
-// Hard cap for one file and for the whole batch. Generous on purpose — the
-// gate is a UX nicety, not a correctness requirement.
-const PER_FILE_TIMEOUT_MS = 30_000;
-const BATCH_TIMEOUT_MS = 45_000;
-
-type Entry = {
-  url: string;
-  loaded: number;
-  weight: number; // bytes when known, else the running average fallback
-  known: boolean; // Content-Length was available
-  done: boolean;
+type AssetTask = {
+  promise: Promise<boolean>;
+  ready: boolean;
+  image?: HTMLImageElement;
+};
+const tasks = new Map<string, AssetTask>();
+const FONT_REQUESTS: Record<string, [string, string]> = {
+  "/fonts/nunito-latin.woff2": ['16px "Nunito"', "Poker"],
+  "/fonts/nunito-latin-ext.woff2": ['16px "Nunito"', "Ā"],
+  "/fonts/FZLTTHJW-subset.woff2": ['16px "FZLanTingHei"', "准备"],
 };
 
-function overallFraction(entries: Entry[]): number {
-  let loaded = 0;
-  let total = 0;
-  for (const e of entries) {
-    loaded += e.done ? e.weight : e.loaded;
-    total += e.weight;
-  }
-  return total > 0 ? Math.min(1, loaded / total) : 1;
-}
-
-function reweightUnknown(entries: Entry[]) {
-  // Give files without Content-Length the average size of the known ones so
-  // the bar does not jump when they finish.
-  const known = entries.filter((e) => e.known);
-  if (known.length === 0) {
-    return;
-  }
-  const avg = known.reduce((s, e) => s + e.weight, 0) / known.length;
-  for (const e of entries) {
-    if (!e.known) {
-      e.weight = avg;
-    }
-  }
-}
-
-async function fetchOne(entry: Entry, report: () => void): Promise<void> {
-  const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), PER_FILE_TIMEOUT_MS);
-  try {
-    const res = await fetch(entry.url, { signal: ctrl.signal });
-    const len = Number(res.headers.get("Content-Length") ?? 0);
-    if (res.ok && len > 0) {
-      entry.weight = len;
-      entry.known = true;
-      if (res.body) {
-        const reader = res.body.getReader();
-        for (;;) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          entry.loaded += value?.byteLength ?? 0;
-          report();
-        }
-      } else {
-        const buf = await res.arrayBuffer();
-        entry.loaded = buf.byteLength;
+function loadAsset(url: string): Promise<boolean> {
+  const existing = tasks.get(url);
+  if (existing) return existing.promise;
+  const task: AssetTask = { promise: Promise.resolve(false), ready: false };
+  tasks.set(url, task);
+  task.promise = new Promise<boolean>((resolve) => {
+    const controller = new AbortController();
+    let finished = false;
+    const finish = (ok: boolean) => {
+      if (finished) return;
+      finished = true;
+      clearTimeout(timer);
+      if (task.image) {
+        task.image.onload = null;
+        task.image.onerror = null;
+        if (!ok) task.image.src = "";
       }
-    } else {
-      // No length: consume fully so the file lands in the HTTP cache even
-      // if we cannot track its progress.
-      await res.arrayBuffer();
-    }
-  } catch {
-    // Offline, aborted or server error: give up on this file silently.
-  } finally {
-    clearTimeout(timer);
-    entry.done = true;
-    report();
-  }
+      task.ready = ok;
+      // Keep successful decoded images alive. Failures may be retried by the
+      // next scene open; a stale decode must never overwrite that retry.
+      if (!ok) {
+        controller.abort();
+        tasks.delete(url);
+      }
+      resolve(ok);
+    };
+    const timer = setTimeout(() => finish(false), PER_FILE_TIMEOUT_MS);
+    const run = async () => {
+      try {
+        if (/\.(png|jpe?g|webp|gif|svg)(?:[?#]|$)/i.test(url)) {
+          const img = new Image();
+          task.image = img;
+          img.onerror = () => finish(false);
+          if (typeof img.decode === "function") {
+            img.src = url;
+            await img.decode();
+            finish(true);
+          } else {
+            img.onload = () => finish(true);
+            img.src = url;
+          }
+        } else if (
+          FONT_REQUESTS[url] &&
+          typeof document !== "undefined" &&
+          document.fonts
+        ) {
+          const faces = await document.fonts.load(...FONT_REQUESTS[url]);
+          finish(faces.length > 0);
+        } else {
+          const res = await fetch(url, { signal: controller.signal });
+          if (!res.ok) throw new Error(`Asset HTTP ${res.status}`);
+          await res.arrayBuffer();
+          finish(true);
+        }
+      } catch {
+        finish(false);
+      }
+    };
+    void run();
+  });
+  return task.promise;
 }
 
-// Pre-decode an image so a CSS <background-image> with the same URL paints
-// from the already-decoded cache. Fetching alone only warms the HTTP cache:
-// the browser still has to decode a large texture, and while it does a
-// background shows its colour/gradient fallback for a frame - the felt/rail
-// "suddenly turning colour" on room entry.
-async function warmImageDecode(url: string): Promise<void> {
-  if (typeof Image === "undefined") {
-    return;
-  }
-  try {
-    const img = new Image();
-    img.src = url;
-    if (typeof img.decode === "function") {
-      await img.decode();
-    } else {
-      await new Promise<void>((resolve, reject) => {
-        img.onload = () => resolve();
-        img.onerror = () => reject();
+export function assetsLoaded(urls: string[]): boolean {
+  return urls.every((url) => tasks.get(url)?.ready === true);
+}
+
+// A batch deadline releases only its caller; shared in-flight work continues
+// for other consumers. Per-file deadlines also bound fetch and decode hangs.
+export function preloadAssets(
+  urls: string[],
+  onProgress?: ProgressFn,
+  timeoutMs = SCENE_TIMEOUT_MS
+): Promise<PreloadResult> {
+  const unique = Array.from(new Set(urls));
+  return new Promise((resolve) => {
+    let finished = false;
+    let completed = 0;
+    const finish = () => {
+      if (finished) return;
+      finished = true;
+      clearTimeout(timer);
+      onProgress?.(1);
+      resolve({ failedUrls: unique.filter((url) => !assetsLoaded([url])) });
+    };
+    const timer = setTimeout(finish, timeoutMs);
+    if (!unique.length) {
+      finish();
+      return;
+    }
+    onProgress?.(0);
+    for (const url of unique) {
+      void loadAsset(url).then(() => {
+        if (finished) return;
+        completed++;
+        if (completed === unique.length) finish();
+        else onProgress?.(completed / unique.length);
       });
     }
-  } catch {
-    // ignore: pre-decode is best-effort
-  }
-}
-
-// Preload a list of URLs concurrently and report overall progress as a
-// 0..1 fraction. Never rejects; resolves after every request settles or the
-// batch timeout expires, whichever comes first.
-export async function preloadAssets(
-  urls: string[],
-  onProgress?: ProgressFn
-): Promise<void> {
-  if (urls.length === 0) {
-    onProgress?.(1);
-    return;
-  }
-  const entries: Entry[] = urls.map((url) => ({
-    url,
-    loaded: 0,
-    weight: 1,
-    known: false,
-    done: false,
-  }));
-  let settled = false;
-
-  const report = () => {
-    if (!settled) {
-      onProgress?.(overallFraction(entries));
-    }
-  };
-
-  const batchTimer = setTimeout(() => {
-    settled = true;
-    onProgress?.(1);
-  }, BATCH_TIMEOUT_MS);
-
-  await Promise.all(
-    entries.map(async (e) => {
-      await fetchOne(e, report);
-      // Fetching warms the HTTP cache; decoding warms the image cache so the
-      // first paint does not flash the colour fallback while a texture (felt,
-      // rail, wallpapers, button layers) is decoded.
-      const isImage =
-        e.url.toLowerCase().endsWith(".png") ||
-        e.url.toLowerCase().endsWith(".jpg") ||
-        e.url.toLowerCase().endsWith(".jpeg") ||
-        e.url.toLowerCase().endsWith(".webp") ||
-        e.url.toLowerCase().endsWith(".gif") ||
-        e.url.toLowerCase().endsWith(".svg");
-      if (isImage) {
-        await warmImageDecode(e.url);
-      }
-      // As soon as at least one length is known, size the unknowns sensibly.
-      reweightUnknown(entries);
-      report();
-    })
-  );
-  clearTimeout(batchTimer);
-  settled = true;
-  onProgress?.(1);
+  });
 }
 
 // ---- asset lists -----------------------------------------------------------
@@ -169,6 +126,7 @@ export async function preloadAssets(
 // styles/shared.css (.room-wallpaper).
 export type WallpaperVariant = "portrait" | "wide" | "small";
 export function wallpaperVariant(): WallpaperVariant {
+  if (typeof window === "undefined") return "small";
   if (window.matchMedia("(orientation: portrait)").matches) {
     return "portrait";
   }
@@ -199,8 +157,7 @@ export function criticalAssetUrls(): string[] {
   ];
 }
 
-// Everything the lobby → game-room transition needs. Preloaded in the
-// background once the loading screen is gone, so entering a room is instant.
+// Room assets shared by the background warm-up and the room loading gate.
 // The BGM mp3s (~5 MB each) and the sfx set are deliberately NOT here: they
 // stream lazily on first use and would dwarf everything else.
 const BUTTON_LAYERS = [
@@ -216,12 +173,25 @@ const BUTTON_LAYERS = [
 ];
 const BUTTON_KINDS = ["check", "bet", "allin", "fold"];
 
-export function idleAssetUrls(): string[] {
+const ROOM_BG: Record<WallpaperVariant, string> = {
+  portrait: "/bg/bg-room-portrait.webp",
+  wide: "/bg/bg-room-1672.webp",
+  small: "/bg/bg-room-1100.webp",
+};
+
+export const RECHARGE_IMAGES = {
+  small: "/assets/recharge/diamond/diamond_small.webp",
+  medium: "/assets/recharge/diamond/diamond_medium.webp",
+  large: "/assets/recharge/diamond/diamond_large.webp",
+};
+
+export function rechargeAssetUrls(): string[] {
+  return Object.values(RECHARGE_IMAGES);
+}
+
+export function roomAssetUrls(): string[] {
   return [
-    // Room wallpapers (all variants; the room may be rotated into any one).
-    "/bg/bg-room-portrait.webp",
-    "/bg/bg-room-1100.webp",
-    "/bg/bg-room-1672.webp",
+    ROOM_BG[wallpaperVariant()],
     // Table materials (felt + rail).
     "/textures/table-felt.webp",
     "/textures/table-edge.webp",
@@ -243,7 +213,18 @@ export function idleAssetUrls(): string[] {
   ];
 }
 
-// Fire-and-forget warm-up used after the loading screen completes.
-export function preloadIdleAssets(): void {
-  void preloadAssets(idleAssetUrls());
+export function idleAssetUrls(): string[] {
+  return Array.from(
+    new Set([
+      ...roomAssetUrls(),
+      ...rechargeAssetUrls(),
+      ...Object.values(ROOM_BG),
+    ])
+  );
+}
+
+// Warm the current scenes first; alternate orientation wallpapers follow.
+export async function preloadIdleAssets(): Promise<void> {
+  await preloadAssets([...roomAssetUrls(), ...rechargeAssetUrls()]);
+  await preloadAssets(Object.values(ROOM_BG));
 }

@@ -16,13 +16,16 @@ import { leaveTable, voteSettle } from "../actions/actions";
 import { clearSession } from "../lib/session";
 import { voice } from "../lib/voice";
 import { startBgm, stopBgm } from "../lib/sfx";
-import { idleAssetUrls, preloadAssets } from "../lib/preload";
+import { roomAssetUrls } from "../lib/preload";
+import { useSceneAssets } from "../hooks/useSceneAssets";
+import AssetLoading from "./AssetLoading";
 import { FiCheckCircle, FiCircle, FiFlag, FiLogOut } from "react-icons/fi";
 
 export default function Game() {
   const { appState, dispatch } = useContext(AppContext);
   const socket = useSocket();
   const { t } = useTranslation();
+  const assets = useSceneAssets(roomAssetUrls);
 
   // Voice chat is scoped to the room: bind the mesh to this room under our
   // account id, and switch it off when the screen goes away (leave button,
@@ -42,15 +45,6 @@ export default function Game() {
   useEffect(() => {
     startBgm("room");
     return () => stopBgm();
-  }, []);
-
-  // Guarantee the room's paint assets (felt/rail materials, room wallpapers,
-  // action-bar buttons) are cached before the table draws, even when the
-  // startup idle warm-up has not run yet (e.g. a session replay that drops
-  // straight into the room). A no-op once the idle warm-up already cached
-  // them.
-  useEffect(() => {
-    void preloadAssets(idleAssetUrls());
   }, []);
 
   const handleLeave = () => {
@@ -76,6 +70,23 @@ export default function Game() {
     }
   }, [appState.botMode, running, isHost, hostReady, dispatch]);
 
+  // Socket state and room lifecycle keep running while paint assets load.
+  // The bounded gate also covers direct session restores into a cold room.
+  if (!assets.ready) {
+    return (
+      <div className="app-screen relative flex items-center justify-center bg-floor">
+        <AssetLoading progress={assets.progress} />
+        <button
+          onClick={handleLeave}
+          className="btn btn-room-control absolute left-2 top-2"
+        >
+          <FiLogOut size={16} aria-hidden="true" />
+          {t("leave")}
+        </button>
+      </div>
+    );
+  }
+
   // A session is active once it has started running or finished a hand.
   const showVotes = !!game && (game.running || game.handsPlayed > 0);
   const myVoted = !!game && game.settleVotes.includes(appState.username ?? "");
@@ -89,7 +100,7 @@ export default function Game() {
       // hold gesture is a game control here.
       onContextMenu={(e) => e.preventDefault()}
     >
-      <div className="flex h-full w-full items-start justify-center">
+      <div className="room-table-layer flex h-full w-full items-start justify-center">
         <Table />
       </div>
       {game && (
@@ -132,7 +143,7 @@ export default function Game() {
           bottom edge is for core actions and the system gesture area);
           chat/log move to the table's left edge. Desktop keeps the chat
           tabs bottom-left. */}
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-50 flex flex-col sm:block">
+      <div className="room-action-layer pointer-events-none absolute inset-x-0 bottom-0 z-50 flex flex-col sm:block">
         <div className="pointer-events-none w-full sm:absolute sm:inset-x-0 sm:bottom-0 sm:z-20">
           <Input />
         </div>

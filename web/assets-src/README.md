@@ -74,3 +74,36 @@ Drop `GB2312_LEVEL=1` to also include level-2 hanzi (6763 chars total,
 ~1.1 MB) if chat should render in-brand more often. After adding new UI
 strings with characters outside GB2312 level 1, rerun the pipeline —
 `subset_font.py` picks them up from the source scan automatically.
+
+## Recharge images and scene preloading
+
+Original transparent PNGs live in `recharge/`; only the generated WebPs in
+`public/assets/recharge/diamond/` are shipped. The three derivatives total about
+185 KB (down from 5.06 MB), with a maximum dimension of 576 px for the small
+mobile cards and desktop/high-density displays. Regenerate with Pillow:
+
+```bash
+python3 -m pip install Pillow
+python3 assets-src/prepare_recharge.py
+```
+
+`lib/preload.ts` defines login, room and recharge asset groups; recharge rendering
+uses the same URL constants as its preloader. After startup, background warm-up
+starts on idle with a 1-second scheduling deadline. Room/recharge gates reuse
+pending requests and successful decoded images, and wait at most 8 seconds.
+Only the current room wallpaper is needed by its gate; other orientations warm
+in the background. Fonts use `document.fonts.load` within the same deadlines.
+
+Progress counts settled resources (including failed attempts), not downloaded
+bytes. A batch timeout releases that caller without cancelling another scene's
+shared work; a 12-second file deadline also bounds stuck fetches/decodes. Failed
+files can be retried on the next open. On failure, room CSS still supplies its
+base colours and the recharge dialog uses a diamond icon so its buttons work.
+Browser memory pressure may still evict decoded surfaces; this is best-effort
+warm-up, not persistent offline caching.
+
+Run the loader regression checks from `web/`:
+
+```bash
+node tests/preload.test.cjs
+```

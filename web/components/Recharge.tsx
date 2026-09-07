@@ -2,6 +2,9 @@ import { useSocket } from "../hooks/useSocket";
 import { addChips } from "../actions/actions";
 import ui from "../styles/Dialog.module.css";
 import Portal from "./Portal";
+import AssetLoading from "./AssetLoading";
+import { useSceneAssets } from "../hooks/useSceneAssets";
+import { rechargeAssetUrls, RECHARGE_IMAGES } from "../lib/preload";
 
 // Diamond recharge packs, ported from tmp/recharge (designer preview). The
 // price copy is display-only; tapping a card grants diamonds + bonus as chips
@@ -20,13 +23,13 @@ type Pack = {
 
 const PACKS: Pack[] = [
   {
-    img: "diamond_small.png",
+    img: RECHARGE_IMAGES.small,
     diamonds: 200,
     price: "$1.99",
     desc: "少量补充，随时畅玩",
   },
   {
-    img: "diamond_medium.png",
+    img: RECHARGE_IMAGES.medium,
     diamonds: 500,
     price: "$4.99",
     desc: "超值选择，畅玩更久",
@@ -34,14 +37,14 @@ const PACKS: Pack[] = [
     hot: true,
   },
   {
-    img: "diamond_medium.png",
+    img: RECHARGE_IMAGES.medium,
     diamonds: 1000,
     price: "$9.99",
     desc: "更多精彩，更多可能",
     bonus: 100,
   },
   {
-    img: "diamond_large.png",
+    img: RECHARGE_IMAGES.large,
     diamonds: 2000,
     price: "$19.99",
     desc: "最佳性价比",
@@ -62,6 +65,7 @@ type RechargeProps = {
 
 export default function Recharge({ onClose }: RechargeProps) {
   const socket = useSocket();
+  const assets = useSceneAssets(rechargeAssetUrls);
 
   const topUp = (diamonds: number, bonus = 0) => {
     if (socket) {
@@ -85,31 +89,40 @@ export default function Recharge({ onClose }: RechargeProps) {
           <h1>💎 充值</h1>
           <p className="recharge-sub">获取钻石，解锁更多精彩内容</p>
 
-          <div className="recharge-cards">
-            {PACKS.map((pack) => (
-              <div
-                key={pack.diamonds}
-                className={`recharge-card${
-                  pack.hot ? " recharge-card--hot" : ""
-                }${pack.legend ? " recharge-card--legend" : ""}`}
-              >
-                {pack.tag && <div className="recharge-tag">{pack.tag}</div>}
-                <img
-                  src={`/assets/recharge/diamond/${pack.img}`}
-                  alt=""
-                  aria-hidden
-                />
-                <h2>{pack.diamonds} 💎</h2>
-                {pack.bonus ? (
-                  <div className="recharge-bonus">+{pack.bonus} BONUS</div>
-                ) : null}
-                <p>{pack.desc}</p>
-                <button onClick={() => topUp(pack.diamonds, pack.bonus ?? 0)}>
-                  {pack.price}
-                </button>
-              </div>
-            ))}
-          </div>
+          {!assets.ready ? (
+            <AssetLoading progress={assets.progress} />
+          ) : (
+            <div className="recharge-cards">
+              {PACKS.map((pack) => (
+                <div
+                  key={pack.diamonds}
+                  className={`recharge-card${
+                    pack.hot ? " recharge-card--hot" : ""
+                  }${pack.legend ? " recharge-card--legend" : ""}`}
+                >
+                  {pack.tag && <div className="recharge-tag">{pack.tag}</div>}
+                  {assets.failedUrls.includes(pack.img) ? (
+                    <span
+                      className="recharge-image-fallback"
+                      aria-hidden="true"
+                    >
+                      💎
+                    </span>
+                  ) : (
+                    <img src={pack.img} alt="" aria-hidden />
+                  )}
+                  <h2>{pack.diamonds} 💎</h2>
+                  {pack.bonus ? (
+                    <div className="recharge-bonus">+{pack.bonus} BONUS</div>
+                  ) : null}
+                  <p>{pack.desc}</p>
+                  <button onClick={() => topUp(pack.diamonds, pack.bonus ?? 0)}>
+                    {pack.price}
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
 
           <div className="recharge-footer">
             {TRUST.map((item) => (
