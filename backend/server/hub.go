@@ -13,7 +13,6 @@ import (
 type Hub struct {
 	rdb        *redis.Client
 	clients    map[*Client]bool
-	broadcast  chan []byte
 	register   chan *Client
 	unregister chan *Client
 	tables     map[*table]bool
@@ -44,7 +43,6 @@ func newHub() (*Hub, error) {
 	hub := &Hub{
 		rdb:        redis,
 		clients:    make(map[*Client]bool),
-		broadcast:  make(chan []byte),
 		register:   make(chan *Client),
 		unregister: make(chan *Client),
 		tables:     make(map[*table]bool),
@@ -69,8 +67,6 @@ func (h *Hub) run() {
 			h.registerClient(client)
 		case client := <-h.unregister:
 			h.unregisterClient(client)
-		case message := <-h.broadcast:
-			h.broadcastToClients(message)
 		}
 	}
 }
@@ -84,15 +80,6 @@ func (h *Hub) unregisterClient(client *Client) {
 		delete(h.clients, client)
 		h.forgetSession(client)
 		client.closeSend()
-	}
-}
-
-func (h *Hub) broadcastToClients(message []byte) {
-	for client := range h.clients {
-		if !client.trySend(message) {
-			client.closeSend()
-			delete(h.clients, client)
-		}
 	}
 }
 

@@ -20,7 +20,6 @@ func bootServer(t *testing.T, cfg guardConfig, settings tlsSettings) (appURL, pl
 	t.Helper()
 	hub := &Hub{
 		clients:    make(map[*Client]bool),
-		broadcast:  make(chan []byte),
 		register:   make(chan *Client),
 		unregister: make(chan *Client),
 		tables:     make(map[*table]bool),
