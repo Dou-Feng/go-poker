@@ -218,38 +218,16 @@ export default function TableFx({ game, maxPlayers, layout }: props) {
           maxPlayersRef.current
         );
         if (ev.kind === "bet") {
-          // A short stream of chips flies from the bettor's seat to the pot.
-          // No "+amount" tag: the seat's own bet pill already shows the
-          // number, so the tag was just noise over the cards.
+          // A short stream of chips flies from the bettor's seat to the dead
+          // centre of the table. No "+amount" tag: the seat's own bet pill
+          // already shows the number, so the tag was just noise over the
+          // cards.
           betAnimated = true;
           const tone = chipToneFor(ev.amount);
-          flyBetween(
-            seat.x,
-            seat.y,
-            layoutRef.current.pot.x,
-            layoutRef.current.pot.y,
-            tone,
-            0,
-            550
-          );
-          flyBetween(
-            seat.x,
-            seat.y,
-            layoutRef.current.pot.x,
-            layoutRef.current.pot.y,
-            tone,
-            140,
-            550
-          );
-          flyBetween(
-            seat.x,
-            seat.y,
-            layoutRef.current.pot.x,
-            layoutRef.current.pot.y,
-            tone,
-            280,
-            550
-          );
+          const { x: cx, y: cy } = layoutRef.current.center;
+          flyBetween(seat.x, seat.y, cx, cy, tone, 0, 550);
+          flyBetween(seat.x, seat.y, cx, cy, tone, 140, 550);
+          flyBetween(seat.x, seat.y, cx, cy, tone, 280, 550);
         }
       }
 

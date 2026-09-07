@@ -28,6 +28,8 @@ export function createTableLayout(
   const centerY = (top + bottom) / 2;
   const radiusY = (bottom - top) / 2;
   const compact = !portrait && height < 300;
+  // Dead centre of the oval table (chip fly-in destination for bets).
+  const center = { x: 50, y: centerY };
   const pot = {
     x: compact ? 72 : 50,
     y: compact ? centerY : centerY - (portrait ? 24 : 18),
@@ -46,6 +48,7 @@ export function createTableLayout(
     insetX,
     centerY,
     radiusY,
+    center,
     pot,
     board,
   };
