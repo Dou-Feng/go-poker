@@ -112,7 +112,7 @@ export default function IndexPage() {
   }, [socket, dispatch]);
 
   return (
-    <Layout title="Poker">
+    <Layout title="Poker" themeColor={appState.table ? "#1a222a" : "#0e1319"}>
       {!assetsReady && <Preloader onComplete={() => setAssetsReady(true)} />}
       {!appState.username ? (
         <Register />

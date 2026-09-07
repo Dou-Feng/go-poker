@@ -2,6 +2,7 @@ import Seat, { useHandLabel } from "./Seat";
 import Felt, { FeltContents } from "./Felt";
 import Card from "./Card";
 import TableFx from "./TableFx";
+import TableWaiting from "./TableWaiting";
 import useTableLayout from "../hooks/useTableLayout";
 import { tableSeatPoint } from "../lib/tableLayout";
 import classNames from "classnames";
@@ -544,11 +545,15 @@ export default function Table() {
         ref={sceneRef}
         className="poker-table-scene"
         data-layout={layout.portrait ? "portrait" : "landscape"}
+        data-waiting={game && !game.running ? "true" : undefined}
       >
         <div className="poker-table-surface">
           <Felt />
         </div>
-        <FeltContents layout={layout} />
+        <FeltContents layout={layout} waiting={!!game && !game.running} />
+        {game && !game.running && (
+          <TableWaiting layout={layout} maxPlayers={maxPlayers} playerCount={game.players.filter(p => !p.left).length} roomName={appState.table ?? ""} />
+        )}
         {game && (
           <TableFx game={game} maxPlayers={maxPlayers} layout={layout} />
         )}
@@ -559,40 +564,11 @@ export default function Table() {
             </p>
           </div>
         )}
-        {game && (!appState.clientID || (me && !game.running && !me.ready)) && (
+        {game?.running && !appState.clientID && (
           <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center">
-            {/* Spectators get a transparent pill (no heavy black box) while
-                they watch; the seated "tap ready" hint keeps its backdrop. */}
-            <div
-              className={classNames(
-                "pointer-events-auto flex flex-col items-center gap-1 rounded-lg px-4 py-2 text-center",
-                appState.clientID && "bg-black/50"
-              )}
-            >
-              {!appState.clientID ? (
-                <p
-                  className={classNames(
-                    "text-sm font-medium sm:text-base",
-                    myReservation ? "text-amber-300" : "text-ink",
-                    // While a hand runs this is only a spectator hint, so it
-                    // stays unobtrusive (40%).
-                    game.running && "opacity-40"
-                  )}
-                >
-                  {!game.running
-                    ? t("pickSeat")
-                    : myReservation
-                    ? t("reservedNextHand")
-                    : t("tapSeatToJoinNext")}
-                </p>
-              ) : (
-                <>
-                  <p className="text-sm font-medium text-ink sm:text-base">
-                    {t("clickReadyButton")}
-                  </p>
-                </>
-              )}
-            </div>
+            <p className={classNames("px-4 text-center text-sm font-medium opacity-40 sm:text-base", myReservation ? "text-amber-300" : "text-ink")}>
+              {t(myReservation ? "reservedNextHand" : "tapSeatToJoinNext")}
+            </p>
           </div>
         )}
         {seats.map((player, i) => {

@@ -118,6 +118,165 @@
 .poker-table-scene[data-layout="landscape"] .poker-table-brand {
   top: 72%;
 }
+
+/* ---- Waiting-for-players invite card, centred on the felt pre-hand ----
+   TableWaiting.tsx scales this 204px-wide card (inline transform) to fit the
+   table; author the box and type in those base units. */
+.table-waiting-anchor {
+  position: absolute;
+  left: 50%;
+  z-index: 3;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+}
+.table-waiting {
+  pointer-events: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 204px;
+  overflow: hidden;
+  border-radius: 18px;
+  /* ~40%-translucent backdrop so the felt reads through the card. */
+  border: 1px solid #cfe6d14d;
+  background: linear-gradient(
+    180deg,
+    rgba(33, 80, 58, 0.4) 0%,
+    rgba(20, 54, 41, 0.42) 55%,
+    rgba(12, 35, 24, 0.46) 100%
+  );
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.3), 0 2px 8px rgba(0, 0, 0, 0.25),
+    inset 0 1px 0 #ffffff1f;
+  text-align: center;
+  animation: fade-in 0.35s ease-out;
+}
+.table-waiting-art {
+  display: block;
+  width: 100%;
+  height: auto;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+.table-waiting h2 {
+  margin: 13px 12px 3px;
+  color: #ffffff;
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  line-height: 1.2;
+}
+.table-waiting-hint {
+  margin: 0 14px;
+  color: #cfe6d6cc;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.55;
+}
+.table-waiting-hint strong {
+  color: #ffe08a;
+  font-weight: 700;
+}
+.table-waiting-divider {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 72%;
+  margin: 10px 0 2px;
+  color: #b6d8bfb3;
+}
+.table-waiting-divider::before,
+.table-waiting-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, #b6d8bf66);
+}
+.table-waiting-divider::after {
+  background: linear-gradient(90deg, #b6d8bf66, transparent);
+}
+.table-waiting-divider span {
+  font-size: 12px;
+  line-height: 1;
+}
+.table-waiting-invite {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 116px;
+  margin: 12px 0 16px;
+  padding: 8px 20px;
+  border-radius: 999px;
+  border: 1px solid #ffd97a;
+  color: #ffd97a;
+  background: rgba(255, 217, 122, 0.08);
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  cursor: pointer;
+  transition: background 140ms ease, filter 140ms ease;
+}
+.table-waiting-invite:hover {
+  background: rgba(255, 217, 122, 0.2);
+}
+.table-waiting-invite:active {
+  filter: brightness(0.92);
+}
+.table-waiting-invite:focus-visible {
+  outline: 2px solid #ffd97a;
+  outline-offset: 2px;
+}
+.table-waiting-invite svg {
+  flex-shrink: 0;
+  width: 13px;
+  height: 13px;
+}
+
+/* Manual invitation dialog (clipboard fallback) opened from the card. */
+.table-invite-dialog {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  max-width: 440px;
+  padding: 20px;
+  border-radius: 16px;
+  border: 1px solid #52705c;
+  background: linear-gradient(180deg, #1c2b23, #132019);
+  color: #e8f2ea;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
+}
+.table-invite-dialog h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  text-align: center;
+}
+.table-invite-dialog label {
+  font-size: 12.5px;
+  color: #9fb8a6;
+}
+.table-invite-dialog textarea {
+  width: 100%;
+  min-height: 96px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid #35503f;
+  background: #0e1712;
+  color: #eaf4ec;
+  font: inherit;
+  font-size: 12.5px;
+  line-height: 1.6;
+  resize: vertical;
+}
+.table-invite-dialog textarea:focus {
+  outline: 2px solid #4fa37a;
+  outline-offset: 1px;
+}
+.table-invite-dialog .btn {
+  align-self: flex-end;
+}
+
 .room-action-input {
   padding-bottom: max(72px, calc(env(safe-area-inset-bottom) + 60px));
 }

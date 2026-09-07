@@ -2,9 +2,9 @@ import CommunityCards from "./CommunityCards";
 import Pot from "./Pot";
 import { TableLayout } from "../lib/tableLayout";
 
-type FeltContentsProps = { layout: TableLayout };
+type FeltContentsProps = { layout: TableLayout; waiting?: boolean };
 
-export function FeltContents({ layout }: FeltContentsProps) {
+export function FeltContents({ layout, waiting = false }: FeltContentsProps) {
   const large = layout.large;
   const boardScale = Math.min(
     (layout.width * (layout.portrait ? 0.52 : 0.38)) / (large ? 356 : 216),
@@ -13,16 +13,16 @@ export function FeltContents({ layout }: FeltContentsProps) {
   );
   return (
     <>
-      <div
+      {!waiting && <div
         className="poker-table-pot"
         style={{ left: `${layout.pot.x}%`, top: `${layout.pot.y}%` }}
       >
         <Pot />
-      </div>
+      </div>}
       {/* The community cards and the GoPoker brand travel together; on
           desktop the whole group is nudged up (styles/game.css). */}
       <div className="poker-table-board-group" aria-hidden="true">
-        <div
+        {!waiting && <div
           className="poker-table-board"
           style={{
             left: `${layout.board.x}%`,
@@ -31,7 +31,7 @@ export function FeltContents({ layout }: FeltContentsProps) {
           }}
         >
           <CommunityCards />
-        </div>
+        </div>}
         <div className="poker-table-brand">
           <strong>GoPoker</strong>
           <svg

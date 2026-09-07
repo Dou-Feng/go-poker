@@ -185,6 +185,8 @@ export const RECHARGE_IMAGES = {
   large: "/assets/recharge/diamond/diamond_large.webp",
 };
 
+export const WAITING_CARDS_IMAGE = "/assets/ui/table/waiting-cards.webp";
+
 export function rechargeAssetUrls(): string[] {
   return Object.values(RECHARGE_IMAGES);
 }
@@ -195,6 +197,7 @@ export function roomAssetUrls(): string[] {
     // Table materials (felt + rail).
     "/textures/table-felt.webp",
     "/textures/table-edge.webp",
+    WAITING_CARDS_IMAGE,
     // Action-bar button layers + the per-key icon, in every state.
     ...BUTTON_KINDS.flatMap((kind) =>
       BUTTON_LAYERS.map((layer) => `/assets/ui/buttons/${kind}/${layer}.png`)

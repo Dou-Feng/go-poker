@@ -1,19 +1,31 @@
 /* Shared buttons, typography, in-app wallpaper and panel transitions. */
 
-.room-wallpaper {
-  background-image: url("/bg/bg-room-1100.webp");
+:root {
+  --room-wallpaper-image: url("/bg/bg-room-1100.webp");
+}
+
+/* Paint the page canvas too, including areas outside the game container.
+   These root backgrounds do not change the safe content viewport or seats. */
+.room-wallpaper,
+html:has(.app-screen.room-wallpaper),
+body:has(.app-screen.room-wallpaper) {
+  background-image: var(--room-wallpaper-image);
   background-position: center;
   background-size: cover;
   background-repeat: no-repeat;
 }
+html:has(.app-screen.room-wallpaper),
+body:has(.app-screen.room-wallpaper) {
+  background-color: #1a222a;
+}
 @media (orientation: portrait) {
-  .room-wallpaper {
-    background-image: url("/bg/bg-room-portrait.webp");
+  :root {
+    --room-wallpaper-image: url("/bg/bg-room-portrait.webp");
   }
 }
 @media (min-width: 700px) and (orientation: landscape) {
-  .room-wallpaper {
-    background-image: url("/bg/bg-room-1672.webp");
+  :root {
+    --room-wallpaper-image: url("/bg/bg-room-1672.webp");
   }
 }
 .btn {
