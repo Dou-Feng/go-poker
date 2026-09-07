@@ -31,14 +31,11 @@ export default function VoiceControls({ className }: voiceControlsProps) {
     return null;
   }
 
-  // Same `btn btn-icon` box as the Settings gear so the three sit on one
-  // row at identical size; the icon is 1rem like FiSettings.
+  // Square sibling of the wallet/stack buttons (see .room-icon-btn) so the
+  // mic, speaker and settings keys read as one family. The emerald `is-on`
+  // state marks a live mic/speaker; the slash stays for the muted state.
   const button = (on: boolean, dimmed = false) =>
-    classNames(
-      "btn btn-icon",
-      on && "border-emerald-500 bg-emerald-700/80 text-ink hover:text-ink",
-      dimmed && "opacity-50"
-    );
+    classNames("room-icon-btn", on && "is-on", dimmed && "is-dim");
 
   // Over plain http on a LAN address the browser hides the microphone API:
   // the button stays visible (so the player learns why) but dimmed, and

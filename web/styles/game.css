@@ -353,6 +353,33 @@
   color: #f4cf72;
 }
 
+/* Top-right room icon toggles (voice mic/speaker + settings): square siblings
+   of the wide wallet/stack buttons — same dark card surface, radius and
+   shadow, icon centred. `is-on` marks a live voice toggle (emerald), `is-dim`
+   an unavailable one (e.g. mic over plain http). */
+.room-icon-btn {
+  @apply inline-flex h-8 w-8 items-center justify-center rounded-md text-ink shadow transition-colors;
+  background-color: rgba(32, 42, 51, 0.6); /* card/60 */
+}
+.room-icon-btn:hover {
+  background-color: rgba(42, 54, 66, 0.6); /* cardhi/60 */
+}
+.room-icon-btn:active {
+  filter: brightness(0.92);
+}
+.room-icon-btn:focus-visible {
+  outline: 2px solid #8bbacc;
+  outline-offset: 2px;
+}
+.room-icon-btn.is-on {
+  background-color: rgba(4, 120, 87, 0.8); /* emerald-700/80 */
+  color: #ecfdf5;
+  box-shadow: inset 0 0 0 1px rgba(16, 185, 129, 0.7);
+}
+.room-icon-btn.is-dim {
+  opacity: 0.5;
+}
+
 @keyframes chip-pop {
   0% {
     transform: scale(0.4);
@@ -488,6 +515,15 @@
     padding-right: max(8px, env(safe-area-inset-right));
   }
   .room-menu-controls .btn-room-control {
+    min-width: 0;
+    min-height: 30px;
+    padding: 4px 8px;
+    font-size: 11px;
+  }
+  /* Top-left leave/surrender keys share the same compact metrics, so their
+     type matches the bottom-right "战绩" button and their two rows mirror
+     the settings (top) and wallet (below) rows of the top-right toolbar. */
+  .room-top-controls .btn-room-control {
     min-width: 0;
     min-height: 30px;
     padding: 4px 8px;

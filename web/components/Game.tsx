@@ -161,15 +161,16 @@ export default function Game() {
           <p className="text-xs font-medium text-muted">{appState.table}</p>
         </div>
       )}
-      {/* Leave / surrender buttons, anchored at the very top-left. On phones
-          the surrender button stacks under the leave button (both flush
-          left); the narrow column stays clear of the centred hands pill,
-          which hangs from the top edge. */}
-      <div className="absolute left-0 top-0 z-10 flex flex-col items-start sm:flex-row sm:items-center">
+      {/* Leave / surrender buttons, anchored at the very top-left. The column
+          mirrors the top-right toolbar: Leave lines up with the settings
+          gear row and Surrender with the wallet row, sharing the compact
+          room-control sizing (see .room-top-controls). On wide screens they
+          sit side by side instead. */}
+      <div className="room-top-controls absolute left-0 top-0 z-10 flex flex-col items-start gap-1 p-2 sm:flex-row sm:items-center sm:gap-1.5">
         <button
           onClick={handleLeave}
           data-sfx="pong"
-          className="btn btn-room-control m-2"
+          className="btn btn-room-control"
         >
           <FiLogOut size={16} aria-hidden="true" className="shrink-0" />
           {t("leave")}
@@ -179,7 +180,7 @@ export default function Game() {
             onClick={() => socket && voteSettle(socket)}
             data-sfx="pong"
             aria-pressed={myVoted}
-            className="btn btn-room-control btn-room-surrender mx-2 mb-2 sm:ml-0 sm:mt-2"
+            className="btn btn-room-control btn-room-surrender"
           >
             <FiFlag size={16} aria-hidden="true" className="shrink-0" />
             {t("voteSettle")}
@@ -191,7 +192,7 @@ export default function Game() {
       <div className="absolute top-0 right-0 z-10 flex flex-col items-end gap-1 p-2 sm:hidden">
         <div className="flex flex-row items-center gap-1">
           <VoiceControls />
-          <Settings />
+          <Settings buttonClassName="room-icon-btn" />
         </div>
         <Wallet />
         <Stack />
@@ -199,7 +200,7 @@ export default function Game() {
       <div className="absolute top-0 right-0 z-10 hidden flex-col items-end gap-2 p-2 sm:flex">
         <div className="flex flex-row items-center gap-1">
           <VoiceControls />
-          <Settings />
+          <Settings buttonClassName="room-icon-btn" />
         </div>
         <GameInfo />
         <Wallet />
