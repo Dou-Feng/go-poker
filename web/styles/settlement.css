@@ -1,0 +1,573 @@
+/* Settlement screen (installed from tmp/new_settlement). A full-screen result
+   takeover with a champion hero, per-player chip-flow rows and next-round
+   actions. Sits above the game (z 60). */
+
+.settlement-root {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: radial-gradient(
+      circle at 50% 12%,
+      rgba(15, 74, 55, 0.2),
+      transparent 38%
+    ),
+    rgba(2, 7, 12, 0.82);
+}
+
+.settlement-modal {
+  position: absolute;
+  left: 5.2%;
+  right: 5.2%;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  max-height: 70%;
+  min-height: 0;
+  border-radius: 30px;
+  padding: 20px 36px 24px;
+  background: linear-gradient(
+    180deg,
+    rgba(15, 38, 54, 0.99),
+    rgba(8, 22, 31, 0.99)
+  );
+  border: 1.5px solid #31516a;
+  box-shadow: 0 36px 100px rgba(0, 0, 0, 0.6),
+    inset 0 1px 0 rgba(255, 255, 255, 0.045);
+  overflow: hidden;
+}
+.settlement-title {
+  flex: 0 0 auto;
+  font-size: 26px;
+  line-height: 1;
+  font-weight: 900;
+  letter-spacing: -0.5px;
+  color: #ffffff;
+  margin: 2px 0 10px;
+}
+
+.winner-hero {
+  flex: 0 0 auto;
+  min-height: 126px;
+  display: grid;
+  grid-template-columns: 1fr 180px;
+  align-items: center;
+  padding: 12px 24px;
+  border-radius: 20px;
+  border: 1.5px solid #365167;
+  background: linear-gradient(
+    90deg,
+    rgba(137, 93, 25, 0.3),
+    rgba(14, 32, 44, 0.92) 40%,
+    rgba(16, 34, 46, 0.96)
+  );
+  box-shadow: inset 0 0 0 1px rgba(255, 196, 63, 0.08),
+    0 0 20px rgba(255, 188, 47, 0.035);
+  position: relative;
+  overflow: hidden;
+}
+.winner-laurel-bg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  opacity: 0.2;
+  pointer-events: none;
+  z-index: 0;
+}
+.winner-left,
+.winner-profit {
+  position: relative;
+  z-index: 1;
+}
+.winner-hero::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 2px;
+  background: linear-gradient(
+    90deg,
+    rgba(255, 196, 63, 0.42),
+    rgba(255, 196, 63, 0.1),
+    transparent
+  );
+}
+.winner-left {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  min-width: 0;
+}
+.trophy-placeholder {
+  font-size: 40px;
+  flex-shrink: 0;
+}
+.winner-avatar {
+  width: 84px;
+  height: 84px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: #102635;
+  border: 3px solid #ffc43f;
+  display: grid;
+  place-items: center;
+  font-size: 46px;
+  position: relative;
+  box-shadow: 0 0 0 6px rgba(255, 196, 63, 0.04);
+  overflow: visible;
+}
+.winner-avatar img {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+}
+.winner-crown {
+  position: absolute;
+  right: -8px;
+  top: -22px;
+  color: #ffc43f;
+  font-size: 34px;
+}
+.winner-pill {
+  position: absolute;
+  bottom: -12px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 3px 14px;
+  border-radius: 999px;
+  background: linear-gradient(#ffe17b, #f5b933);
+  color: #101820;
+  font-weight: 900;
+  font-size: 16px;
+  white-space: nowrap;
+}
+.winner-copy {
+  min-width: 0;
+}
+.winner-copy h2 {
+  margin: 0 0 6px;
+  font-size: 28px;
+  line-height: 1.05;
+  color: #ffffff;
+  font-weight: 900;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.winner-copy p {
+  margin: 0;
+  color: #7694b1;
+  font-size: 16px;
+}
+.winner-profit {
+  text-align: center;
+}
+.winner-profit span {
+  display: block;
+  font-size: 14px;
+  color: #86a1b8;
+  margin-bottom: 4px;
+}
+.winner-profit strong {
+  font-size: 42px;
+  color: #49e2a3;
+  line-height: 1;
+}
+
+.player-table-head {
+  flex: 0 0 auto;
+  margin-top: 14px;
+  padding: 0 18px;
+  display: grid;
+  grid-template-columns: 1fr 200px 110px;
+  align-items: end;
+  color: #8ca4b8;
+  font-size: 16px;
+}
+.player-table-head strong {
+  color: #ffffff;
+  font-size: 20px;
+}
+.player-table-head > span:nth-child(2) {
+  text-align: center;
+}
+.player-table-head > span:last-child {
+  text-align: right;
+}
+.settlement-player-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  margin-top: 10px;
+  display: grid;
+  gap: 10px;
+  align-content: start;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+}
+.settlement-player-list::-webkit-scrollbar {
+  display: none;
+}
+.settlement-player-row {
+  min-height: 76px;
+  display: grid;
+  grid-template-columns: 1fr 200px 110px;
+  align-items: center;
+  padding: 0 18px;
+  border: 1px solid #183549;
+  background: #102431;
+  border-radius: 14px;
+}
+.settlement-player {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+}
+.settlement-player > strong {
+  font-size: 20px;
+  color: #ffffff;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.settlement-avatar {
+  width: 52px;
+  height: 52px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: #102635;
+  border: 2px solid #315a76;
+  display: grid;
+  place-items: center;
+  font-size: 30px;
+  overflow: hidden;
+}
+.settlement-avatar img {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.chip-flow {
+  display: grid;
+  grid-template-columns: 1fr 24px 1fr;
+  align-items: center;
+  justify-items: center;
+  gap: 0;
+  font-size: 18px;
+  color: #7f97aa;
+  font-variant-numeric: tabular-nums;
+}
+.chip-flow b {
+  color: #e7eef5;
+  font-size: 20px;
+  font-variant-numeric: tabular-nums;
+}
+.flow-arrow-svg {
+  width: 24px;
+  height: 13px;
+  opacity: 0.82;
+  justify-self: center;
+}
+.profit {
+  text-align: right;
+  font-size: 30px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+.profit.positive {
+  color: #49e2a3;
+}
+.profit.negative {
+  color: #ff667a;
+}
+
+.flow-head {
+  display: grid;
+  grid-template-columns: 1fr 24px 1fr;
+  align-items: center;
+  width: 100%;
+  text-align: center;
+}
+.flow-head::before {
+  content: "";
+  grid-column: 2;
+  width: 24px;
+}
+.flow-head span:first-child {
+  grid-column: 1;
+  white-space: nowrap;
+}
+.flow-head span:last-child {
+  grid-column: 3;
+  white-space: nowrap;
+}
+
+.pot-heading {
+  flex: 0 0 auto;
+  margin: 14px 0 8px;
+  color: #d6e2eb;
+  font-size: 20px;
+  font-weight: 700;
+}
+.biggest-pot {
+  flex: 0 0 auto;
+  min-height: 64px;
+  border: 1px solid #1d3a4c;
+  background: #0d202d;
+  border-radius: 14px;
+  padding: 0 20px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.pot-player {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 19px;
+  min-width: 0;
+}
+.pot-player strong {
+  color: #ffffff;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pot-avatar {
+  font-size: 28px;
+}
+.pot-amount {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: #ffc43f;
+  font-size: 30px;
+  font-weight: 800;
+}
+.pot-chips {
+  position: relative;
+  display: block;
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+}
+.pot-chip {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 26px;
+  height: 26px;
+}
+.pot-chip--back {
+  left: 5px;
+  top: 3px;
+  opacity: 0.85;
+}
+.pot-chip--front {
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.35));
+}
+
+.settlement-actions {
+  flex: 0 0 auto;
+  margin-top: 14px;
+  display: grid;
+  grid-template-columns: 1fr 1.35fr;
+  gap: 16px;
+}
+.settlement-actions button {
+  height: 56px;
+  border-radius: 18px;
+  font-size: 19px;
+  font-weight: 800;
+  cursor: pointer;
+}
+.settlement-secondary {
+  border: 2px solid #2d5069;
+  background: #0d1f2b;
+  color: #9cb3c5;
+}
+.settlement-secondary:hover {
+  background: #132a38;
+}
+.settlement-primary {
+  border: 2px solid #ffe073;
+  background: linear-gradient(#ffd45f, #f5b139);
+  color: #0d1a24;
+  box-shadow: 0 0 20px rgba(255, 193, 52, 0.22),
+    inset 0 2px 0 rgba(255, 255, 255, 0.35);
+}
+.settlement-primary:hover {
+  filter: brightness(1.05);
+}
+.play-triangle {
+  margin-right: 10px;
+}
+
+@media (max-height: 760px) {
+  .settlement-modal {
+    padding: 14px 34px 18px;
+  }
+  .settlement-title {
+    font-size: 22px;
+    margin: 0 0 8px;
+  }
+  .winner-hero {
+    min-height: 108px;
+    grid-template-columns: 1fr 150px;
+    padding: 10px 20px;
+  }
+  .winner-avatar {
+    width: 68px;
+    height: 68px;
+    font-size: 38px;
+    border-width: 2px;
+  }
+  .trophy-placeholder {
+    font-size: 32px;
+  }
+  .winner-copy h2 {
+    font-size: 24px;
+  }
+  .winner-copy p {
+    font-size: 14px;
+  }
+  .winner-profit span {
+    font-size: 12px;
+  }
+  .winner-profit strong {
+    font-size: 34px;
+  }
+  .winner-pill {
+    font-size: 13px;
+    padding: 2px 10px;
+  }
+  .winner-crown {
+    font-size: 26px;
+    top: -16px;
+  }
+  .player-table-head {
+    margin-top: 10px;
+  }
+  .player-table-head strong {
+    font-size: 17px;
+  }
+  .settlement-player-row {
+    min-height: 60px;
+  }
+  .settlement-avatar {
+    width: 42px;
+    height: 42px;
+    font-size: 24px;
+  }
+  .settlement-player > strong {
+    font-size: 17px;
+  }
+  .chip-flow {
+    font-size: 15px;
+  }
+  .chip-flow b {
+    font-size: 17px;
+  }
+  .profit {
+    font-size: 24px;
+  }
+  .settlement-player-list {
+    gap: 8px;
+  }
+  .pot-heading {
+    margin: 10px 0 6px;
+  }
+  .biggest-pot {
+    min-height: 54px;
+  }
+  .settlement-actions {
+    margin-top: 10px;
+    gap: 12px;
+  }
+  .settlement-actions button {
+    height: 48px;
+    font-size: 17px;
+  }
+}
+
+@media (max-width: 700px) {
+  .settlement-modal {
+    left: 10px;
+    right: 10px;
+    top: 50%;
+    bottom: auto;
+    transform: translateY(-50%);
+    max-height: 80%;
+    padding: 20px 18px 22px;
+  }
+  .winner-hero {
+    grid-template-columns: 1fr 92px;
+    min-height: 128px;
+    padding: 16px;
+  }
+  .trophy-placeholder {
+    font-size: 34px;
+  }
+  .winner-avatar {
+    width: 72px;
+    height: 72px;
+    font-size: 40px;
+  }
+  .winner-copy h2 {
+    font-size: 24px;
+  }
+  .winner-copy p {
+    font-size: 15px;
+  }
+  .winner-profit strong {
+    font-size: 38px;
+  }
+  .player-table-head,
+  .settlement-player-row {
+    grid-template-columns: 1fr 130px 78px;
+  }
+  .player-table-head {
+    padding: 0 10px;
+    font-size: 13px;
+  }
+  .player-table-head strong {
+    font-size: 17px;
+  }
+  .settlement-player-row {
+    min-height: 64px;
+    padding: 0 10px;
+  }
+  .settlement-avatar {
+    width: 44px;
+    height: 44px;
+    font-size: 26px;
+  }
+  .settlement-player > strong {
+    font-size: 17px;
+  }
+  .chip-flow {
+    font-size: 15px;
+  }
+  .chip-flow b {
+    font-size: 17px;
+  }
+  .profit {
+    font-size: 24px;
+  }
+  .settlement-actions {
+    gap: 10px;
+  }
+  .settlement-actions button {
+    height: 56px;
+    font-size: 16px;
+  }
+}

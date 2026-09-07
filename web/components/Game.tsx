@@ -218,7 +218,7 @@ export default function Game() {
         <Wallet />
         <Stack />
       </div>
-      <Settlement />
+      <Settlement onLeaveRoom={handleLeave} />
     </div>
   );
 }
