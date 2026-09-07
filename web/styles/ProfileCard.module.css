@@ -1,0 +1,484 @@
+/* New user profile card (replaces the old stats dialog). It uses the app's
+   dialog surface (navy panel) like other windows, but in two containers:
+   - lobby / overlays: a centred modal without the drag handle
+   - in a room: a bottom sheet that slides up, closed by the '--' handle
+   All inner layout (avatar, stats, rows) lives here in profile.css scale. */
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 14px;
+  background: rgba(2, 7, 12, 0.72);
+}
+.overlayRoom {
+  align-items: flex-end;
+  justify-content: center;
+  padding: 0;
+}
+
+.sheet {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  color: #e8f1f7;
+  background: linear-gradient(180deg, #14232f, #0b1721);
+  border: 1px solid #7ea7c03d;
+  box-shadow: 0 22px 70px rgba(0, 0, 0, 0.6),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+.sheetCenter {
+  max-width: 460px;
+  border-radius: 22px;
+  animation: card-pop 0.24s ease-out;
+}
+.sheetRoom {
+  max-width: 620px;
+  border-radius: 26px 26px 0 0;
+  border-bottom: 0;
+  max-height: 86dvh;
+  animation: sheet-up 0.3s cubic-bezier(0.2, 0.9, 0.3, 1);
+}
+@keyframes card-pop {
+  from {
+    transform: scale(0.94) translateY(8px);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1) translateY(0);
+    opacity: 1;
+  }
+}
+@keyframes sheet-up {
+  from {
+    transform: translateY(60px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+/* Drag handle (room only): tap or drag down to close. */
+.handle {
+  flex-shrink: 0;
+  width: 108px;
+  height: 9px;
+  margin: 10px auto 2px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #5f83a5, #8ab2dc, #5f83a5);
+  opacity: 0.85;
+  cursor: pointer;
+}
+
+.scroll {
+  padding: 6px 18px 20px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: #375062 transparent;
+}
+.sheetRoom .scroll {
+  padding-bottom: calc(18px + env(safe-area-inset-bottom));
+}
+
+/* Compact close button for the centered (lobby) variant only. */
+.closeRow {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 6px 10px 0 10px;
+}
+
+/* Header: avatar | info | actions */
+.head {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 6px;
+}
+.avatarWrap {
+  position: relative;
+  flex-shrink: 0;
+}
+.avatarRing {
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  border: 2px solid rgba(138, 178, 220, 0.55);
+  background: radial-gradient(
+    circle,
+    rgba(138, 178, 220, 0.14),
+    transparent 70%
+  );
+  pointer-events: none;
+}
+.crown {
+  position: absolute;
+  right: -6px;
+  bottom: -6px;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  color: #0b1721;
+  font-size: 13px;
+  background: radial-gradient(circle at 35% 30%, #ffe29a, #f5b41c 60%, #c47f0a);
+  box-shadow: 0 0 0 2px rgba(11, 23, 33, 0.9), 0 2px 6px rgba(0, 0, 0, 0.4);
+}
+.info {
+  flex: 1;
+  min-width: 0;
+}
+.nameRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.nameRow h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  overflow-wrap: break-word;
+}
+.editName {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  color: #9fb6cc;
+  cursor: pointer;
+}
+.editName:hover {
+  color: #e8f1f7;
+  background: rgba(126, 167, 192, 0.12);
+}
+.renameForm {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+}
+.renameInput {
+  min-width: 0;
+  flex: 1;
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(126, 167, 192, 0.3);
+  background: #0a1720;
+  color: #edf5fa;
+  font-size: 13px;
+  outline: none;
+}
+.renameInput:focus {
+  border-color: rgba(72, 198, 236, 0.6);
+}
+.uid {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  margin-top: 6px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #89a1b7;
+  font: inherit;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.uid span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.uid:hover {
+  color: #cfe2f2;
+}
+.netLine {
+  margin-top: 4px;
+  color: #f5c34d;
+  font-size: 13px;
+  font-weight: 700;
+}
+.coins {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #ffc33b;
+  font-weight: 800;
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+  margin-top: 6px;
+}
+.coins img {
+  flex-shrink: 0;
+  width: 15px;
+  height: 15px;
+}
+
+.actions {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.actions .btnRow {
+  display: flex;
+  gap: 8px;
+}
+.action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 0 13px;
+  border-radius: 12px;
+  border: 1px solid rgba(126, 167, 192, 0.28);
+  background: #0c1b26;
+  color: #dce8f4;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 120ms ease, filter 120ms ease;
+}
+.action:hover {
+  background: #14293a;
+}
+.action.gold {
+  border-color: #ffc33b;
+  color: #ffc33b;
+}
+.action.gold:hover {
+  background: rgba(255, 195, 59, 0.12);
+}
+.action:active {
+  filter: brightness(0.92);
+}
+.action:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.action svg {
+  flex-shrink: 0;
+}
+
+/* Aggregate stat tiles (main view). */
+.stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin-top: 18px;
+  padding: 14px 10px;
+  border: 1px solid rgba(126, 167, 192, 0.16);
+  border-radius: 16px;
+  background: linear-gradient(
+    180deg,
+    rgba(10, 26, 36, 0.9),
+    rgba(8, 20, 28, 0.9)
+  );
+}
+.stat {
+  position: relative;
+  text-align: center;
+  min-width: 0;
+}
+.stat:not(:last-child)::after {
+  content: "";
+  position: absolute;
+  top: 10px;
+  bottom: 10px;
+  right: -5px;
+  width: 1px;
+  background: rgba(126, 167, 192, 0.18);
+}
+.statValue {
+  font-size: 17px;
+  line-height: 1;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: #f3f8fc;
+}
+.statLabel {
+  margin-top: 6px;
+  font-size: 10px;
+  color: #7ea0bf;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Big tappable rows (detailed stats / achievements). */
+.row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  margin-top: 12px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(126, 167, 192, 0.16);
+  background: linear-gradient(180deg, #0b1a24, #08141c);
+  color: #e8f1f7;
+  text-align: left;
+  cursor: pointer;
+  transition: background 120ms ease;
+}
+.row:hover {
+  background: linear-gradient(180deg, #0e2230, #0a1a24);
+}
+.rowIcon {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  color: #ffc33b;
+  background: rgba(255, 195, 59, 0.1);
+  font-size: 15px;
+}
+.rowIcon.blue {
+  color: #7fc7ff;
+  background: rgba(127, 199, 255, 0.1);
+}
+.rowCopy {
+  flex: 1;
+  min-width: 0;
+}
+.rowCopy strong {
+  display: block;
+  font-size: 13px;
+}
+.rowCopy span {
+  display: block;
+  margin-top: 2px;
+  color: #69839a;
+  font-size: 10.5px;
+}
+.chev {
+  color: #9bb0c4;
+  font-size: 17px;
+}
+
+/* Detail (stats) sub-view. */
+.detailHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 0 2px;
+}
+.backBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: #9fb6cc;
+  font-size: 12px;
+  cursor: pointer;
+}
+.backBtn:hover {
+  color: #e8f1f7;
+  background: rgba(126, 167, 192, 0.1);
+}
+.detailHead h3 {
+  margin: 0 0 0 4px;
+  font-size: 15px;
+}
+.detailList {
+  margin-top: 6px;
+  display: flex;
+  flex-direction: column;
+}
+.detailRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 7px 2px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+.detailRow:last-child {
+  border-bottom: 0;
+}
+.detailRow dt {
+  color: #9fb6cc;
+  font-size: 12px;
+}
+.detailRow dd {
+  margin: 0;
+  color: #edf5fa;
+  font-size: 12px;
+  font-weight: 700;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.sectionTitle {
+  margin: 14px 2px 0;
+  color: #69839a;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+@media (max-width: 640px) {
+  .sheetCenter {
+    max-width: none;
+    border-radius: 22px;
+  }
+  /* Avatar + name share one row; the actions drop to their own full-width
+     row underneath so they can never squeeze the name into wrapping. */
+  .head {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    align-items: center;
+    gap: 10px 14px;
+  }
+  .actions {
+    grid-column: 1 / -1;
+    width: 100%;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .actions .btnRow {
+    display: flex;
+    flex: 1 1 auto;
+    gap: 8px;
+  }
+  .actions .btnRow .action {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+  .stats {
+    grid-template-columns: repeat(4, 1fr);
+    gap: 4px;
+    padding: 12px 4px;
+  }
+  .statValue {
+    font-size: 14px;
+  }
+  .statLabel {
+    font-size: 9px;
+  }
+}

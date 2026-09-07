@@ -3,7 +3,7 @@ import Game from "../components/Game";
 import Register from "../components/Register";
 import Lobby from "../components/Lobby";
 import Preloader from "../components/Preloader";
-import Profile from "../components/Profile";
+import ProfileCard from "../components/ProfileCard";
 import SessionBoard from "../components/SessionBoard";
 import Toast from "../components/Toast";
 import { useContext, useEffect, useState } from "react";
@@ -122,7 +122,7 @@ export default function IndexPage() {
         <Game />
       )}
       <SessionBoard />
-      <Profile />
+      <ProfileCard />
       <Toast />
     </Layout>
   );
