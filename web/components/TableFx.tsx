@@ -146,14 +146,15 @@ export default function TableFx({ game, maxPlayers, layout }: props) {
           slot,
           maxPlayersRef.current
         );
-        // A few chips stream from the pot to each winner, coloured by the
-        // size of the pot they carry.
+        // A few chips stream from the table centre to each winner, coloured
+        // by the size of the pot they carry. The centre matches where bets
+        // converge, so the pot reads as one pile that then splits out.
+        const { x: cx, y: cy } = layoutRef.current.center;
         const tone = chipToneFor(pot.amount);
         for (let i = 0; i < 4; i++) {
           flyBetween(
-            layoutRef.current.pot.x +
-              (((Math.random() - 0.5) * 24) / layoutRef.current.width) * 100,
-            layoutRef.current.pot.y +
+            cx + (((Math.random() - 0.5) * 24) / layoutRef.current.width) * 100,
+            cy +
               (((Math.random() - 0.5) * 12) / layoutRef.current.height) * 100,
             seat.x,
             seat.y,
