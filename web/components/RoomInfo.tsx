@@ -32,6 +32,8 @@ export default function RoomInfo({ onClose }: RoomInfoProps) {
   const rows: Array<[string, string]> = [
     [t("roomName"), appState.table ?? "—"],
     [t("roomMode"), tournament ? t("tournament") : t("modeCash")],
+    // Tournaments cap each player's total buy-in (maxBuy); cash games do not.
+    ...(tournament ? [[t("maxBuy"), `${cfg.maxBuy}`] as [string, string]] : []),
     [t("blinds"), `${cfg.sb} / ${cfg.bb}`],
     [t("buyIn"), `${cfg.buyIn}`],
     [t("maxPlayers"), `${cfg.maxPlayers}`],
