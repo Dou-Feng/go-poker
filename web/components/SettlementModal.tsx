@@ -1,5 +1,9 @@
 import { useTranslation } from "../hooks/useTranslation";
 import Chip from "./Chip";
+import {
+  SETTLEMENT_LAUREL_IMAGE,
+  SETTLEMENT_FLOW_ARROW_IMAGE,
+} from "../lib/preload";
 
 export type SettlementPlayer = {
   id: string;
@@ -51,7 +55,7 @@ export default function SettlementModal({
           <section className="winner-hero">
             <img
               className="winner-laurel-bg"
-              src="/assets/ui/settlement/champion-laurel.png"
+              src={SETTLEMENT_LAUREL_IMAGE}
               alt=""
               aria-hidden="true"
               draggable={false}
@@ -104,7 +108,7 @@ export default function SettlementModal({
                   <span>{player.buyIn}</span>
                   <img
                     className="flow-arrow-svg"
-                    src="/assets/ui/settlement/chip-flow-arrow.svg"
+                    src={SETTLEMENT_FLOW_ARROW_IMAGE}
                     alt=""
                     aria-hidden="true"
                     draggable={false}

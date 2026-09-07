@@ -188,8 +188,21 @@ export const RECHARGE_IMAGES = {
 export const WAITING_CARDS_IMAGE = "/assets/ui/table/waiting-cards.webp";
 export const WALLET_FRAME_IMAGE = "/assets/ui/buttons/wallet/wallet_room.png";
 
+// Settlement takeover (end-of-session screen): the laurel hero backdrop and
+// the chip-flow row arrows. They only appear at settlement, but preloading
+// them with the room avoids a blank flash on the laurel image when the
+// result screen first opens.
+export const SETTLEMENT_LAUREL_IMAGE =
+  "/assets/ui/settlement/champion-laurel.webp";
+export const SETTLEMENT_FLOW_ARROW_IMAGE =
+  "/assets/ui/settlement/chip-flow-arrow.svg";
+
 export function rechargeAssetUrls(): string[] {
   return Object.values(RECHARGE_IMAGES);
+}
+
+export function settlementAssetUrls(): string[] {
+  return [SETTLEMENT_LAUREL_IMAGE, SETTLEMENT_FLOW_ARROW_IMAGE];
 }
 
 export function roomAssetUrls(): string[] {
@@ -216,6 +229,8 @@ export function roomAssetUrls(): string[] {
     "/icons/robot.svg",
     "/icons/microphone.svg",
     "/icons/speaker.svg",
+    // End-of-session settlement screen (laurel hero + chip-flow arrows).
+    ...settlementAssetUrls(),
   ];
 }
 
