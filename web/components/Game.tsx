@@ -1,4 +1,4 @@
-import { useContext, useEffect } from "react";
+import { useContext, useEffect, useState } from "react";
 import ChatLog from "./ChatLog";
 import GameInfo from "./GameInfo";
 import Input from "./Input";
@@ -8,6 +8,7 @@ import Stack from "./Stack";
 import Settlement from "./Settlement";
 import Settings from "./Settings";
 import RoomMenu from "./RoomMenu";
+import RoomInfo from "./RoomInfo";
 import VoiceControls from "./VoiceControls";
 import { AppContext } from "../providers/AppStore";
 import { useSocket } from "../hooks/useSocket";
@@ -26,6 +27,7 @@ export default function Game() {
   const socket = useSocket();
   const { t } = useTranslation();
   const assets = useSceneAssets(roomAssetUrls);
+  const [showRoomInfo, setShowRoomInfo] = useState(false);
 
   // Voice chat is scoped to the room: bind the mesh to this room under our
   // account id, and switch it off when the screen goes away (leave button,
@@ -104,7 +106,14 @@ export default function Game() {
         <Table />
       </div>
       {game && (
-        <div className="absolute left-1/2 top-0 z-50 flex -translate-x-1/2 flex-row items-center gap-2 rounded-b-lg bg-tablehi/90 px-3 py-1.5 sm:px-4">
+        <button
+          type="button"
+          onClick={() => setShowRoomInfo((o) => !o)}
+          data-sfx="pong"
+          aria-expanded={showRoomInfo}
+          aria-label={t("roomInfo")}
+          className="absolute left-1/2 top-0 z-50 flex -translate-x-1/2 cursor-pointer flex-row items-center gap-2 rounded-b-lg bg-tablehi/90 px-3 py-1.5 transition-colors hover:bg-cardhi/90 sm:px-4"
+        >
           {showVotes && (
             <>
               {/* One circle per player on wide screens; a compact "voted /
@@ -134,7 +143,10 @@ export default function Game() {
               : game.handsPlayed + 1}
             /{game.config.handsLimit > 0 ? game.config.handsLimit : "∞"}
           </span>
-        </div>
+        </button>
+      )}
+      {showRoomInfo && game && (
+        <RoomInfo onClose={() => setShowRoomInfo(false)} />
       )}
       {/* Bottom-right controls: stats / rebuy / spectate sit in the open,
           with host-only bot management behind the "..." button. */}

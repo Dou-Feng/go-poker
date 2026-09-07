@@ -277,6 +277,39 @@
   align-self: flex-end;
 }
 
+/* Room-info rows (opened from the hands pill) ride the shared dialog
+   surface (Dialog.module.css .dialog); only the label/value list is local. */
+.room-info-list {
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+.room-info-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 7px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+.room-info-row:last-child {
+  border-bottom: 0;
+}
+.room-info-row dt {
+  flex-shrink: 0;
+  color: #b7cbd8;
+  font-size: 13px;
+}
+.room-info-row dd {
+  margin: 0;
+  color: #edf5fa;
+  font-size: 13.5px;
+  font-weight: 600;
+  text-align: right;
+  word-break: break-word;
+}
+
 .room-action-input {
   padding-bottom: max(72px, calc(env(safe-area-inset-bottom) + 60px));
 }

@@ -1214,6 +1214,8 @@ func createUpdatedGame(c *Client) []byte {
 		Busted:            c.table.isBusted(c.accountUUID),
 		ActionTimeout:     timeoutSec,
 		ActionRemainingMs: remainingMs,
+		Locked:            c.table.password != "",
+		CreatedAt:         c.table.createdAt.UnixMilli(),
 	}
 
 	resp, err := json.Marshal(game)
@@ -1237,6 +1239,8 @@ func createUpdatedGameBytes(t *table) []byte {
 		Host:              t.hostAccount(),
 		ActionTimeout:     timeoutSec,
 		ActionRemainingMs: remainingMs,
+		Locked:            t.password != "",
+		CreatedAt:         t.createdAt.UnixMilli(),
 	}
 
 	resp, err := json.Marshal(game)

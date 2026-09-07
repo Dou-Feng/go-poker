@@ -41,6 +41,7 @@ type table struct {
 	broadcast     chan []byte
 	game          *poker.Game
 	password      string
+	createdAt     time.Time
 	stop          chan struct{}
 	stopOnce      sync.Once
 	emptyTimer    *time.Timer
@@ -90,6 +91,8 @@ func newTable(name string, redisClient *redis.Client, hub *Hub) *table {
 		unregister:    make(chan *Client, 32),
 		broadcast:     make(chan []byte, 64),
 		game:          game,
+		createdAt:     time.Now(),
+		password:      "",
 		stop:          make(chan struct{}),
 		offlineTimers: make(map[string]*time.Timer),
 		offlineAfter:  offlineTimeout,
@@ -346,6 +349,8 @@ func (t *table) censoredGameFor(client *Client, m *updateGame) []byte {
 		Busted:            t.isBusted(client.accountUUID),
 		ActionTimeout:     m.ActionTimeout,
 		ActionRemainingMs: m.ActionRemainingMs,
+		Locked:            m.Locked,
+		CreatedAt:         m.CreatedAt,
 	}
 
 	resp, err := json.Marshal(game)
@@ -405,6 +410,8 @@ func (m *updateGame) censoredFor(viewerUUID string) []byte {
 		Host:              m.Host,
 		ActionTimeout:     m.ActionTimeout,
 		ActionRemainingMs: m.ActionRemainingMs,
+		Locked:            m.Locked,
+		CreatedAt:         m.CreatedAt,
 	}
 
 	resp, err := json.Marshal(game)

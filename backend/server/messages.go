@@ -341,6 +341,10 @@ type updateGame struct {
 	// tournament session (max buy-ins used, stack 0): the client should not
 	// offer them empty seats they can no longer take.
 	Busted bool `json:"busted,omitempty"`
+	// Room facts for the room-info panel: whether entry needs a password, and
+	// when the room was created (Unix milliseconds).
+	Locked    bool  `json:"locked,omitempty"`
+	CreatedAt int64 `json:"createdAt,omitempty"`
 }
 
 type updatePlayerUUID struct {

@@ -177,6 +177,11 @@ export type Game = {
   actionTimeout: number;
   /** Local clock time (ms) when the player to act times out, or null. */
   actionDeadline: number | null;
+  /** Whether the room is protected by a password (the password itself is
+   *  never sent to clients). */
+  locked: boolean;
+  /** Room creation time, Unix milliseconds. */
+  createdAt: number;
   handsPlayed: number;
   biggestPotAmt: number;
   biggestPotWinners: number[];
