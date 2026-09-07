@@ -186,6 +186,7 @@ export const RECHARGE_IMAGES = {
 };
 
 export const WAITING_CARDS_IMAGE = "/assets/ui/table/waiting-cards.webp";
+export const WALLET_FRAME_IMAGE = "/assets/ui/buttons/wallet/wallet_room.png";
 
 export function rechargeAssetUrls(): string[] {
   return Object.values(RECHARGE_IMAGES);
@@ -198,6 +199,8 @@ export function roomAssetUrls(): string[] {
     "/textures/table-felt.webp",
     "/textures/table-edge.webp",
     WAITING_CARDS_IMAGE,
+    // Gold bracket frame drawn over the in-room wallet chip button.
+    WALLET_FRAME_IMAGE,
     // Action-bar button layers + the per-key icon, in every state.
     ...BUTTON_KINDS.flatMap((kind) =>
       BUTTON_LAYERS.map((layer) => `/assets/ui/buttons/${kind}/${layer}.png`)
