@@ -100,13 +100,34 @@
 }
 .spectator-copy small {
   display: block;
+  min-height: 14px;
   margin-top: 3px;
   color: #8a9cab;
   font-size: 10px;
+  line-height: 14px;
+}
+
+.spectator-reservation-hint.is-hidden {
+  visibility: hidden;
 }
 .spectator-buttons {
   display: flex;
   gap: 7px;
+}
+
+.spectator-cancel {
+  transition: opacity 160ms ease;
+}
+
+.spectator-cancel.is-hidden {
+  visibility: hidden;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.spectator-cancel.is-visible {
+  visibility: visible;
+  opacity: 1;
 }
 .spectator-buttons button {
   display: inline-flex;
@@ -125,18 +146,41 @@
   font-weight: 700;
 }
 .spectator-buttons .spectator-primary {
+  position: relative;
   color: #efc355;
   border-color: #d6aa3a;
   background: linear-gradient(#243027, #0b1920);
 }
-.spectator-primary svg {
+.spectator-primary-icon {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  transform: translateY(-50%);
+}
+
+.spectator-primary-icon.is-hidden {
+  visibility: hidden;
+}
+
+.spectator-primary-icon svg {
+  width: 14px;
+  height: 14px;
   color: #6bb574;
 }
 .spectator-buttons button:disabled {
   cursor: default;
 }
-.spectator-buttons button:disabled:not(:has(svg)) {
+.spectator-buttons button:disabled {
   opacity: 0.55;
+}
+
+.spectator-buttons .spectator-primary:disabled:has(.spectator-primary-icon.is-visible) {
+  opacity: 1;
 }
 .spectator-buttons button:not(:disabled):hover {
   filter: brightness(1.2);

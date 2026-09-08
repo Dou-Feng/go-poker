@@ -4,6 +4,7 @@ import {
   FiChevronRight,
   FiEye,
   FiLock,
+  FiShield,
   FiUnlock,
   FiUser,
   FiUsers,
@@ -21,24 +22,32 @@ import Portal from "./Portal";
 import ui from "../styles/Dialog.module.css";
 
 type RoomDockProps = { dockRef: Ref<HTMLDivElement> };
+
 export default function RoomDock({ dockRef }: RoomDockProps) {
   const { appState } = useContext(AppContext);
   const { t } = useTranslation();
   const socket = useSocket();
   const [showSpectators, setShowSpectators] = useState(false);
+
   const game = appState.game;
   if (!game) return null;
+
   const me = game.players.find((p) => p.uuid === appState.clientID);
+
   const { reservation, seatID, blocked } = spectatorSeatState(
     game,
     appState.uuid,
     appState.chips
   );
+
   const spectators = game.spectators ?? [];
+
   const join = (id: number) => {
-    if (socket && appState.username && id)
+    if (socket && appState.username && id) {
       takeSeat(socket, appState.username, id, game.config.buyIn);
+    }
   };
+
   const status = reservation
     ? "seatReservedStatus"
     : blocked ?? (game.running ? "reserveNextHandHint" : "pickSeat");
@@ -49,12 +58,17 @@ export default function RoomDock({ dockRef }: RoomDockProps) {
         <section className="spectator-card" aria-label={t("spectatorPanel")}>
           <div className="spectator-identity">
             <header className="spectator-heading">
-              <FiEye aria-hidden="true" />
+              {game.running ? (
+                <FiEye aria-hidden="true" />
+              ) : (
+                <FiShield aria-hidden="true" />
+              )}
               <div>
-                <h2>{t("spectatorPanel")}</h2>
-                <span>SPECTATOR</span>
+                <h2>{game.running ? t("spectatorPanel") : "备战中"}</h2>
+                <span>{game.running ? "SPECTATOR" : "READY ROOM"}</span>
               </div>
             </header>
+
             <div className="spectator-person">
               <span className="spectator-avatar">
                 <Avatar
@@ -66,14 +80,27 @@ export default function RoomDock({ dockRef }: RoomDockProps) {
                   size={48}
                 />
               </span>
+
               <div className="spectator-copy">
                 <strong title={appState.username ?? ""}>
                   {appState.username}
                 </strong>
-                <p className={reservation ? "is-reserved" : ""}>{t(status)}</p>
-                {reservation && <small>{t("autoSeatNextHand")}</small>}
+
+                <p className={reservation ? "is-reserved" : ""}>
+                  {t(status)}
+                </p>
+
+                <small
+                  className={`spectator-reservation-hint ${
+                    reservation ? "is-visible" : "is-hidden"
+                  }`}
+                  aria-hidden={!reservation}
+                >
+                  {t("autoSeatNextHand")}
+                </small>
               </div>
             </div>
+
             <div className="spectator-buttons">
               <button
                 className="spectator-primary"
@@ -82,25 +109,44 @@ export default function RoomDock({ dockRef }: RoomDockProps) {
                 }
                 onClick={() => join(seatID)}
               >
-                {reservation && <FiCheck aria-hidden="true" />}
-                {t(
-                  reservation
-                    ? "seatReservedShort"
-                    : game.running
-                    ? "reserveSeat"
-                    : "takeSeatNow"
-                )}
-              </button>
-              {reservation && (
-                <button
-                  onClick={() => join(reservation.seatID)}
-                  disabled={!socket}
+                <span
+                  className={`spectator-primary-icon ${
+                    reservation ? "is-visible" : "is-hidden"
+                  }`}
+                  aria-hidden="true"
                 >
-                  {t("cancelReservation")}
-                </button>
-              )}
+                  <FiCheck />
+                </span>
+
+                <span>
+                  {t(
+                    reservation
+                      ? "seatReservedShort"
+                      : game.running
+                      ? "reserveSeat"
+                      : "takeSeatNow"
+                  )}
+                </span>
+              </button>
+
+              <button
+                className={`spectator-cancel ${
+                  reservation ? "is-visible" : "is-hidden"
+                }`}
+                onClick={() => {
+                  if (reservation) {
+                    join(reservation.seatID);
+                  }
+                }}
+                disabled={!reservation || !socket}
+                aria-hidden={!reservation}
+                tabIndex={reservation ? 0 : -1}
+              >
+                {t("cancelReservation")}
+              </button>
             </div>
           </div>
+
           <aside className="spectator-room-info">
             <h3>
               {game.locked ? (
@@ -110,6 +156,7 @@ export default function RoomDock({ dockRef }: RoomDockProps) {
               )}
               {t("roomInfo")}
             </h3>
+
             <dl>
               <div>
                 <dt>{t("blinds")}</dt>
@@ -117,10 +164,12 @@ export default function RoomDock({ dockRef }: RoomDockProps) {
                   {game.config.sb} / {game.config.bb}
                 </dd>
               </div>
+
               <div>
                 <dt>{t("buyIn")}</dt>
                 <dd>{game.config.buyIn}</dd>
               </div>
+
               <div>
                 <dt>{t("players")}</dt>
                 <dd>
@@ -128,6 +177,7 @@ export default function RoomDock({ dockRef }: RoomDockProps) {
                   {game.config.maxPlayers}
                 </dd>
               </div>
+
               <div>
                 <dt>{t("spectate")}</dt>
                 <dd>{spectators.length}</dd>
@@ -136,8 +186,10 @@ export default function RoomDock({ dockRef }: RoomDockProps) {
           </aside>
         </section>
       )}
+
       <div className="room-dock-footer">
         <ChatLog dock />
+
         <button
           className="room-spectators-trigger"
           onClick={() => setShowSpectators(true)}
@@ -149,8 +201,10 @@ export default function RoomDock({ dockRef }: RoomDockProps) {
           </span>
           <FiChevronRight className="spectator-chevron" aria-hidden="true" />
         </button>
+
         <RoomMenu docked />
       </div>
+
       {showSpectators && (
         <Portal>
           <div className={ui.overlay} onClick={() => setShowSpectators(false)}>
@@ -165,6 +219,7 @@ export default function RoomDock({ dockRef }: RoomDockProps) {
                 <h2>
                   {t("spectatorList")} ({spectators.length})
                 </h2>
+
                 <button
                   className={ui.iconButton}
                   onClick={() => setShowSpectators(false)}
@@ -173,6 +228,7 @@ export default function RoomDock({ dockRef }: RoomDockProps) {
                   <FiX />
                 </button>
               </div>
+
               {spectators.length === 0 ? (
                 <p className="text-muted">{t("noSpectators")}</p>
               ) : (
@@ -191,7 +247,9 @@ export default function RoomDock({ dockRef }: RoomDockProps) {
                         <span className="spectator-list-avatar">
                           <FiUser aria-hidden="true" />
                         </span>
+
                         <span>{person.username || t("guestSpectator")}</span>
+
                         {person.accountUuid === appState.uuid && (
                           <small>{t("you")}</small>
                         )}
