@@ -156,6 +156,7 @@ export function SocketProvider(props: SocketProviderProps) {
               minRaise: event.game.minRaise,
               readyCount: event.game.readyCount,
               reserved: event.reserved ?? [],
+              spectators: event.spectators ?? [],
               settleVotes: event.settleVotes ?? [],
               host: event.host ?? "",
               busted: event.busted ?? false,

@@ -52,3 +52,16 @@ checks translation key use; CSS Module class references also need checking
 when selectors move because Next's default CSS Module typing accepts any key.
 Browser visual verification requires the Chromium system libraries, which
 are not installed in the current workspace environment.
+
+## Room spectator dock
+
+`room-dock.css` styles the spectator identity/reservation card and the shared
+bottom chat/observer toolbar. `Game.tsx` measures the dock with ResizeObserver
+and feeds its height to the table and action area, keeping the seat/FX layout
+on the same measured scene. Compact landscape screens place the spectator card
+to the right of the table. Chat and hand logs share a bottom dialog.
+
+`update-game.spectators` is a server snapshot of connected spectators (public
+account UUID and display name only). Room membership changes refresh it even
+between hands; existing reservation and take-seat actions remain authoritative.
+Deploy the backend together with the frontend for the live spectator list.

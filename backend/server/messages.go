@@ -330,6 +330,7 @@ type updateGame struct {
 	Game *poker.GameView `json:"game"`
 	// Reserved lists the empty seats spectators claimed for the next hand
 	// (take-seat during a hand; see reserve.go).
+	Spectators  []roomSpectator   `json:"spectators"`
 	Reserved    []seatReservation `json:"reserved"`
 	SettleVotes []string          `json:"settleVotes"`
 	Host        string            `json:"host,omitempty"` // account UUID of the room host (manages bots)

@@ -1,4 +1,10 @@
-import { useContext, useRef, useState, type ChangeEvent } from "react";
+import {
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+  type ChangeEvent,
+} from "react";
 import { AppContext } from "../providers/AppStore";
 import { Profile as ProfileType, PlayerStats } from "../interfaces";
 import { useTranslation } from "../hooks/useTranslation";
@@ -11,7 +17,13 @@ import { voice } from "../lib/voice";
 import Avatar from "./Avatar";
 import MicIcon from "./MicIcon";
 import PlusIcon from "./PlusIcon";
-import { FiArrowLeft, FiChevronRight, FiEdit2, FiX } from "react-icons/fi";
+import {
+  FiArrowLeft,
+  FiChevronRight,
+  FiCheck,
+  FiEdit2,
+  FiX,
+} from "react-icons/fi";
 import ui from "../styles/Dialog.module.css";
 import s from "../styles/ProfileCard.module.css";
 
@@ -42,6 +54,14 @@ export default function ProfileCard() {
   const [view, setView] = useState<"main" | "detail">("main");
   const [showChangeUsername, setShowChangeUsername] = useState(false);
   const [newUsername, setNewUsername] = useState("");
+  const renameInputRef = useRef<HTMLInputElement>(null);
+  const editNameRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (showChangeUsername) {
+      renameInputRef.current?.focus({ preventScroll: true });
+      renameInputRef.current?.select();
+    }
+  }, [showChangeUsername]);
   const [copied, setCopied] = useState(false);
   // Drag on the room sheet handle: pull down to close.
   const dragStartY = useRef<number | null>(null);
@@ -78,6 +98,14 @@ export default function ProfileCard() {
   // the lobby); there is no default-emoji grid at this stage and in-room
   // editing is not allowed.
   const canEditAvatar = isSelf && !isSession && !inRoom;
+  const canEditName = isSelf && !isSession && !inRoom;
+  const finishRename = () => {
+    setShowChangeUsername(false);
+    setNewUsername("");
+    requestAnimationFrame(() =>
+      editNameRef.current?.focus({ preventScroll: true })
+    );
+  };
 
   const close = () => {
     setShowChangeUsername(false);
@@ -249,56 +277,78 @@ export default function ProfileCard() {
 
                 <div className={s.info}>
                   <div className={s.nameRow}>
-                    <h2>{profile.username}</h2>
-                    {isSelf && !isSession && !inRoom && (
-                      <button
-                        onClick={() =>
-                          setShowChangeUsername(!showChangeUsername)
-                        }
-                        data-sfx="pong"
-                        className={s.editName}
-                        aria-label={t("changeUsername")}
-                        title={t("changeUsername")}
+                    {showChangeUsername && canEditName ? (
+                      <form
+                        className={s.renameForm}
+                        onSubmit={(e) => {
+                          e.preventDefault();
+                          if (!socket || !newUsername.trim()) return;
+                          changeUsername(socket, newUsername.trim());
+                          finishRename();
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.nativeEvent.isComposing) {
+                            if (e.key === "Enter") e.preventDefault();
+                            return;
+                          }
+                          if (e.key === "Escape") {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            finishRename();
+                          }
+                        }}
                       >
-                        <FiEdit2 size={13} />
-                      </button>
+                        <input
+                          ref={renameInputRef}
+                          type="text"
+                          value={newUsername}
+                          onChange={(e) => setNewUsername(e.target.value)}
+                          placeholder={t("newUsername")}
+                          aria-label={t("newUsername")}
+                          className={s.renameInput}
+                          autoComplete="off"
+                        />
+                        <button
+                          type="submit"
+                          className={`${s.editName} ${s.saveName}`}
+                          disabled={!socket || !newUsername.trim()}
+                          aria-label={t("change")}
+                          title={t("change")}
+                        >
+                          <FiCheck size={16} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={finishRename}
+                          data-sfx="back"
+                          aria-label={t("cancel")}
+                          title={t("cancel")}
+                          className={s.editName}
+                        >
+                          <FiX size={16} />
+                        </button>
+                      </form>
+                    ) : (
+                      <>
+                        <h2 title={profile.username}>{profile.username}</h2>
+                        {canEditName && (
+                          <button
+                            ref={editNameRef}
+                            onClick={() => {
+                              setNewUsername(profile.username);
+                              setShowChangeUsername(true);
+                            }}
+                            data-sfx="pong"
+                            className={s.editName}
+                            aria-label={t("changeUsername")}
+                            title={t("changeUsername")}
+                          >
+                            <FiEdit2 size={13} />
+                          </button>
+                        )}
+                      </>
                     )}
                   </div>
-                  {showChangeUsername && isSelf && !isSession && (
-                    <div className={s.renameForm}>
-                      <input
-                        type="text"
-                        value={newUsername}
-                        onChange={(e) => setNewUsername(e.target.value)}
-                        placeholder={t("newUsername")}
-                        aria-label={t("newUsername")}
-                        className={s.renameInput}
-                      />
-                      <button
-                        onClick={() => {
-                          if (socket && newUsername.trim()) {
-                            changeUsername(socket, newUsername.trim());
-                          }
-                          setShowChangeUsername(false);
-                          setNewUsername("");
-                        }}
-                        className={s.action}
-                      >
-                        {t("change")}
-                      </button>
-                      <button
-                        onClick={() => {
-                          setShowChangeUsername(false);
-                          setNewUsername("");
-                        }}
-                        data-sfx="back"
-                        aria-label={t("cancel")}
-                        className={s.action}
-                      >
-                        ✕
-                      </button>
-                    </div>
-                  )}
                   {isSession ? (
                     <p className={s.netLine}>
                       {t("buyInLabel")}: {profile.buyIn} · {t("net")}:{" "}

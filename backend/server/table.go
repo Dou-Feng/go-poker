@@ -125,8 +125,11 @@ func (t *table) run() {
 		select {
 		case client := <-t.register:
 			t.registerClient(client)
+			// Presence updates must reach the room even while no hand is running.
+			t.publishMessages(createUpdatedGameBytes(t))
 		case client := <-t.unregister:
 			t.unregisterClient(client)
+			t.publishMessages(createUpdatedGameBytes(t))
 		case message := <-t.broadcast:
 			t.publishMessages(message)
 		case <-t.stop:
@@ -344,6 +347,7 @@ func (t *table) censoredGameFor(client *Client, m *updateGame) []byte {
 		base:              m.base,
 		Game:              m.Game.CensorFor(m.Game.ViewerNum(client.uuid)),
 		Reserved:          m.Reserved,
+		Spectators:        m.Spectators,
 		SettleVotes:       m.SettleVotes,
 		Host:              m.Host,
 		Busted:            t.isBusted(client.accountUUID),
@@ -406,6 +410,7 @@ func (m *updateGame) censoredFor(viewerUUID string) []byte {
 		base:              m.base,
 		Game:              m.Game.CensorFor(m.Game.ViewerNum(viewerUUID)),
 		Reserved:          m.Reserved,
+		Spectators:        m.Spectators,
 		SettleVotes:       m.SettleVotes,
 		Host:              m.Host,
 		ActionTimeout:     m.ActionTimeout,

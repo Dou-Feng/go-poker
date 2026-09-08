@@ -1,7 +1,7 @@
 import React, { useContext, useEffect, useState } from "react";
 import { MdExpandLess } from "react-icons/md";
 import { MdExpandMore } from "react-icons/md";
-import { FiList, FiMessageSquare, FiX } from "react-icons/fi";
+import { FiList, FiMessageSquare, FiSmile, FiX } from "react-icons/fi";
 import classNames from "classnames";
 import { useTranslation } from "../../hooks/useTranslation";
 import { AppContext } from "../../providers/AppStore";
@@ -16,13 +16,17 @@ type chatLogProps = {
    * panel opens as an overlay above the action area.
    */
   compact?: boolean;
+  dock?: boolean;
 };
 
 // Chat and hand-log panel. Both start collapsed: only the tab buttons (and
 // the room name) are visible. Tapping a tab opens that panel; tapping the
 // active tab again collapses it. Chat messages that arrive while the chat is
 // hidden show as an unread count on the tab.
-export default function ChatLog({ compact = false }: chatLogProps) {
+export default function ChatLog({
+  compact = false,
+  dock = false,
+}: chatLogProps) {
   const { appState } = useContext(AppContext);
   const [open, setOpen] = useState(false);
   const [expand, setExpand] = useState(false);
@@ -58,6 +62,62 @@ export default function ChatLog({ compact = false }: chatLogProps) {
       {unread > 99 ? "99+" : unread}
     </span>
   );
+
+  if (dock) {
+    return (
+      <>
+        <button
+          className="room-chat-trigger"
+          onClick={() => toggle(true)}
+          aria-label={t("chat")}
+          aria-expanded={open}
+        >
+          <FiMessageSquare aria-hidden="true" />
+          <span>{t("saySomething")}</span>
+          {unreadBadge}
+          <FiSmile aria-hidden="true" />
+        </button>
+        {open && (
+          <Portal>
+            <div className="room-chat-backdrop" onClick={() => setOpen(false)}>
+              <section
+                className="room-chat-dialog"
+                role="dialog"
+                aria-modal="true"
+                aria-label={showChat ? t("chat") : t("log")}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <header>
+                  <div className="room-chat-tabs">
+                    <button
+                      className={showChat ? "is-active" : ""}
+                      onClick={() => setShowChat(true)}
+                    >
+                      {t("chat")}
+                    </button>
+                    <button
+                      className={!showChat ? "is-active" : ""}
+                      onClick={() => setShowChat(false)}
+                    >
+                      {t("log")}
+                    </button>
+                  </div>
+                  <button
+                    className="room-chat-close"
+                    aria-label={t("close")}
+                    onClick={() => setOpen(false)}
+                  >
+                    <FiX />
+                  </button>
+                </header>
+                {showChat ? <Chat /> : <Log />}
+              </section>
+            </div>
+          </Portal>
+        )}
+      </>
+    );
+  }
 
   if (compact) {
     return (

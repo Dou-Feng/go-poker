@@ -118,12 +118,6 @@ export default function Table() {
   const { t } = useTranslation();
   const game = appState.game;
   const me = game?.players.find((p) => p.uuid === appState.clientID);
-  // A spectator's claim on a seat for the next hand (tap an empty seat
-  // mid-hand; see Seat.tsx).
-  const myReservation =
-    !me && !!appState.uuid
-      ? game?.reserved.find((r) => r.accountUuid === appState.uuid) ?? null
-      : null;
   // Only one client drives the all-in runout (and the post-settlement deal).
   // Otherwise every seated/spectating client sends deal-game in the same
   // interval, flipping the turn + river + settlement almost at once and
@@ -552,7 +546,12 @@ export default function Table() {
         </div>
         <FeltContents layout={layout} waiting={!!game && !game.running} />
         {game && !game.running && (
-          <TableWaiting layout={layout} maxPlayers={maxPlayers} playerCount={game.players.filter(p => !p.left).length} roomName={appState.table ?? ""} />
+          <TableWaiting
+            layout={layout}
+            maxPlayers={maxPlayers}
+            playerCount={game.players.filter((p) => !p.left).length}
+            roomName={appState.table ?? ""}
+          />
         )}
         {game && (
           <TableFx game={game} maxPlayers={maxPlayers} layout={layout} />
@@ -561,13 +560,6 @@ export default function Table() {
           <div className="pointer-events-none absolute inset-0 z-30 flex items-center justify-center">
             <p className="animate-ready-go text-2xl font-extrabold italic tracking-[0.3em] text-[#ffd97a] drop-shadow-[0_2px_12px_rgba(0,0,0,0.85)] sm:text-4xl">
               READY GO!
-            </p>
-          </div>
-        )}
-        {game?.running && !appState.clientID && (
-          <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center">
-            <p className={classNames("px-4 text-center text-sm font-medium opacity-40 sm:text-base", myReservation ? "text-amber-300" : "text-ink")}>
-              {t(myReservation ? "reservedNextHand" : "tapSeatToJoinNext")}
             </p>
           </div>
         )}

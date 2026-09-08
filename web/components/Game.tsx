@@ -1,5 +1,5 @@
-import { useContext, useEffect, useState } from "react";
-import ChatLog from "./ChatLog";
+import { useContext, useEffect, useRef, useState } from "react";
+import RoomDock from "./RoomDock";
 import GameInfo from "./GameInfo";
 import Input from "./Input";
 import Table from "./Table";
@@ -7,7 +7,6 @@ import Wallet from "./Wallet";
 import Stack from "./Stack";
 import Settlement from "./Settlement";
 import Settings from "./Settings";
-import RoomMenu from "./RoomMenu";
 import RoomInfo from "./RoomInfo";
 import VoiceControls from "./VoiceControls";
 import { AppContext } from "../providers/AppStore";
@@ -27,6 +26,8 @@ export default function Game() {
   const socket = useSocket();
   const { t } = useTranslation();
   const assets = useSceneAssets(roomAssetUrls);
+  const roomRef = useRef<HTMLDivElement>(null);
+  const dockRef = useRef<HTMLDivElement>(null);
   const [showRoomInfo, setShowRoomInfo] = useState(false);
 
   // Voice chat is scoped to the room: bind the mesh to this room under our
@@ -72,6 +73,19 @@ export default function Game() {
     }
   }, [appState.botMode, running, isHost, hostReady, dispatch]);
 
+  useEffect(() => {
+    if (!assets.ready || !dockRef.current) return;
+    const measure = () =>
+      roomRef.current?.style.setProperty(
+        "--room-dock-height",
+        `${Math.ceil(dockRef.current?.getBoundingClientRect().height ?? 0)}px`
+      );
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(dockRef.current);
+    return () => observer.disconnect();
+  }, [assets.ready, !!game, !!me]);
+
   // Socket state and room lifecycle keep running while paint assets load.
   // The bounded gate also covers direct session restores into a cold room.
   if (!assets.ready) {
@@ -97,7 +111,9 @@ export default function Game() {
 
   return (
     <div
-      className="app-screen room-wallpaper relative w-screen overflow-hidden bg-floor"
+      className="app-screen room-wallpaper room-with-dock relative w-screen overflow-hidden bg-floor"
+      ref={roomRef}
+      data-spectator={game && !me ? "true" : "false"}
       // No long-press / right-click context menu anywhere in the room: the
       // hold gesture is a game control here.
       onContextMenu={(e) => e.preventDefault()}
@@ -148,31 +164,10 @@ export default function Game() {
       {showRoomInfo && game && (
         <RoomInfo onClose={() => setShowRoomInfo(false)} />
       )}
-      {/* Bottom-right controls: stats / rebuy / spectate sit in the open,
-          with host-only bot management behind the "..." button. */}
-      <RoomMenu />
-      {/* Bottom of the room: on phones only the action keys live here (the
-          bottom edge is for core actions and the system gesture area);
-          chat/log move to the table's left edge. Desktop keeps the chat
-          tabs bottom-left. */}
-      <div className="room-action-layer pointer-events-none absolute inset-x-0 bottom-0 z-50 flex flex-col sm:block">
-        <div className="pointer-events-none w-full sm:absolute sm:inset-x-0 sm:bottom-0 sm:z-20">
-          <Input />
-        </div>
-        <div className="pointer-events-none hidden w-full sm:absolute sm:bottom-0 sm:left-0 sm:right-auto sm:z-10 sm:block">
-          <ChatLog />
-        </div>
+      <RoomDock dockRef={dockRef} />
+      <div className="room-action-layer pointer-events-none absolute inset-x-0 bottom-0 z-50">
+        <Input />
       </div>
-      <div className="absolute left-1 top-[46%] z-20 -translate-y-1/2 sm:hidden">
-        <ChatLog compact />
-      </div>
-      {/* Phones: the room name sits in the very bottom-left corner of the
-          screen, inside the safe area (desktop shows it in the chat tab row). */}
-      {appState.table && (
-        <div className="pointer-events-none absolute bottom-[max(0.5rem,env(safe-area-inset-bottom))] left-2 z-30 sm:hidden">
-          <p className="text-xs font-medium text-muted">{appState.table}</p>
-        </div>
-      )}
       {/* Leave / surrender buttons, anchored at the very top-left. The column
           mirrors the top-right toolbar: Leave lines up with the settings
           gear row and Surrender with the wallet row, sharing the compact
@@ -214,7 +209,9 @@ export default function Game() {
           <VoiceControls />
           <Settings buttonClassName="room-icon-btn" />
         </div>
-        <GameInfo />
+        <div className="room-desktop-info">
+          <GameInfo />
+        </div>
         <Wallet />
         <Stack />
       </div>

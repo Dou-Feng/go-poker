@@ -6,7 +6,7 @@ type SeatPlaceholderProps = ButtonHTMLAttributes<HTMLButtonElement> & {
   label: string;
   caption: string;
   avatar?: ReactNode;
-  variant?: "reserved" | "claim" | "bot";
+  variant?: "reserved" | "claim" | "bot" | "mine";
 };
 
 // The same avatar and panel geometry as an occupied seat, including its

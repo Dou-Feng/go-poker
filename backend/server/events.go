@@ -1209,6 +1209,7 @@ func createUpdatedGame(c *Client) []byte {
 		base:              base{actionUpdateGame},
 		Game:              view.CensorFor(view.ViewerNum(c.uuid)),
 		Reserved:          c.table.reservations(),
+		Spectators:        c.table.spectators(view),
 		SettleVotes:       c.table.settleVoteList(),
 		Host:              c.table.hostAccount(),
 		Busted:            c.table.isBusted(c.accountUUID),
@@ -1230,10 +1231,12 @@ func createUpdatedGame(c *Client) []byte {
 // Redis channel; the per-client censoring happens at the fan-out
 // (table.broadcastToClients), never on the socket.
 func createUpdatedGameBytes(t *table) []byte {
+	view := t.game.GenerateOmniView()
 	timeoutSec, remainingMs := t.actionClockState()
 	game := updateGame{
 		base:              base{actionUpdateGame},
-		Game:              t.game.GenerateOmniView(),
+		Game:              view,
+		Spectators:        t.spectators(view),
 		Reserved:          t.reservations(),
 		SettleVotes:       t.settleVoteList(),
 		Host:              t.hostAccount(),

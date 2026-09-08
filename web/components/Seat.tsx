@@ -454,17 +454,19 @@ export default function Seat({
         disabled={!mine}
         onClick={mine ? sitOrClaim : undefined}
         title={mine ? t("cancelReservation") : undefined}
-        variant="reserved"
-        label={reservation.username}
-        caption={t("nextHand")}
+        variant={mine ? "mine" : "reserved"}
+        label={mine ? t("myReservedSeat") : reservation.username}
+        caption={t("joinNextHandShort")}
         avatar={
-          <Avatar
-            username={reservation.username}
-            uuid={reservation.accountUuid}
-            emoji={reservation.avatar || "🙂"}
-            hasImage={reservation.avatarImage}
-            size={36}
-          />
+          mine ? undefined : (
+            <Avatar
+              username={reservation.username}
+              uuid={reservation.accountUuid}
+              emoji={reservation.avatar || "🙂"}
+              hasImage={reservation.avatarImage}
+              size={36}
+            />
+          )
         }
       />
     );
