@@ -234,7 +234,9 @@ export function getBgmVolume(): number {
   if (cachedBgmVolume !== null) {
     return cachedBgmVolume;
   }
-  let v = 0.15;
+  // Default to a quiet 5% background bed; users raise it from the settings
+  // dialog (the mute button restores to the same default).
+  let v = 0.05;
   if (typeof window !== "undefined") {
     const raw = window.localStorage.getItem(BGM_KEY);
     if (raw !== null) {

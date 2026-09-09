@@ -13,6 +13,7 @@ import classNames from "classnames";
 import { useTranslation } from "../../hooks/useTranslation";
 import { AppContext } from "../../providers/AppStore";
 import Chat from "./Chat";
+import ChatComposer from "./ChatComposer";
 import Log from "./Log";
 import Portal from "../Portal";
 
@@ -108,6 +109,9 @@ export default function ChatLog({
   );
 
   if (dock) {
+    // Collapsed, the trigger is a "say something…" invitation. Once open, the
+    // very same bottom row is replaced by the live composer (ChatComposer) so
+    // the panel reads as a real chat: history above, input pinned at the base.
     const triggerContent = (
       <>
         <FiMessageSquare aria-hidden="true" />
@@ -189,19 +193,25 @@ export default function ChatLog({
                   <FiX />
                 </button>
               </header>
-              {showChat ? <Chat /> : <Log />}
+              {showChat ? <Chat noComposer /> : <Log />}
             </section>
           </div>
-          <button
-            ref={dockTriggerRef}
-            type="button"
-            className="room-chat-trigger"
-            onClick={() => toggle(true)}
-            aria-label={t("chat")}
-            aria-expanded={open}
-          >
-            {triggerContent}
-          </button>
+          <div className="dock-chat-input">
+            {open ? (
+              <ChatComposer />
+            ) : (
+              <button
+                ref={dockTriggerRef}
+                type="button"
+                className="room-chat-trigger"
+                onClick={() => toggle(true)}
+                aria-label={t("chat")}
+                aria-expanded={open}
+              >
+                {triggerContent}
+              </button>
+            )}
+          </div>
         </div>
       </div>
     );

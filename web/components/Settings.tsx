@@ -144,7 +144,7 @@ export default function Settings({ buttonClassName }: SettingsProps) {
                     className={sliderClass}
                   />
                   <button
-                    onClick={() => applyBgm(bgmVolume === 0 ? 15 : 0)}
+                    onClick={() => applyBgm(bgmVolume === 0 ? 5 : 0)}
                     title={t("bgm")}
                     aria-label={t("bgm")}
                     aria-pressed={bgmVolume === 0}

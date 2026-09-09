@@ -265,7 +265,8 @@
   background: #0e1712;
   color: #eaf4ec;
   font: inherit;
-  font-size: 12.5px;
+  /* 16px: iOS would otherwise zoom the viewport into this field on focus. */
+  font-size: 16px;
   line-height: 1.6;
   resize: vertical;
 }

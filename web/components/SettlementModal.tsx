@@ -1,5 +1,6 @@
 import { useTranslation } from "../hooks/useTranslation";
 import Chip from "./Chip";
+import Avatar from "./Avatar";
 import {
   SETTLEMENT_LAUREL_IMAGE,
   SETTLEMENT_FLOW_ARROW_IMAGE,
@@ -9,6 +10,10 @@ export type SettlementPlayer = {
   id: string;
   name: string;
   avatar: string;
+  /** Uploaded picture avatar — render it instead of the emoji fallback. */
+  avatarImage?: boolean;
+  avatarUuid?: string;
+  avatarVersion?: number;
   buyIn: number;
   endingChips: number;
 };
@@ -41,6 +46,27 @@ export default function SettlementModal({
   const profit = (p: SettlementPlayer) => p.endingChips - p.buyIn;
   const fmtProfit = (v: number) => `${v >= 0 ? "+" : ""}${v}`;
 
+  // Settlement faces must reflect uploaded pictures too, not just emoji: show
+  // the real <img> avatar when the account has one, else the emoji in the
+  // circle (which keeps its existing font sizing from the parent rules).
+  const avatarFace = (
+    p: SettlementPlayer,
+    size: number,
+    fallback = "🙂"
+  ) =>
+    p.avatarImage && p.avatarUuid ? (
+      <Avatar
+        username={p.name}
+        uuid={p.avatarUuid}
+        emoji={p.avatar}
+        hasImage
+        size={size}
+        version={p.avatarVersion}
+      />
+    ) : (
+      <span>{p.avatar || fallback}</span>
+    );
+
   return (
     <div className="settlement-root">
       <section
@@ -65,7 +91,7 @@ export default function SettlementModal({
                 🏆
               </div>
               <div className="winner-avatar">
-                <span>{winner.avatar || "🙂"}</span>
+                {avatarFace(winner, 78)}
                 <span className="winner-crown" aria-hidden="true">
                   ♛
                 </span>
@@ -99,7 +125,7 @@ export default function SettlementModal({
               <div className="settlement-player-row" key={player.id}>
                 <div className="settlement-player">
                   <div className="settlement-avatar">
-                    <span>{player.avatar || "🙂"}</span>
+                    {avatarFace(player, 48)}
                   </div>
                   <strong>{player.name}</strong>
                 </div>
@@ -132,7 +158,7 @@ export default function SettlementModal({
             <div className="biggest-pot">
               <div className="pot-player">
                 <div className="pot-avatar">
-                  {biggestPotPlayer.avatar || "🪙"}
+                  {avatarFace(biggestPotPlayer, 40, "🪙")}
                 </div>
                 <strong>{biggestPotPlayer.name}</strong>
               </div>

@@ -140,7 +140,9 @@
   border: 0;
   outline: 0;
   color: #f5f9fc;
-  font-size: 15px;
+  /* >=16px: iOS Safari otherwise auto-zooms the whole page into the focused
+     field (and the zoomed page then pans like a web page, not a game). */
+  font-size: 16px;
 }
 .field input::placeholder {
   color: #91a5b4;

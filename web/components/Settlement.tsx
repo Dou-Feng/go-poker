@@ -28,6 +28,11 @@ export default function Settlement({ onLeaveRoom }: settlementProps) {
     id: p.uuid || p.username,
     name: p.username,
     avatar: p.avatar || "🙂",
+    avatarImage: p.avatarImage,
+    avatarUuid: p.uuid,
+    // Cache-bust only the current user's freshly uploaded picture.
+    avatarVersion:
+      p.uuid === appState.uuid ? appState.avatarVersion : undefined,
     buyIn: p.buyIn,
     // Everyone has cashed out at settlement: end chips = buy-in + net.
     endingChips: p.buyIn + p.net,
