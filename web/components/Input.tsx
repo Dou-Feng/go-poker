@@ -105,7 +105,8 @@ export default function Input() {
       >
         <InputButton
           kind="check"
-          label={canCheck ? "过牌" : `跟注 ${callAmount}`}
+          label={canCheck ? "过牌" : "跟注"}
+          amount={canCheck ? undefined : callAmount}
           subLabel={canCheck ? "CHECK" : "CALL"}
           onClick={() => handleCallOrCheck(appState.username)}
         />

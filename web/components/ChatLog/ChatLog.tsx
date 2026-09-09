@@ -1,4 +1,11 @@
-import React, { useContext, useEffect, useState } from "react";
+import React, {
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type PointerEvent as ReactPointerEvent,
+} from "react";
 import { MdExpandLess } from "react-icons/md";
 import { MdExpandMore } from "react-icons/md";
 import { FiList, FiMessageSquare, FiSmile, FiX } from "react-icons/fi";
@@ -31,6 +38,10 @@ export default function ChatLog({
   const [open, setOpen] = useState(false);
   const [expand, setExpand] = useState(false);
   const [showChat, setShowChat] = useState(true);
+  const [dockHeight, setDockHeight] = useState(260);
+  const dockRef = useRef<HTMLDivElement>(null);
+  const dockTriggerRef = useRef<HTMLButtonElement>(null);
+  const dragRef = useRef<{ y: number; height: number } | null>(null);
   // Messages already on screen when the panel was last visible (or when the
   // room was entered) do not count as unread.
   const [seenMessages, setSeenMessages] = useState(
@@ -44,6 +55,14 @@ export default function ChatLog({
       setSeenMessages(appState.messages.length);
     }
   }, [chatVisible, appState.messages.length]);
+  useEffect(() => {
+    if (!dock || !open) return;
+    const outside = (event: PointerEvent) => {
+      if (!dockRef.current?.contains(event.target as Node)) setOpen(false);
+    };
+    document.addEventListener("pointerdown", outside);
+    return () => document.removeEventListener("pointerdown", outside);
+  }, [dock, open]);
   const unread = chatVisible
     ? 0
     : Math.max(0, appState.messages.length - seenMessages);
@@ -57,6 +76,31 @@ export default function ChatLog({
     setOpen(true);
   };
 
+  const resizeDock = (nextHeight: number) => {
+    const maxHeight = Math.max(
+      220,
+      Math.min(480, (window.visualViewport?.height ?? window.innerHeight) - 120)
+    );
+    setDockHeight(Math.min(maxHeight, Math.max(220, nextHeight)));
+  };
+
+  const startDockResize = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    dragRef.current = { y: event.clientY, height: dockHeight };
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+
+  const continueDockResize = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    if (!dragRef.current) return;
+    resizeDock(dragRef.current.height + dragRef.current.y - event.clientY);
+  };
+
+  const stopDockResize = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    dragRef.current = null;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+  };
+
   const unreadBadge = unread > 0 && (
     <span className="rounded-full bg-rose-600 px-1.5 text-xs font-semibold leading-4 text-ink">
       {unread > 99 ? "99+" : unread}
@@ -64,58 +108,102 @@ export default function ChatLog({
   );
 
   if (dock) {
-    return (
+    const triggerContent = (
       <>
-        <button
-          className="room-chat-trigger"
-          onClick={() => toggle(true)}
-          aria-label={t("chat")}
-          aria-expanded={open}
-        >
-          <FiMessageSquare aria-hidden="true" />
-          <span>{t("saySomething")}</span>
-          {unreadBadge}
-          <FiSmile aria-hidden="true" />
-        </button>
-        {open && (
-          <Portal>
-            <div className="room-chat-backdrop" onClick={() => setOpen(false)}>
-              <section
-                className="room-chat-dialog"
-                role="dialog"
-                aria-modal="true"
-                aria-label={showChat ? t("chat") : t("log")}
-                onClick={(e) => e.stopPropagation()}
-              >
-                <header>
-                  <div className="room-chat-tabs">
-                    <button
-                      className={showChat ? "is-active" : ""}
-                      onClick={() => setShowChat(true)}
-                    >
-                      {t("chat")}
-                    </button>
-                    <button
-                      className={!showChat ? "is-active" : ""}
-                      onClick={() => setShowChat(false)}
-                    >
-                      {t("log")}
-                    </button>
-                  </div>
-                  <button
-                    className="room-chat-close"
-                    aria-label={t("close")}
-                    onClick={() => setOpen(false)}
-                  >
-                    <FiX />
-                  </button>
-                </header>
-                {showChat ? <Chat /> : <Log />}
-              </section>
-            </div>
-          </Portal>
-        )}
+        <FiMessageSquare aria-hidden="true" />
+        <span>{t("saySomething")}</span>
+        {unreadBadge}
+        <FiSmile aria-hidden="true" />
       </>
+    );
+    return (
+      <div
+        ref={dockRef}
+        className={`dock-expander dock-chat-expander ${open ? "is-open" : ""}`}
+        onBlur={(event) => {
+          if (
+            event.relatedTarget &&
+            !event.currentTarget.contains(event.relatedTarget as Node)
+          )
+            setOpen(false);
+        }}
+        onKeyDown={(event) => {
+          if (event.key === "Escape") {
+            event.stopPropagation();
+            setOpen(false);
+            dockTriggerRef.current?.focus();
+          }
+        }}
+      >
+        <span
+          className="room-chat-trigger dock-expander-sizing"
+          aria-hidden="true"
+        >
+          {triggerContent}
+        </span>
+        <div className="dock-expander-surface">
+          <div className="dock-expander-reveal" aria-hidden={!open}>
+            <section
+              className="dock-chat-panel"
+              role="region"
+              aria-label={showChat ? t("chat") : t("log")}
+              style={
+                { "--dock-chat-height": `${dockHeight}px` } as CSSProperties
+              }
+            >
+              <button
+                type="button"
+                className="dock-chat-handle"
+                aria-label={t("resizeChat")}
+                onPointerDown={startDockResize}
+                onPointerMove={continueDockResize}
+                onPointerUp={stopDockResize}
+                onPointerCancel={stopDockResize}
+                onKeyDown={(event) => {
+                  if (event.key === "ArrowUp") resizeDock(dockHeight + 40);
+                  if (event.key === "ArrowDown") resizeDock(dockHeight - 40);
+                }}
+              >
+                <span />
+              </button>
+              <header>
+                <div className="room-chat-tabs">
+                  <button
+                    className={showChat ? "is-active" : ""}
+                    onClick={() => setShowChat(true)}
+                  >
+                    {t("chat")}
+                  </button>
+                  <button
+                    className={!showChat ? "is-active" : ""}
+                    onClick={() => setShowChat(false)}
+                  >
+                    {t("log")}
+                  </button>
+                </div>
+                <button
+                  className="room-chat-close"
+                  aria-label={t("close")}
+                  onClick={() => setOpen(false)}
+                >
+                  <FiX />
+                </button>
+              </header>
+              {showChat ? <Chat /> : <Log />}
+            </section>
+          </div>
+          <button
+            ref={dockTriggerRef}
+            type="button"
+            className="room-chat-trigger"
+            onClick={() => toggle(true)}
+            aria-label={t("chat")}
+            aria-expanded={open}
+          >
+            {triggerContent}
+          </button>
+        </div>
+      </div>
     );
   }
 

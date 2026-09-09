@@ -399,7 +399,7 @@
   font-size: 17px;
 }
 
-/* Detail (stats) sub-view. */
+/* Detail view: three visual levels instead of a database-like row list. */
 .detailHead {
   display: flex;
   align-items: center;
@@ -426,41 +426,94 @@
   margin: 0 0 0 4px;
   font-size: 15px;
 }
-.detailList {
-  margin-top: 6px;
-  display: flex;
-  flex-direction: column;
+.detailStats {
+  margin-top: 14px;
 }
-.detailRow {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 7px 2px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+.detailStats dd,
+.detailStats dt {
+  margin-inline: 0;
 }
-.detailRow:last-child {
-  border-bottom: 0;
+.detailStats .statValue {
+  font-size: 19px;
 }
-.detailRow dt {
-  color: #9fb6cc;
-  font-size: 12px;
+.detailSection {
+  margin-top: 18px;
 }
-.detailRow dd {
-  margin: 0;
-  color: #edf5fa;
+.detailSectionTitle {
+  margin: 0 2px 8px;
+  color: #c5d5e1;
   font-size: 12px;
   font-weight: 700;
-  text-align: right;
+  letter-spacing: 0.02em;
+}
+.detailGrid {
+  display: grid;
+  gap: 1px;
+  overflow: hidden;
+  margin: 0;
+  padding: 1px;
+  border: 1px solid rgba(126, 167, 192, 0.14);
+  border-radius: 15px;
+  background: rgba(126, 167, 192, 0.09);
+}
+.behaviorGrid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.detailMetric,
+.positionMetric {
+  min-width: 0;
+  background: linear-gradient(
+    180deg,
+    rgba(12, 29, 40, 0.98),
+    rgba(8, 21, 29, 0.98)
+  );
+  text-align: center;
+}
+.detailMetric {
+  padding: 13px 8px 12px;
+}
+.detailMetric dd,
+.positionMetric dd {
+  margin: 0;
+  color: #f0f6fa;
+  font-size: 17px;
+  font-weight: 800;
+  line-height: 1;
   font-variant-numeric: tabular-nums;
 }
-.sectionTitle {
-  margin: 14px 2px 0;
-  color: #69839a;
+.detailMetric dt {
+  margin-top: 7px;
+  color: #829fb5;
+  font-size: 10.5px;
+}
+.positionGrid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.positionMetric {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 11px 5px 10px;
+}
+.positionMetric dd {
+  font-size: 16px;
+}
+.positionMetric span {
+  margin-top: 6px;
+  color: #e7c66f;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.09em;
+}
+.positionMetric dt {
+  width: 100%;
+  margin-top: 3px;
+  overflow: hidden;
+  color: #728fa5;
   font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 @media (max-width: 640px) {
@@ -502,5 +555,8 @@
   }
   .statLabel {
     font-size: 9px;
+  }
+  .detailStats .statValue {
+    font-size: 16px;
   }
 }

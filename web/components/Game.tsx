@@ -113,7 +113,7 @@ export default function Game() {
     <div
       className="app-screen room-wallpaper room-with-dock relative w-screen overflow-hidden bg-floor"
       ref={roomRef}
-      data-spectator={game && !me ? "true" : "false"}
+      data-spectator={game?.running && !me ? "true" : "false"}
       // No long-press / right-click context menu anywhere in the room: the
       // hold gesture is a game control here.
       onContextMenu={(e) => e.preventDefault()}

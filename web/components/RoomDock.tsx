@@ -1,25 +1,15 @@
-import { Ref, useContext, useState } from "react";
-import {
-  FiCheck,
-  FiChevronRight,
-  FiEye,
-  FiLock,
-  FiShield,
-  FiUnlock,
-  FiUser,
-  FiUsers,
-  FiX,
-} from "react-icons/fi";
+import { Ref, useContext } from "react";
+import { FiCheck, FiEye, FiLock, FiUnlock } from "react-icons/fi";
 import { AppContext } from "../providers/AppStore";
 import { useTranslation } from "../hooks/useTranslation";
 import { useSocket } from "../hooks/useSocket";
-import { getUser, takeSeat } from "../actions/actions";
+import { takeSeat } from "../actions/actions";
 import { spectatorSeatState } from "../lib/spectatorSeat";
 import Avatar from "./Avatar";
 import ChatLog from "./ChatLog";
 import RoomMenu from "./RoomMenu";
-import Portal from "./Portal";
-import ui from "../styles/Dialog.module.css";
+import SpectatorList from "./SpectatorList";
+import RoomStats from "./RoomStats";
 
 type RoomDockProps = { dockRef: Ref<HTMLDivElement> };
 
@@ -27,7 +17,6 @@ export default function RoomDock({ dockRef }: RoomDockProps) {
   const { appState } = useContext(AppContext);
   const { t } = useTranslation();
   const socket = useSocket();
-  const [showSpectators, setShowSpectators] = useState(false);
 
   const game = appState.game;
   if (!game) return null;
@@ -54,18 +43,14 @@ export default function RoomDock({ dockRef }: RoomDockProps) {
 
   return (
     <div className="room-dock" ref={dockRef}>
-      {!me && (
+      {!me && game.running && (
         <section className="spectator-card" aria-label={t("spectatorPanel")}>
           <div className="spectator-identity">
             <header className="spectator-heading">
-              {game.running ? (
-                <FiEye aria-hidden="true" />
-              ) : (
-                <FiShield aria-hidden="true" />
-              )}
+              <FiEye aria-hidden="true" />
               <div>
-                <h2>{game.running ? t("spectatorPanel") : "备战中"}</h2>
-                <span>{game.running ? "SPECTATOR" : "READY ROOM"}</span>
+                <h2>{t("spectatorPanel")}</h2>
+                <span>SPECTATOR</span>
               </div>
             </header>
 
@@ -86,9 +71,7 @@ export default function RoomDock({ dockRef }: RoomDockProps) {
                   {appState.username}
                 </strong>
 
-                <p className={reservation ? "is-reserved" : ""}>
-                  {t(status)}
-                </p>
+                <p className={reservation ? "is-reserved" : ""}>{t(status)}</p>
 
                 <small
                   className={`spectator-reservation-hint ${
@@ -190,78 +173,14 @@ export default function RoomDock({ dockRef }: RoomDockProps) {
       <div className="room-dock-footer">
         <ChatLog dock />
 
-        <button
-          className="room-spectators-trigger"
-          onClick={() => setShowSpectators(true)}
-          aria-label={`${t("spectatorList")} (${spectators.length})`}
-        >
-          <FiUsers aria-hidden="true" />
-          <span>
-            {t("spectatorList")} <b>({spectators.length})</b>
-          </span>
-          <FiChevronRight className="spectator-chevron" aria-hidden="true" />
-        </button>
+        {me ? (
+          <RoomStats dock className="room-dock-stats" />
+        ) : (
+          <SpectatorList />
+        )}
 
         <RoomMenu docked />
       </div>
-
-      {showSpectators && (
-        <Portal>
-          <div className={ui.overlay} onClick={() => setShowSpectators(false)}>
-            <section
-              className={`${ui.dialog} room-spectators-dialog`}
-              role="dialog"
-              aria-modal="true"
-              aria-label={t("spectatorList")}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className={ui.dialogHeader}>
-                <h2>
-                  {t("spectatorList")} ({spectators.length})
-                </h2>
-
-                <button
-                  className={ui.iconButton}
-                  onClick={() => setShowSpectators(false)}
-                  aria-label={t("close")}
-                >
-                  <FiX />
-                </button>
-              </div>
-
-              {spectators.length === 0 ? (
-                <p className="text-muted">{t("noSpectators")}</p>
-              ) : (
-                <ul>
-                  {spectators.map((person, i) => (
-                    <li key={person.accountUuid || `guest-${i}`}>
-                      <button
-                        disabled={!person.accountUuid || !socket}
-                        onClick={() => {
-                          if (socket) {
-                            getUser(socket, person.accountUuid);
-                            setShowSpectators(false);
-                          }
-                        }}
-                      >
-                        <span className="spectator-list-avatar">
-                          <FiUser aria-hidden="true" />
-                        </span>
-
-                        <span>{person.username || t("guestSpectator")}</span>
-
-                        {person.accountUuid === appState.uuid && (
-                          <small>{t("you")}</small>
-                        )}
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </section>
-          </div>
-        </Portal>
-      )}
     </div>
   );
 }

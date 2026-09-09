@@ -5,10 +5,22 @@ import (
 	"sort"
 )
 
+type clientAvatar struct {
+	emoji string
+	image bool
+}
+
+// Cache only public avatar metadata; room broadcasts never read Redis per viewer.
+func (c *Client) cacheAvatar(user *UserRecord) {
+	c.publicAvatar.Store(&clientAvatar{emoji: user.Avatar, image: user.AvatarImage})
+}
+
 // Public room presence only: no wallets, session IDs or hole cards.
 type roomSpectator struct {
 	AccountUUID string `json:"accountUuid"`
 	Username    string `json:"username"`
+	Avatar      string `json:"avatar"`
+	AvatarImage bool   `json:"avatarImage"`
 }
 
 func (t *table) spectators(view *poker.GameView) []roomSpectator {
@@ -35,7 +47,11 @@ func (t *table) spectators(view *poker.GameView) []roomSpectator {
 		if c.accountUUID != "" {
 			seen[c.accountUUID] = true
 		}
-		result = append(result, roomSpectator{AccountUUID: c.accountUUID, Username: c.username})
+		person := roomSpectator{AccountUUID: c.accountUUID, Username: c.username}
+		if avatar := c.publicAvatar.Load(); avatar != nil {
+			person.Avatar, person.AvatarImage = avatar.emoji, avatar.image
+		}
+		result = append(result, person)
 	}
 	sort.Slice(result, func(i, j int) bool {
 		if result[i].Username == result[j].Username {

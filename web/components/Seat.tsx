@@ -5,7 +5,7 @@ import Card from "./Card";
 import Chip from "./Chip";
 import InputButton from "./InputButton";
 import SeatPlaceholder from "./SeatPlaceholder";
-import { FiCheck, FiX, FiEye } from "react-icons/fi";
+import { FiCheck, FiEye } from "react-icons/fi";
 import classNames from "classnames";
 import { useTranslation } from "../hooks/useTranslation";
 import { TranslationKey } from "../lib/translations";
@@ -158,28 +158,28 @@ export default function Seat({
         },
       });
     };
-    const handleClick = () => {
+    const handleAvatarClick = () => {
       if (removable) {
         if (socket) {
           removeBot(socket, player.uuid);
         }
         return;
       }
-      if (
-        isMine &&
-        running &&
-        player.in &&
-        player.stack === 0 &&
-        !player.revealed
-      ) {
-        // Voluntarily showing my hand (all-in, cards not up yet).
-        playSfx("showcard");
-        if (socket) {
-          showHand(socket);
-        }
-      } else {
-        openStats();
+      openStats();
+    };
+    const handleReady = () => {
+      if (!socket) {
+        return;
       }
+      playSfx("tick");
+      if (player.stack === 0) {
+        dispatch({
+          type: "setAuthError",
+          payload: "not enough chips to ready",
+        });
+        return;
+      }
+      toggleReady(socket);
     };
     const inHand = running && player.in;
     const allIn = inHand && player.stack === 0;
@@ -227,6 +227,8 @@ export default function Seat({
           className={classNames("gps-seat", {
             "gps-seat--idle": !running,
             "gps-seat--hero": isMine,
+            "gps-seat--ready": !running && player.ready,
+            "gps-seat--ready-enabled": !running && isMine && !!socket,
             "gps-seat--active": myTurn,
             "gps-seat--folded": folded,
             "gps-seat--allin": allIn,
@@ -234,15 +236,7 @@ export default function Seat({
             "gps-seat--left": left,
             "gps-seat--removable": removable,
           })}
-          onClick={handleClick}
-          role="button"
-          title={
-            removable
-              ? t("removeBot")
-              : canShow
-              ? t("showCards")
-              : t("viewRoomStats")
-          }
+          onClick={!running && isMine && socket ? handleReady : undefined}
         >
           {allIn && (
             <div className="gps-allin-fx" aria-hidden="true">
@@ -268,7 +262,16 @@ export default function Seat({
             </div>
           )}
 
-          <div className="gps-seat__avatar">
+          <button
+            type="button"
+            className="gps-seat__avatar"
+            onClick={(event) => {
+              event.stopPropagation();
+              handleAvatarClick();
+            }}
+            aria-label={removable ? t("removeBot") : t("viewRoomStats")}
+            title={removable ? t("removeBot") : t("viewRoomStats")}
+          >
             <Avatar
               username={player.username}
               uuid={player.accountUuid}
@@ -297,7 +300,7 @@ export default function Seat({
                 <MicIcon off={micMuted} className="h-3 w-3" />
               </span>
             )}
-          </div>
+          </button>
 
           {running && (
             <div className="gps-seat__cards">
@@ -339,13 +342,42 @@ export default function Seat({
               )}
               {status && <span className="gps-seat__status">{status}</span>}
             </div>
-            <div className="gps-seat__stack">
-              <Chip className="gps-seat__chip" amount={player.stack} />
-              <span className="type-num">{player.stack}</span>
+            <div className="gps-seat__bottom-row">
+              <div className="gps-seat__stack">
+                <Chip className="gps-seat__chip" amount={player.stack} />
+                <span className="type-num">{player.stack}</span>
+              </div>
+              {!running && isMine && (
+                <button
+                  type="button"
+                  className={classNames(
+                    "gps-seat__ready-control",
+                    player.ready && "is-ready"
+                  )}
+                  aria-pressed={player.ready}
+                  aria-label={player.ready ? t("cancelReady") : t("ready")}
+                  title={player.ready ? t("cancelReady") : t("ready")}
+                  disabled={!socket}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    handleReady();
+                  }}
+                >
+                  <span className="gps-seat__ready-icon" aria-hidden="true">
+                    <FiCheck />
+                  </span>
+                  <span>{player.ready ? t("readyStatus") : t("ready")}</span>
+                </button>
+              )}
+              {!running && !isMine && player.ready && (
+                <span className="gps-seat__ready-state">
+                  <span className="gps-seat__ready-icon" aria-hidden="true">
+                    <FiCheck />
+                  </span>
+                  <span>{t("readyStatus")}</span>
+                </span>
+              )}
             </div>
-            {!running && player.ready && (
-              <div className="gps-seat__ready">{t("ready")}</div>
-            )}
           </div>
           {/* Action clock: drains left to right while this player is to act,
               turning red for the last quarter. */}
@@ -371,36 +403,6 @@ export default function Seat({
               setGlassShown(true);
               if (socket) {
                 showHand(socket);
-              }
-            }}
-            className="gp-seat-action"
-          />
-        )}
-        {!running && isMine && (
-          <InputButton
-            kind={player.ready ? "check" : "bet"}
-            dataSfx="tick"
-            label={player.ready ? t("cancelReady") : t("ready")}
-            icon={
-              player.ready ? (
-                <FiX className="gp-action-btn__icon" />
-              ) : (
-                <FiCheck className="gp-action-btn__icon" />
-              )
-            }
-            pressed={player.ready}
-            disabled={!socket}
-            onClick={(e) => {
-              e.stopPropagation();
-              if (player.stack === 0) {
-                dispatch({
-                  type: "setAuthError",
-                  payload: "not enough chips to ready",
-                });
-                return;
-              }
-              if (socket) {
-                toggleReady(socket);
               }
             }}
             className="gp-seat-action"

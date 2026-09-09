@@ -4,14 +4,11 @@ import { AppContext } from "../../providers/AppStore";
 import useChatScroll from "../../hooks/useChatScroll";
 
 export default function Log() {
-  const { appState, dispatch } = useContext(AppContext);
+  const { appState } = useContext(AppContext);
   const scrollRef = useChatScroll(appState.logs);
 
   return (
-    <div
-      ref={scrollRef}
-      className="selectable h-full w-full overflow-auto bg-card p-2"
-    >
+    <div ref={scrollRef} className="game-hand-log selectable">
       {appState.logs.map((log, index) => (
         <LogMessage
           key={index}

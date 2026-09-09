@@ -76,3 +76,29 @@ func TestSpectatorRosterDropsDepartedConnectionsAndIsSorted(t *testing.T) {
 		t.Fatal("previous snapshot mutated")
 	}
 }
+
+func TestSpectatorRosterIncludesAvatarSnapshot(t *testing.T) {
+	tbl, _ := newTestTable(t)
+	watcher := &Client{accountUUID: "watcher", username: "Walker", table: tbl}
+	watcher.cacheAvatar(&UserRecord{Avatar: "😎", AvatarImage: true})
+	tbl.registerClient(watcher)
+	var snapshot updateGame
+	if err := json.Unmarshal(createUpdatedGameBytes(tbl), &snapshot); err != nil {
+		t.Fatal(err)
+	}
+	var censored updateGame
+	if err := json.Unmarshal(snapshot.censoredFor(""), &censored); err != nil {
+		t.Fatal(err)
+	}
+	if len(censored.Spectators) != 1 || censored.Spectators[0].Avatar != "😎" || !censored.Spectators[0].AvatarImage {
+		t.Fatalf("avatar missing from public roster: %+v", censored.Spectators)
+	}
+	watcher.cacheAvatar(&UserRecord{Avatar: "🙂"})
+	next := tbl.spectators(tbl.game.GenerateOmniView())
+	if next[0].Avatar != "🙂" || next[0].AvatarImage {
+		t.Fatalf("stale avatar: %+v", next)
+	}
+	if snapshot.Spectators[0].Avatar != "😎" {
+		t.Fatal("previous avatar snapshot mutated")
+	}
+}

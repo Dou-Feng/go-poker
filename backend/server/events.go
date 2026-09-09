@@ -167,6 +167,7 @@ func handleRegisterUser(c *Client, username string, accountUUID string, password
 	c.username = username
 	c.accountUUID = accountUUID
 	c.send <- createResultWithUUID(actionRegisterResult, true, "", username, accountUUID)
+	c.cacheAvatar(user)
 	c.send <- createUserInfo(c.hub.rdb, user, true)
 	// A fresh account cannot have a live session yet; bound for uniformity
 	// with the other authentication paths.
@@ -204,6 +205,7 @@ func handleLogin(c *Client, identifier string, password string) {
 	c.username = user.Username
 	c.accountUUID = user.UUID
 	c.send <- createResultWithUUID(actionLoginResult, true, "", user.Username, user.UUID)
+	c.cacheAvatar(user)
 	c.send <- createUserInfo(c.hub.rdb, user, true)
 	// Single session per account: a second login kicks the previous
 	// connection and takes over its seat (see session.go).
@@ -228,6 +230,7 @@ func handleReconnectUser(c *Client, accountUUID string) {
 	}
 	c.username = user.Username
 	c.accountUUID = user.UUID
+	c.cacheAvatar(user)
 	c.send <- createUserInfo(c.hub.rdb, user, true)
 	// The replayed login is the account's newest connection: it takes over
 	// any previous one (and any orphaned seat from an offline grace period).
@@ -303,6 +306,7 @@ func handleGetUser(c *Client, targetUUID string) {
 		c.send <- createError("could not load user")
 		return
 	}
+	c.cacheAvatar(user)
 	c.send <- createUserInfo(c.hub.rdb, user, true)
 }
 
@@ -333,6 +337,7 @@ func handleAddFriend(c *Client, friendUUID string) {
 		c.send <- createError("could not save user")
 		return
 	}
+	c.cacheAvatar(user)
 	c.send <- createUserInfo(c.hub.rdb, user, true)
 }
 
@@ -353,6 +358,7 @@ func handleSetAvatar(c *Client, avatar string) {
 		c.send <- createError("could not save user")
 		return
 	}
+	c.cacheAvatar(user)
 	c.send <- createUserInfo(c.hub.rdb, user, true)
 }
 
@@ -391,6 +397,7 @@ func handleChangeUsername(c *Client, newUsername string) {
 
 	c.username = newUsername
 	c.send <- createResultWithUUID(actionChangeUsernameResult, true, "", newUsername, c.accountUUID)
+	c.cacheAvatar(user)
 	c.send <- createUserInfo(c.hub.rdb, user, true)
 }
 
@@ -409,6 +416,7 @@ func handleAddChips(c *Client, amount uint) {
 		c.send <- createError("could not save user")
 		return
 	}
+	c.cacheAvatar(user)
 	c.send <- createUserInfo(c.hub.rdb, user, true)
 }
 
@@ -595,6 +603,7 @@ func handleTakeSeat(c *Client, username string, seatID uint, buyIn uint) {
 		slog.Default().Warn("Set seat id", "error", err)
 	}
 	c.table.broadcastGame()
+	c.cacheAvatar(user)
 	c.send <- createUserInfo(c.hub.rdb, user, true)
 }
 
@@ -659,6 +668,7 @@ func handleRebuy(c *Client, amount uint) {
 	// and must explicitly tap their avatar to get ready.
 	autoStartIfReady(c.table)
 	c.table.broadcastGame()
+	c.cacheAvatar(user)
 	c.send <- createUserInfo(c.hub.rdb, user, true)
 }
 
@@ -717,6 +727,7 @@ func handleUndoRebuy(c *Client) {
 	}
 
 	c.table.broadcastGame()
+	c.cacheAvatar(user)
 	c.send <- createUserInfo(c.hub.rdb, user, true)
 }
 

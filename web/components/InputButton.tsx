@@ -14,6 +14,8 @@ type InputButtonProps = {
   icon?: ReactNode;
   pressed?: boolean;
   label: string;
+  /** Prominent chip amount; the accessible label includes it. */
+  amount?: number;
   /** Small English caption shown under the label. */
   subLabel?: string;
   disabled?: boolean;
@@ -31,6 +33,7 @@ export default function InputButton({
   icon,
   pressed,
   label,
+  amount,
   subLabel = "",
   disabled = false,
   onClick,
@@ -40,11 +43,13 @@ export default function InputButton({
   return (
     <button
       type="button"
-      className={`gp-action-btn gp-action-btn--${kind} ${className}`}
+      className={`gp-action-btn gp-action-btn--${kind} ${
+        amount !== undefined ? "gp-action-btn--amount" : ""
+      } ${className}`}
       disabled={disabled}
       data-sfx={dataSfx}
       onClick={onClick}
-      aria-label={label}
+      aria-label={amount === undefined ? label : `${label} ${amount}`}
       aria-pressed={pressed}
     >
       <span className="gp-action-btn__shadow" aria-hidden="true" />
@@ -63,8 +68,30 @@ export default function InputButton({
         <span className="gp-action-btn__divider" aria-hidden="true" />
 
         <span className="gp-action-btn__text">
-          <strong>{label}</strong>
-          {subLabel && <small>{subLabel}</small>}
+          {amount === undefined ? (
+            <>
+              <strong>{label}</strong>
+              {subLabel && <small>{subLabel}</small>}
+            </>
+          ) : (
+            <>
+              <strong
+                className="gp-action-btn__amount"
+                style={{
+                  fontSize: `${Math.max(
+                    10,
+                    21 - Math.max(0, String(amount).length - 4) * 1.7
+                  )}px`,
+                }}
+              >
+                {amount}
+              </strong>
+              <small>
+                {label}
+                {subLabel && ` / ${subLabel}`}
+              </small>
+            </>
+          )}
         </span>
       </span>
 

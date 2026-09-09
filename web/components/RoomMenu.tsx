@@ -1,4 +1,4 @@
-import { useContext, useEffect, useState } from "react";
+import { useContext, useEffect, useRef, useState } from "react";
 import { FiCheck, FiMoreHorizontal, FiX } from "react-icons/fi";
 import classNames from "classnames";
 import { AppContext } from "../providers/AppStore";
@@ -7,6 +7,7 @@ import { useTranslation } from "../hooks/useTranslation";
 import { spectate } from "../actions/actions";
 import EyeIcon from "./EyeIcon";
 import RoomStats from "./RoomStats";
+import SpectatorList from "./SpectatorList";
 
 // The shared dock keeps room tools in a small menu beside chat. The standalone
 // variant retains its open row; bot management is always host-only.
@@ -14,6 +15,7 @@ export default function RoomMenu({ docked = false }: { docked?: boolean }) {
   const { appState, dispatch } = useContext(AppContext);
   const socket = useSocket();
   const { t } = useTranslation();
+  const menuRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
   const [reservedSpectate, setReservedSpectate] = useState(false);
 
@@ -24,6 +26,22 @@ export default function RoomMenu({ docked = false }: { docked?: boolean }) {
       setReservedSpectate(false);
     }
   }, [me]);
+
+  useEffect(() => {
+    if (!open) return;
+    const outside = (event: PointerEvent) => {
+      if (!menuRef.current?.contains(event.target as Node)) setOpen(false);
+    };
+    const escape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("pointerdown", outside);
+    document.addEventListener("keydown", escape);
+    return () => {
+      document.removeEventListener("pointerdown", outside);
+      document.removeEventListener("keydown", escape);
+    };
+  }, [open]);
 
   if (!game) {
     return null;
@@ -36,6 +54,7 @@ export default function RoomMenu({ docked = false }: { docked?: boolean }) {
 
   return (
     <div
+      ref={menuRef}
       className={
         docked
           ? "room-dock-menu"
@@ -44,7 +63,7 @@ export default function RoomMenu({ docked = false }: { docked?: boolean }) {
     >
       {(!docked || open) && (
         <div className={docked ? "room-dock-menu-popup" : "contents"}>
-          <RoomStats className="min-w-[4.5rem]" />
+          {(!docked || !me) && <RoomStats className="min-w-[4.5rem]" />}
           {me && (
             <button
               onClick={() => {
@@ -111,6 +130,7 @@ export default function RoomMenu({ docked = false }: { docked?: boolean }) {
               )}
             </button>
           )}
+          {docked && me && <SpectatorList />}
         </div>
       )}
       {(isHost || docked) && (

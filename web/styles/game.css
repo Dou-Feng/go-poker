@@ -534,9 +534,13 @@
 }
 
 @media (max-width: 760px) and (orientation: portrait) {
-  /* Expand the seat orbit 16px at each end, keeping the felt in place. */
+  /* Give the phone table longer, straighter sides. The scene and seat orbit
+     stay fixed, so seats, cards and chip FX keep their shared coordinates. */
   .poker-table-surface {
-    inset: calc(9% + 13px) 14% calc(10% + 13px);
+    inset: calc(5% + 10px) 13% calc(6% + 10px);
+  }
+  .poker-table-surface .rail-material {
+    border-radius: 48% / 24%;
   }
   .poker-table-scene {
     top: max(56px, calc(env(safe-area-inset-top) + 40px));

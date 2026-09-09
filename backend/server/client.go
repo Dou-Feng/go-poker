@@ -40,13 +40,14 @@ type kickRequest struct {
 
 // Client is a middleman between the websocket connection and the hub.
 type Client struct {
-	hub         *Hub
-	conn        *websocket.Conn // Websocket connection
-	send        chan []byte     // Buffered channel of outbound bytes
-	uuid        string          // per-session player UUID
-	accountUUID string          // account UUID
-	username    string          // display name
-	table       *table          // Player's table
+	publicAvatar atomic.Pointer[clientAvatar]
+	hub          *Hub
+	conn         *websocket.Conn // Websocket connection
+	send         chan []byte     // Buffered channel of outbound bytes
+	uuid         string          // per-session player UUID
+	accountUUID  string          // account UUID
+	username     string          // display name
+	table        *table          // Player's table
 
 	// kicked is set when another connection took over this account: inbound
 	// processing stops at once and teardown skips the offline timer (the seat

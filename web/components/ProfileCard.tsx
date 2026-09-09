@@ -42,6 +42,7 @@ const POSITION_KEYS: TranslationKey[] = [
   "posMP",
   "posCO",
 ];
+const POSITION_CODES = ["BTN", "SB", "BB", "UTG", "MP", "CO"];
 
 export default function ProfileCard() {
   const { appState, dispatch } = useContext(AppContext);
@@ -161,23 +162,17 @@ export default function ProfileCard() {
     dispatch({ type: "setNotice", payload: key });
 
   const hands = stats?.handsPlayed ?? 0;
-  // Detailed rows: counts and rates beyond the four headline tiles.
-  const detail: Array<[string, string]> = [
-    [t("handsPlayed"), String(hands)],
-    [t("winRate"), rate(stats?.handsWon ?? 0, hands)],
-    [t("foldRate"), rate(stats?.folds ?? 0, hands)],
-    [t("threeBetRate"), rate(stats?.threeBets ?? 0, hands)],
-    [t("raises"), String(stats?.raises ?? 0)],
-    [t("calls"), String(stats?.calls ?? 0)],
-    [t("vpip"), rate(stats?.vpip ?? 0, hands)],
-    [t("maxPotWon"), String(stats?.maxPotWon ?? 0)],
-  ];
-
   const headStats: Array<{ key: TranslationKey; value: string }> = [
     { key: "handsPlayed", value: String(hands) },
     { key: "winRate", value: rate(stats?.handsWon ?? 0, hands) },
     { key: "vpip", value: rate(stats?.vpip ?? 0, hands) },
     { key: "maxPotWon", value: String(stats?.maxPotWon ?? 0) },
+  ];
+  const behaviorStats: Array<{ key: TranslationKey; value: string }> = [
+    { key: "foldRate", value: rate(stats?.folds ?? 0, hands) },
+    { key: "threeBetRate", value: rate(stats?.threeBets ?? 0, hands) },
+    { key: "raises", value: String(stats?.raises ?? 0) },
+    { key: "calls", value: String(stats?.calls ?? 0) },
   ];
 
   const handleDown = (e: React.PointerEvent) => {
@@ -464,23 +459,40 @@ export default function ProfileCard() {
                 </button>
                 <h3>{t("detailStats")}</h3>
               </div>
-              <dl className={s.detailList}>
-                {detail.map(([label, value]) => (
-                  <div className={s.detailRow} key={label}>
-                    <dt>{label}</dt>
-                    <dd>{value}</dd>
+
+              <dl className={`${s.stats} ${s.detailStats}`}>
+                {headStats.map(({ key, value }) => (
+                  <div className={s.stat} key={key}>
+                    <dd className={s.statValue}>{value}</dd>
+                    <dt className={s.statLabel}>{t(key)}</dt>
                   </div>
                 ))}
               </dl>
-              <p className={s.sectionTitle}>{t("vpipByPosition")}</p>
-              <dl className={s.detailList}>
-                {POSITION_KEYS.map((key, i) => (
-                  <div className={s.detailRow} key={key}>
-                    <dt>{t(key)}</dt>
-                    <dd>{rate(stats?.vpipByPos?.[i] ?? 0, hands)}</dd>
-                  </div>
-                ))}
-              </dl>
+
+              <section className={s.detailSection}>
+                <h4 className={s.detailSectionTitle}>{t("gameBehavior")}</h4>
+                <dl className={`${s.detailGrid} ${s.behaviorGrid}`}>
+                  {behaviorStats.map(({ key, value }) => (
+                    <div className={s.detailMetric} key={key}>
+                      <dd>{value}</dd>
+                      <dt>{t(key)}</dt>
+                    </div>
+                  ))}
+                </dl>
+              </section>
+
+              <section className={s.detailSection}>
+                <h4 className={s.detailSectionTitle}>{t("vpipByPosition")}</h4>
+                <dl className={`${s.detailGrid} ${s.positionGrid}`}>
+                  {POSITION_KEYS.map((key, i) => (
+                    <div className={s.positionMetric} key={key}>
+                      <dd>{rate(stats?.vpipByPos?.[i] ?? 0, hands)}</dd>
+                      <span>{POSITION_CODES[i]}</span>
+                      <dt>{t(key)}</dt>
+                    </div>
+                  ))}
+                </dl>
+              </section>
             </>
           )}
         </div>

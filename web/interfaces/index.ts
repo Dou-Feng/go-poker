@@ -149,7 +149,12 @@ export type SeatReservation = {
   avatarImage: boolean;
 };
 
-export type RoomSpectator = { accountUuid: string; username: string };
+export type RoomSpectator = {
+  accountUuid: string;
+  username: string;
+  avatar?: string;
+  avatarImage?: boolean;
+};
 
 export type Game = {
   spectators?: RoomSpectator[];

@@ -29,7 +29,7 @@
   width: var(--gps-w);
   height: calc(var(--gps-card-h) + var(--gps-panel-h) - var(--gps-overlap));
   color: #dce6ec;
-  cursor: pointer;
+  cursor: default;
   user-select: none;
   -webkit-tap-highlight-color: transparent;
   filter: drop-shadow(0 8px 12px rgba(0, 0, 0, 0.34));
@@ -57,6 +57,22 @@
    avatar riding its top edge. */
 .gps-seat--idle {
   height: calc(var(--gps-panel-h) + var(--gps-avatar) / 2);
+}
+
+/* The hero's pre-hand card has enough room for chips and the inline ready
+   state without changing its table anchor. */
+.gps-seat--idle.gps-seat--hero {
+  --gps-w: 146px;
+}
+
+.gps-seat--ready-enabled {
+  cursor: pointer;
+}
+
+@media (min-width: 640px) {
+  .gps-seat--idle.gps-seat--hero {
+    --gps-w: 240px;
+  }
 }
 
 /* ---- bet pill (this street's bet), above the seat. The wrapper centres, the
@@ -125,6 +141,13 @@
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08),
     0 4px 10px rgba(0, 0, 0, 0.34);
   transition: border-color 150ms ease, box-shadow 150ms ease;
+  cursor: pointer;
+  padding: 0;
+}
+
+.gps-seat__avatar:focus-visible {
+  outline: 2px solid #f0c86c;
+  outline-offset: 3px;
 }
 
 /* Avatar.tsx sizes itself inline; the disc decides the size here. */
@@ -303,9 +326,10 @@
 
 .gps-seat__row {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
   gap: 4px;
+  min-width: 0;
 }
 
 .gps-seat__name {
@@ -343,27 +367,105 @@
   display: flex;
   align-items: center;
   gap: 4px;
-  margin-top: 4px;
+  min-width: 0;
   color: #f3d99d;
   font-size: var(--gps-stack);
   font-weight: 700;
   line-height: 1;
 }
 
-/* "Ready" veil over the panel between hands. It fills the info panel below
-   the avatar disc, so it must stay under the disc (z 5) — the avatar rides
-   the panel's top edge and must never be covered by the veil's frame. */
-.gps-seat__ready {
-  position: absolute;
-  inset: 0;
-  z-index: 3;
+.gps-seat__bottom-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  min-width: 0;
+  margin-top: 4px;
+}
+
+/* On a waiting card, the avatar only occupies the upper-left corner. Extend
+   the second row into the clear area below it so the stack stays on the left
+   and readiness stays on the right. Running seats never match this selector
+   and retain their existing in-hand geometry. */
+.gps-seat--idle .gps-seat__bottom-row {
+  gap: 2px;
+  margin-left: calc(var(--gps-panel-left) - var(--gps-avatar) - 4px);
+}
+
+.gps-seat--idle:not(.gps-seat--hero) .gps-seat__ready-state {
+  padding-inline: 0;
+}
+
+/* Readiness belongs to the hero identity card: a quiet inline action before
+   selection, then a mint status after selection. */
+.gps-seat__ready-control,
+.gps-seat__ready-state {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  min-width: 0;
+  height: 20px;
+  padding: 0 4px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: #ffd65a;
+  font-size: 9px;
+  font-weight: 800;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: color 140ms ease, background 140ms ease, transform 90ms ease;
+}
+
+.gps-seat__ready-state {
+  color: #8de2b2;
+}
+
+.gps-seat__ready-control:hover {
+  background: rgba(255, 214, 90, 0.1);
+  transform: translateY(-1px);
+}
+
+.gps-seat__ready-control:active {
+  transform: translateY(1px);
+}
+
+.gps-seat__ready-control:focus-visible {
+  outline: 2px solid #f2cf72;
+  outline-offset: 1px;
+}
+
+.gps-seat__ready-control:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.gps-seat__ready-control.is-ready {
+  color: #8de2b2;
+  background: rgba(81, 190, 128, 0.06);
+}
+
+.gps-seat__ready-icon {
   display: grid;
   place-items: center;
-  border-radius: inherit;
-  background: rgba(0, 0, 0, 0.55);
-  color: rgba(232, 237, 241, 0.92);
-  font-size: var(--gps-name);
-  font-weight: 700;
+  width: 14px;
+  height: 14px;
+  flex: 0 0 14px;
+  border-radius: 50%;
+  background: rgba(255, 214, 90, 0.12);
+}
+
+.gps-seat__ready-icon svg {
+  width: 9px;
+  height: 9px;
+  stroke-width: 3;
+}
+
+.gps-seat__ready-control.is-ready .gps-seat__ready-icon,
+.gps-seat__ready-state .gps-seat__ready-icon {
+  background: rgba(81, 190, 128, 0.14);
 }
 
 /* ---- action clock, along the panel's bottom edge ---- */
@@ -411,6 +513,18 @@
   border-color: #dca948;
   box-shadow: 0 0 0 3px rgba(220, 169, 72, 0.1),
     0 0 12px rgba(220, 169, 72, 0.2);
+}
+
+.gps-seat--hero.gps-seat--ready .gps-seat__panel {
+  border-color: rgba(111, 211, 155, 0.58);
+  box-shadow: 0 0 15px rgba(81, 190, 128, 0.14),
+    inset 0 1px 0 rgba(203, 255, 224, 0.04);
+}
+
+.gps-seat--hero.gps-seat--ready .gps-seat__avatar {
+  border-color: rgba(111, 211, 155, 0.78);
+  box-shadow: 0 0 0 3px rgba(81, 190, 128, 0.08),
+    0 0 12px rgba(81, 190, 128, 0.16);
 }
 
 .gps-seat--active .gps-seat__panel {
@@ -728,6 +842,18 @@
   text-align: center;
 }
 @media (min-width: 640px) {
+  .gps-seat__ready-control,
+  .gps-seat__ready-state {
+    gap: 5px;
+    height: 24px;
+    padding-inline: 7px;
+    font-size: 11px;
+  }
+  .gps-seat__ready-icon {
+    width: 16px;
+    height: 16px;
+    flex-basis: 16px;
+  }
   .gp-action-btn.gp-seat-action {
     left: calc(50% + 8px - 52px);
     width: 104px;

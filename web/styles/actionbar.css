@@ -516,3 +516,29 @@
     text-align: center;
   }
 }
+
+/* Calling puts the actual cost first; checking keeps its original layout. */
+.gp-action-btn--amount .gp-action-btn__icon-wrap,
+.gp-action-btn--amount .gp-action-btn__divider {
+  display: none;
+}
+.room-action-input .gp-action-btn--amount .gp-action-btn__text {
+  min-width: 0;
+  align-items: center;
+  text-align: center;
+}
+.room-action-input .gp-action-btn--amount .gp-action-btn__amount {
+  color: #ffe19a;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -.025em;
+  line-height: 1;
+  white-space: nowrap;
+  text-shadow: 0 1px 2px #0009, 0 0 9px #f3c35b30;
+}
+.room-action-input .gp-action-btn--amount .gp-action-btn__text small {
+  margin-top: 4px;
+  font-size: 8px;
+  letter-spacing: .04em;
+  color: #bdcbd4;
+}

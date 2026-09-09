@@ -206,8 +206,8 @@ export default function RaiseInput({ onClose }: raiseProps) {
       <footer className="gp-raise-panel__footer">
         <InputButton
           kind={isAllIn ? "allin" : "bet"}
-          label={isAllIn ? "ALL-IN" : "确认加注"}
-          subLabel={isAllIn ? "" : "RAISE"}
+          label={isAllIn ? "ALL-IN" : "确认"}
+          subLabel={isAllIn ? "" : "CONFIRM"}
           onClick={confirm}
         />
       </footer>
