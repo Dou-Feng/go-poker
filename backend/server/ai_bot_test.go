@@ -50,6 +50,12 @@ func newInferenceServer(t *testing.T) (*httptest.Server, *int32) {
 // betting in progress (the decision tests only need a live betting view).
 func bettingHandView(t *testing.T) *poker.GameView {
 	t.Helper()
+	tbl := bettingHandTable(t)
+	return tbl.game.GenerateOmniView()
+}
+
+func bettingHandTable(t *testing.T) *table {
+	t.Helper()
 	tbl, _ := botTable(t)
 	seat(t, tbl, "acc-a", 1, true)
 	seat(t, tbl, "acc-b", 2, true)
@@ -60,7 +66,7 @@ func bettingHandView(t *testing.T) *poker.GameView {
 	if !view.Running || !view.Betting {
 		t.Fatalf("expected a running betting view")
 	}
-	return view
+	return tbl
 }
 
 // legalAction reports whether act is something the engine could accept.
@@ -178,7 +184,7 @@ func TestDecideBotActionGatedByRoomKind(t *testing.T) {
 	// Service up: normal rooms still decide locally.
 	srv, acts := newInferenceServer(t)
 	withAIEnv(t, srv.URL)
-	if act := decideBotAction(botKindNormal, view, view.ActionNum); !legalAction(act) {
+	if act := decideBotAction(botKindNormal, view, view.ActionNum, nil); !legalAction(act) {
 		t.Fatalf("normal bot should produce a legal heuristic action, got %+v", act)
 	}
 	if n := atomic.LoadInt32(acts); n != 0 {
@@ -186,7 +192,7 @@ func TestDecideBotActionGatedByRoomKind(t *testing.T) {
 	}
 
 	// AI rooms ask the service (the fake always folds).
-	if act := decideBotAction(botKindAI, view, view.ActionNum); act.kind != "fold" {
+	if act := decideBotAction(botKindAI, view, view.ActionNum, nil); act.kind != "fold" {
 		t.Fatalf("ai bot should follow the service (fold), got %+v", act)
 	}
 	if n := atomic.LoadInt32(acts); n != 1 {
@@ -195,8 +201,116 @@ func TestDecideBotActionGatedByRoomKind(t *testing.T) {
 
 	// Service gone: the AI room falls back to a legal heuristic action.
 	withAIEnv(t, "http://127.0.0.1:1")
-	if act := decideBotAction(botKindAI, view, view.ActionNum); !legalAction(act) {
+	if act := decideBotAction(botKindAI, view, view.ActionNum, nil); !legalAction(act) {
 		t.Fatalf("ai bot should fall back to the heuristic, got %+v", act)
+	}
+}
+
+// Successful actions are retained per player for this hand using the five OM
+// action buckets and the exact 25-value training context. A request only sees
+// opponents, never the deciding bot's own actions.
+func TestAIHandActionHistory(t *testing.T) {
+	tbl := bettingHandTable(t)
+	tbl.resetAIActionHistory()
+
+	// Heads-up preflop starts on the small blind, who calls the outstanding
+	// blind. The first context has no previous-action feature.
+	beforeCall := tbl.game.GenerateOmniView()
+	caller := beforeCall.ActionNum
+	callAmount := beforeCall.Players[beforeCall.BBNum].Bet - beforeCall.Players[caller].Bet
+	handleCall(&Client{table: tbl})
+
+	beforeRaise := tbl.game.GenerateOmniView()
+	raiser := beforeRaise.ActionNum
+	raiseAmount := uint(aiPot(beforeRaise)) // a pot-sized opening raise
+	handleRaise(&Client{table: tbl}, raiseAmount)
+
+	view := tbl.game.GenerateOmniView()
+	histories := tbl.aiOpponentHistories(view, view.ActionNum)
+	if len(histories) != 1 || histories[0].OpponentID != int(raiser) {
+		t.Fatalf("expected only raiser history for player %d, got %+v", view.ActionNum, histories)
+	}
+	if got := histories[0].Actions[0].ActionID; got != 3 {
+		t.Fatalf("pot-sized raise action_id = %d, want 3", got)
+	}
+	context := histories[0].Actions[0].Context
+	if context[0] != 1 {
+		t.Fatalf("preflop context flag = %v, want 1", context[0])
+	}
+	if context[6] != float64(2)/aiModelSeats {
+		t.Fatalf("active-player context = %v, want %v", context[6], float64(2)/aiModelSeats)
+	}
+	if context[11] != 1 { // previous action was a pokers Call (enum 2)
+		t.Fatalf("previous-call context flag = %v, want 1", context[11])
+	}
+	if callAmount == 0 { // guards the test setup: the first action was a call
+		t.Fatalf("expected the small blind to have an outstanding call")
+	}
+
+	// The deciding player is excluded even though they also acted earlier.
+	for _, history := range histories {
+		if history.OpponentID == int(view.ActionNum) {
+			t.Fatalf("request leaked deciding player's own history: %+v", histories)
+		}
+	}
+
+	// A hand/session reset cannot leak observations into the next hand.
+	tbl.resetAIActionHistory()
+	if got := tbl.aiOpponentHistories(view, view.ActionNum); len(got) != 0 {
+		t.Fatalf("history survived hand reset: %+v", got)
+	}
+
+	// Fold uses the same production handler path and records bucket 0.
+	foldTable := bettingHandTable(t)
+	foldView := foldTable.game.GenerateOmniView()
+	folder := foldView.ActionNum
+	handleFold(&Client{table: foldTable})
+	foldHistories := foldTable.aiOpponentHistories(
+		foldTable.game.GenerateOmniView(), (folder+1)%uint(len(foldView.Players)),
+	)
+	if len(foldHistories) != 1 || foldHistories[0].Actions[0].ActionID != 0 {
+		t.Fatalf("fold was not recorded as action_id 0: %+v", foldHistories)
+	}
+}
+
+// aiDecide serializes the per-opponent sequence under opponent_histories so
+// an OM-capable inference server can replay it before the forward pass.
+func TestAIDecideSendsOpponentHistories(t *testing.T) {
+	view := bettingHandView(t)
+	context := [aiHistoryContextSize]float64{}
+	context[0], context[5], context[24] = 1, 0.25, 1
+	want := []aiOpponentHistory{{
+		OpponentID: 1,
+		Actions: []aiActionHistoryItem{{
+			ActionID: 4,
+			Context:  context,
+		}},
+	}}
+
+	received := make(chan aiActionRequest, 1)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var req aiActionRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			t.Errorf("decode request: %v", err)
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		received <- req
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"kind":"fold","action_type":0,"label":"fold"}`))
+	}))
+	defer srv.Close()
+
+	if _, err := aiDecide(srv.URL, view, view.ActionNum, want); err != nil {
+		t.Fatalf("ai decide: %v", err)
+	}
+	got := <-received
+	if len(got.OpponentHistories) != 1 || got.OpponentHistories[0].OpponentID != 1 {
+		t.Fatalf("opponent histories missing from request: %+v", got.OpponentHistories)
+	}
+	item := got.OpponentHistories[0].Actions[0]
+	if item.ActionID != 4 || item.Context != context {
+		t.Fatalf("history item = %+v, want action_id=4 context=%v", item, context)
 	}
 }
 

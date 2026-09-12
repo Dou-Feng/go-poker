@@ -368,13 +368,19 @@ type result struct {
 }
 
 type tableInfo struct {
-	Name       string `json:"name"`
-	Players    int    `json:"players"`
-	Running    bool   `json:"running"`
-	Spectators int    `json:"spectators"`
-	Locked     bool   `json:"locked"`
-	Tournament bool   `json:"tournament"` // buy-in cap in force
-	BotType    string `json:"botType"`    // room's bot brain: "normal" | "ai"
+	Name          string `json:"name"`
+	Players       int    `json:"players"`
+	Running       bool   `json:"running"`
+	Spectators    int    `json:"spectators"`
+	Locked        bool   `json:"locked"`
+	Tournament    bool   `json:"tournament"` // buy-in cap in force
+	BotType       string `json:"botType"`    // room's bot brain: "normal" | "ai"
+	SmallBlind    uint   `json:"sb"`
+	BigBlind      uint   `json:"bb"`
+	BuyIn         uint   `json:"buyIn"`
+	MaxPlayers    uint   `json:"maxPlayers"`
+	HandsLimit    uint   `json:"handsLimit"`
+	ActionTimeout uint   `json:"actionTimeout"`
 }
 
 type tableList struct {

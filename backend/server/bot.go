@@ -519,7 +519,8 @@ func (t *table) botTick() {
 		// The room's bot kind decides the brain: "ai" rooms ask the model
 		// (when the service is configured), normal rooms always use the
 		// heuristic (see ai_client.go).
-		decision := decideBotAction(t.botKind, view, view.ActionNum)
+		histories := t.aiOpponentHistories(view, view.ActionNum)
+		decision := decideBotAction(t.botKind, view, view.ActionNum, histories)
 		switch decision.kind {
 		case "fold":
 			t.broadcast <- createNewLog(fmt.Sprintf("%s folds", actor.Username))

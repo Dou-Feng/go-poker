@@ -774,6 +774,7 @@ func handleStartGame(c *Client) {
 		fmt.Println(err)
 		return
 	}
+	c.table.resetAIActionHistory()
 	c.table.startNewSession()
 	broadcastDeal(c.table)
 	c.table.broadcastGame()
@@ -853,6 +854,7 @@ func autoStartIfReady(t *table) bool {
 		slog.Default().Warn("Auto start", "error", err)
 		return false
 	}
+	t.resetAIActionHistory()
 	t.startNewSession()
 	broadcastDeal(t)
 	return true
@@ -938,6 +940,8 @@ func handleDealGame(c *Client) {
 }
 
 func handleCall(c *Client) {
+	c.table.actionMu.Lock()
+	defer c.table.actionMu.Unlock()
 	view := c.table.game.GenerateOmniView()
 	if len(view.Players) == 0 {
 		return
@@ -965,11 +969,15 @@ func handleCall(c *Client) {
 	err := poker.Bet(c.table.game, pn, callAmount)
 	if err != nil {
 		slog.Default().Warn("Handle call", "error", err)
+	} else {
+		c.table.recordAIBet(view, pn, callAmount)
 	}
 	c.table.broadcastGame()
 }
 
 func handleRaise(c *Client, raise uint) {
+	c.table.actionMu.Lock()
+	defer c.table.actionMu.Unlock()
 	view := c.table.game.GenerateOmniView()
 	pn := view.ActionNum
 	if pn >= uint(len(view.Players)) {
@@ -978,12 +986,16 @@ func handleRaise(c *Client, raise uint) {
 	err := poker.Bet(c.table.game, pn, raise)
 	if err != nil {
 		slog.Default().Warn("Handle raise", "error", err)
+	} else {
+		c.table.recordAIBet(view, pn, raise)
 	}
 
 	c.table.broadcastGame()
 }
 
 func handleCheck(c *Client) {
+	c.table.actionMu.Lock()
+	defer c.table.actionMu.Unlock()
 	view := c.table.game.GenerateOmniView()
 	pn := view.ActionNum
 	if pn >= uint(len(view.Players)) {
@@ -992,11 +1004,15 @@ func handleCheck(c *Client) {
 	err := poker.Bet(c.table.game, pn, 0)
 	if err != nil {
 		slog.Default().Warn("Handle check", "error", err)
+	} else {
+		c.table.recordAIBet(view, pn, 0)
 	}
 	c.table.broadcastGame()
 }
 
 func handleFold(c *Client) {
+	c.table.actionMu.Lock()
+	defer c.table.actionMu.Unlock()
 	view := c.table.game.GenerateOmniView()
 	pn := view.ActionNum
 	if pn >= uint(len(view.Players)) {
@@ -1007,6 +1023,7 @@ func handleFold(c *Client) {
 		slog.Default().Warn("Handle fold", "error", err)
 		return
 	}
+	c.table.recordAIFold(view, pn)
 	c.table.broadcastGame()
 }
 

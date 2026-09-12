@@ -31,15 +31,19 @@ type flushFunc func(accountUUID string, room string, totalBuyIn uint, stack uint
 
 // table is a single table or game of poker
 type table struct {
-	name          string
-	rdb           *redis.Client
-	hub           *Hub
-	clients       map[*Client]bool
-	clientsMu     sync.Mutex
-	register      chan *Client
-	unregister    chan *Client
-	broadcast     chan []byte
-	game          *poker.Game
+	name       string
+	rdb        *redis.Client
+	hub        *Hub
+	clients    map[*Client]bool
+	clientsMu  sync.Mutex
+	register   chan *Client
+	unregister chan *Client
+	broadcast  chan []byte
+	game       *poker.Game
+	// actionMu serializes the pre-action snapshot, engine mutation and OM
+	// history append. aiActions contains only the current hand.
+	actionMu      sync.Mutex
+	aiActions     aiHandActionHistory
 	password      string
 	createdAt     time.Time
 	stop          chan struct{}
@@ -436,6 +440,9 @@ func (m *updateGame) censoredFor(viewerUUID string) []byte {
 // info returns a lightweight description of the table for the lobby.
 func (t *table) info() tableInfo {
 	view := t.game.GenerateOmniView()
+	t.clock.mu.Lock()
+	actionTimeout := uint(t.clock.timeout / time.Second)
+	t.clock.mu.Unlock()
 
 	seated := make(map[string]bool, len(view.Players))
 	for _, p := range view.Players {
@@ -452,13 +459,19 @@ func (t *table) info() tableInfo {
 	t.clientsMu.Unlock()
 
 	return tableInfo{
-		Name:       t.name,
-		Players:    len(view.Players),
-		Running:    view.Running,
-		Spectators: spectators,
-		Locked:     t.password != "",
-		Tournament: view.Config.MaxBuy > 0,
-		BotType:    t.botKind,
+		Name:          t.name,
+		Players:       len(view.Players),
+		Running:       view.Running,
+		Spectators:    spectators,
+		Locked:        t.password != "",
+		Tournament:    view.Config.MaxBuy > 0,
+		BotType:       t.botKind,
+		SmallBlind:    view.Config.SmallBlind,
+		BigBlind:      view.Config.BigBlind,
+		BuyIn:         view.Config.BuyIn,
+		MaxPlayers:    view.Config.MaxPlayers,
+		HandsLimit:    view.Config.HandsLimit,
+		ActionTimeout: actionTimeout,
 	}
 }
 

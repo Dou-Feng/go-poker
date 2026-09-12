@@ -287,71 +287,137 @@ export default function Lobby() {
         </nav>
       </header>
       <section className={styles.content}>
-        <div className={styles.brand}>
-          <GiSpades aria-hidden="true" />
-          <p>GoPoker</p>
-          <span>PLAY • MEET • ENJOY</span>
-          <h1>{t("lobby")}</h1>
-        </div>
-        <div className={styles.actions}>
-          <button
-            onClick={() => socket && listTables(socket)}
-            className={ui.secondary}
-          >
-            <FiRefreshCw aria-hidden="true" />
-            {t("refresh")}
-          </button>
+        <header className={styles.lobbyIntro}>
+          <div>
+            <h1>{t("lobby")}</h1>
+            <p>{t("lobbyTagline")}</p>
+          </div>
           <button
             onClick={() => setShowCreate(true)}
             data-sfx="pong"
-            className={ui.primary}
+            className={`${ui.primary} ${styles.createButton}`}
           >
             <FiPlus aria-hidden="true" />
             {t("newRoom")}
           </button>
-        </div>
+        </header>
         <section className={styles.rooms} aria-label={t("rooms")}>
-          <h2>{t("rooms")}</h2>
+          <header className={styles.roomsHeader}>
+            <div className={styles.roomsTitle}>
+              <h2>{t("rooms")}</h2>
+              <span className="type-num">{appState.tables.length}</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => socket && listTables(socket)}
+              className={styles.refreshButton}
+            >
+              <FiRefreshCw aria-hidden="true" />
+              <span>{t("refresh")}</span>
+            </button>
+          </header>
           {appState.tables.length === 0 && (
             <div className={styles.empty}>
               <GiSpades aria-hidden="true" className={styles.emptySpade} />
               <h3>{t("lobbyEmptyTitle")}</h3>
               <p>{t("lobbyEmptyHint")}</p>
+              <button
+                type="button"
+                onClick={() => setShowCreate(true)}
+                data-sfx="pong"
+                className={`${ui.primary} ${styles.emptyAction}`}
+              >
+                <FiPlus aria-hidden="true" />
+                {t("createFirstRoom")}
+              </button>
             </div>
           )}
           <div className={styles.roomList}>
             {appState.tables.map((room) => (
               <article key={room.name} className={styles.room}>
-                <div className={styles.roomSummary}>
-                  <div className={styles.roomText}>
-                    <h3>
-                      {room.name}
-                      {room.locked && (
-                        <FiLock aria-hidden="true" title={t("roomPassword")} />
-                      )}
-                    </h3>
-                    {room.tournament && (
-                      <span
-                        className={styles.badge}
-                        title={t("tournamentHint")}
-                      >
-                        {t("tournament")}
-                      </span>
-                    )}
-                    {room.botType === "ai" && (
-                      <span className={styles.badge} title={t("botTypeAIHint")}>
-                        {t("botTypeAI")}
-                      </span>
-                    )}
-                    <p>
-                      {room.players} {t("players")} · {room.spectators}{" "}
-                      {t("watching")}
-                      {room.running ? " · " + t("running") : ""}
-                    </p>
+                <div className={styles.roomTopline}>
+                  <div className={styles.roomIdentity}>
+                    <span className={styles.roomMark} aria-hidden="true">
+                      <GiSpades />
+                    </span>
+                    <div className={styles.roomText}>
+                      <h3 title={room.name}>
+                        <span>{room.name}</span>
+                        {room.locked && (
+                          <FiLock
+                            aria-hidden="true"
+                            title={t("roomPassword")}
+                          />
+                        )}
+                      </h3>
+                      <div className={styles.roomBadges}>
+                        {room.tournament && (
+                          <span
+                            className={styles.badge}
+                            title={t("tournamentHint")}
+                          >
+                            {t("tournament")}
+                          </span>
+                        )}
+                        {room.botType === "ai" && (
+                          <span
+                            className={styles.badge}
+                            title={t("botTypeAIHint")}
+                          >
+                            {t("botTypeAI")}
+                          </span>
+                        )}
+                        {room.running && (
+                          <span className={styles.runningBadge}>
+                            {t("running")}
+                          </span>
+                        )}
+                      </div>
+                    </div>
                   </div>
+                  <strong className={`${styles.occupancy} type-num`}>
+                    {room.players} / {room.maxPlayers}
+                  </strong>
+                </div>
+
+                <div className={styles.roomFacts}>
+                  <div>
+                    <span>{t("blinds")}</span>
+                    <strong className="type-num">
+                      {room.sb} / {room.bb}
+                    </strong>
+                  </div>
+                  <div>
+                    <span>{t("buyInLabel")}</span>
+                    <strong className="type-num">{room.buyIn}</strong>
+                  </div>
+                </div>
+
+                <div className={styles.roomFooter}>
+                  <p>
+                    <span>
+                      {room.handsLimit > 0
+                        ? `${room.handsLimit} ${t("hands")}`
+                        : t("unlimited")}
+                    </span>
+                    <span>·</span>
+                    <span>
+                      {room.actionTimeout > 0
+                        ? `${room.actionTimeout}s`
+                        : t("unlimited")}
+                    </span>
+                    {room.spectators > 0 && (
+                      <>
+                        <span>·</span>
+                        <span>
+                          {room.spectators} {t("watching")}
+                        </span>
+                      </>
+                    )}
+                  </p>
                   <button
                     onClick={() => onJoinClick(room)}
-                    className={ui.secondary}
+                    className={`${ui.secondary} ${styles.joinButton}`}
                   >
                     {t("join")}
                     <FiArrowRight aria-hidden="true" />
@@ -413,39 +479,41 @@ export default function Lobby() {
               </button>
             </header>
             <form
-              className={ui.createForm}
+              className={`${ui.createForm} ${ui.compactCreateForm}`}
               onSubmit={(event) => {
                 event.preventDefault();
                 create();
               }}
             >
-              <label className={ui.field}>
-                {t("newRoomName")}
-                <input
-                  autoFocus
-                  className={ui.input}
-                  type="text"
-                  value={newRoom}
-                  placeholder={t("roomAutoName")}
-                  maxLength={20}
-                  onChange={(e) => setNewRoom(e.target.value)}
-                />
-              </label>
-              <label className={ui.field}>
-                {t("roomPassword")}
-                <input
-                  className={ui.input}
-                  type="password"
-                  value={newPassword}
-                  placeholder={t("optionalField")}
-                  maxLength={20}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  autoComplete="new-password"
-                />
-              </label>
-              <fieldset className={ui.blinds}>
+              <div className={ui.identityFields}>
+                <label className={ui.field}>
+                  {t("newRoomName")}
+                  <input
+                    autoFocus
+                    className={ui.input}
+                    type="text"
+                    value={newRoom}
+                    placeholder={t("roomAutoName")}
+                    maxLength={20}
+                    onChange={(e) => setNewRoom(e.target.value)}
+                  />
+                </label>
+                <label className={ui.field}>
+                  {t("roomPassword")}
+                  <input
+                    className={ui.input}
+                    type="password"
+                    value={newPassword}
+                    placeholder={t("optionalField")}
+                    maxLength={20}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    autoComplete="new-password"
+                  />
+                </label>
+              </div>
+              <fieldset className={`${ui.blinds} ${ui.economyFields}`}>
                 <legend>{t("blinds")}</legend>
-                <div className={ui.columns}>
+                <div className={ui.compactColumns}>
                   <label className={ui.inlineField}>
                     <span>{t("smallBlindLabel")}</span>
                     <input
@@ -466,94 +534,103 @@ export default function Lobby() {
                       onChange={(e) => setBb(e.target.value)}
                     />
                   </label>
+                  <label className={ui.inlineField}>
+                    <span>{t("buyInLabel")}</span>
+                    <input
+                      aria-label={t("buyIn")}
+                      type="text"
+                      inputMode="numeric"
+                      value={buyIn}
+                      onChange={(e) => setBuyIn(e.target.value)}
+                    />
+                  </label>
                 </div>
               </fieldset>
-              <label className={ui.field}>
-                {t("buyIn")}
-                <input
-                  className={ui.input}
-                  type="text"
-                  inputMode="numeric"
-                  value={buyIn}
-                  onChange={(e) => setBuyIn(e.target.value)}
-                />
-              </label>
-              <label className={ui.tournament}>
-                <span>
-                  {t("tournament")}
-                  <small>{t("tournamentHint")}</small>
-                </span>
-                <input
-                  type="checkbox"
-                  role="switch"
-                  checked={tournament}
-                  onChange={(e) => setTournament(e.target.checked)}
-                />
-              </label>
-              {tournament && (
-                <label className={ui.field}>
-                  {t("maxBuy")}
-                  <input
-                    className={ui.input}
-                    type="text"
-                    inputMode="numeric"
-                    value={maxBuy}
-                    onChange={(e) => setMaxBuy(e.target.value)}
-                  />
-                </label>
-              )}
-              <div className={ui.columns}>
-                <label className={ui.field}>
-                  {t("maxPlayers")}
-                  <input
-                    className={ui.input}
-                    type="text"
-                    inputMode="numeric"
-                    value={maxPlayers}
-                    onChange={(e) => setMaxPlayers(e.target.value)}
-                  />
-                </label>
-                <label className={ui.field}>
-                  {t("hands")}
-                  <input
-                    className={ui.input}
-                    type="text"
-                    inputMode="numeric"
-                    value={handsLimit}
-                    onChange={(e) => setHandsLimit(e.target.value)}
-                  />
-                  <small>0 = {t("unlimited")}</small>
-                </label>
-                <label className={ui.field}>
-                  {t("actionTimeout")}
-                  <input
-                    className={ui.input}
-                    type="text"
-                    inputMode="numeric"
-                    value={actionTimeout}
-                    onChange={(e) => setActionTimeout(e.target.value)}
-                  />
-                  <small>0 = {t("unlimited")}</small>
-                </label>
-              </div>
-              <label
-                className={ui.tournament}
-                title={aiDisabledReason ?? t("botTypeAIHint")}
-              >
-                <span>
-                  {t("botTypeAI")}
-                  <small>{aiDisabledReason ?? t("botTypeAIHint")}</small>
-                </span>
-                <input
-                  type="checkbox"
-                  role="switch"
-                  disabled={aiDisabledReason !== null}
-                  checked={botType === "ai"}
-                  onChange={(e) =>
-                    setBotType(e.target.checked ? "ai" : "normal")
-                  }
-                />
-              </label>
+              <details className={ui.advancedSettings}>
+                <summary>
+                  <span>{t("moreSettings")}</span>
+                  <small className="type-num">
+                    {maxPlayers}P · {handsLimit || 0}H · {actionTimeout || 0}s
+                  </small>
+                </summary>
+                <div className={ui.advancedBody}>
+                  <div className={ui.compactColumns}>
+                    <label className={ui.field}>
+                      {t("maxPlayers")}
+                      <input
+                        className={ui.input}
+                        type="text"
+                        inputMode="numeric"
+                        value={maxPlayers}
+                        onChange={(e) => setMaxPlayers(e.target.value)}
+                      />
+                    </label>
+                    <label className={ui.field}>
+                      {t("hands")}
+                      <input
+                        className={ui.input}
+                        type="text"
+                        inputMode="numeric"
+                        value={handsLimit}
+                        onChange={(e) => setHandsLimit(e.target.value)}
+                      />
+                    </label>
+                    <label className={ui.field}>
+                      {t("actionTimeout")}
+                      <input
+                        className={ui.input}
+                        type="text"
+                        inputMode="numeric"
+                        value={actionTimeout}
+                        onChange={(e) => setActionTimeout(e.target.value)}
+                      />
+                    </label>
+                  </div>
+                  <p className={ui.zeroHint}>0 = {t("unlimited")}</p>
+                  <label className={ui.tournament}>
+                    <span>
+                      {t("tournament")}
+                      <small>{t("tournamentHint")}</small>
+                    </span>
+                    <input
+                      type="checkbox"
+                      role="switch"
+                      checked={tournament}
+                      onChange={(e) => setTournament(e.target.checked)}
+                    />
+                  </label>
+                  {tournament && (
+                    <label className={`${ui.field} ${ui.maxBuyField}`}>
+                      {t("maxBuy")}
+                      <input
+                        className={ui.input}
+                        type="text"
+                        inputMode="numeric"
+                        value={maxBuy}
+                        onChange={(e) => setMaxBuy(e.target.value)}
+                      />
+                    </label>
+                  )}
+                  <label
+                    className={ui.tournament}
+                    title={aiDisabledReason ?? t("botTypeAIHint")}
+                  >
+                    <span>
+                      {t("botTypeAI")}
+                      <small>{aiDisabledReason ?? t("botTypeAIHint")}</small>
+                    </span>
+                    <input
+                      type="checkbox"
+                      role="switch"
+                      disabled={aiDisabledReason !== null}
+                      checked={botType === "ai"}
+                      onChange={(e) =>
+                        setBotType(e.target.checked ? "ai" : "normal")
+                      }
+                    />
+                  </label>
+                </div>
+              </details>
               <div className={ui.dialogActions}>
                 <button
                   type="button"

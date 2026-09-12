@@ -129,6 +129,8 @@ func (t *table) enforceActionClock(key string) {
 	if stale {
 		return
 	}
+	t.actionMu.Lock()
+	defer t.actionMu.Unlock()
 	view := t.game.GenerateOmniView()
 	if turnKey(view) != key {
 		return
@@ -153,6 +155,11 @@ func (t *table) enforceActionClock(key string) {
 		// The engine moved on between our snapshot and the action: nothing to
 		// enforce any more.
 		return
+	}
+	if what == "checks" {
+		t.recordAIBet(view, pn, 0)
+	} else {
+		t.recordAIFold(view, pn)
 	}
 	t.broadcast <- createNewLog(fmt.Sprintf("%s ran out of time and %s", p.Username, what))
 	t.broadcastGame()

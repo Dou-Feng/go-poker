@@ -57,6 +57,12 @@ export type TableInfo = {
   tournament: boolean;
   /** The room's bot brain: "normal" (heuristic) or "ai" (model-backed). */
   botType: string;
+  sb: number;
+  bb: number;
+  buyIn: number;
+  maxPlayers: number;
+  handsLimit: number;
+  actionTimeout: number;
 };
 
 export type PlayerStats = {

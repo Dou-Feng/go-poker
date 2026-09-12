@@ -93,6 +93,7 @@ func (t *table) canBuyIn(account string, amount uint) bool {
 // single place to extend when more session state appears.
 func (t *table) resetSession() {
 	t.startNewSession()
+	t.resetAIActionHistory()
 	t.ledger.reset()
 	// A new session means buy-ins start again: everyone can re-seat.
 	t.clearBusted()

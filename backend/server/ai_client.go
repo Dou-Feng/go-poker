@@ -27,6 +27,8 @@ package server
 //	pot: sum of every player's TotalBet (collected streets + current bets)
 //	players: exactly 6 slots keyed by seat position (the net was trained
 //	6-handed; unused seats are zeroed and marked inactive)
+//	opponent_histories: current-hand opponent actions, each paired with the
+//	25-value context used by OM training (see ai_history.go)
 
 import (
 	"bytes"
@@ -63,28 +65,29 @@ type aiPlayerSlot struct {
 }
 
 type aiActionRequest struct {
-	PlayerID      int            `json:"player_id"`
-	Hand          []aiCard       `json:"hand"`
-	Community     []aiCard       `json:"community"`
-	Stage         int            `json:"stage"`
-	Pot           float64        `json:"pot"`
-	MinBet        float64        `json:"min_bet"`
-	MinRaise      float64        `json:"min_raise"`
-	BB            float64        `json:"bb"`
-	Button        int            `json:"button"`
-	CurrentPlayer int            `json:"current_player"`
-	Players       []aiPlayerSlot `json:"players"`
-	LegalActions  []string       `json:"legal_actions"`
-	Sample        bool           `json:"sample"`
+	PlayerID          int                 `json:"player_id"`
+	Hand              []aiCard            `json:"hand"`
+	Community         []aiCard            `json:"community"`
+	Stage             int                 `json:"stage"`
+	Pot               float64             `json:"pot"`
+	MinBet            float64             `json:"min_bet"`
+	MinRaise          float64             `json:"min_raise"`
+	BB                float64             `json:"bb"`
+	Button            int                 `json:"button"`
+	CurrentPlayer     int                 `json:"current_player"`
+	Players           []aiPlayerSlot      `json:"players"`
+	LegalActions      []string            `json:"legal_actions"`
+	OpponentHistories []aiOpponentHistory `json:"opponent_histories"`
+	Sample            bool                `json:"sample"`
 }
 
 type aiActionResponse struct {
-	Kind       string             `json:"kind"`
-	Amount     int                `json:"amount"`
-	ActionType int                `json:"action_type"`
-	Label      string             `json:"label"`
+	Kind          string             `json:"kind"`
+	Amount        int                `json:"amount"`
+	ActionType    int                `json:"action_type"`
+	Label         string             `json:"label"`
 	Probabilities map[string]float64 `json:"probabilities"`
-	ElapsedMS  float64            `json:"elapsed_ms"`
+	ElapsedMS     float64            `json:"elapsed_ms"`
 }
 
 // aiSuitBit maps a riverboat suit bitmask onto the pokers suit number.
@@ -124,9 +127,9 @@ const (
 )
 
 var (
-	aiHealthMu    sync.Mutex
-	aiHealthAt    time.Time
-	aiHealthOK    bool
+	aiHealthMu sync.Mutex
+	aiHealthAt time.Time
+	aiHealthOK bool
 	// aiHealthProbe is swappable in tests.
 	aiHealthProbe = probeAIHealth
 )
@@ -174,9 +177,14 @@ func aiServiceAvailable() bool {
 // aiDecide asks the inference server for an action. It returns the same
 // botAction shape as botDecide: for "raise", Amount is the chips to put in
 // this action (call amount + raise), matching what handleRaise expects.
-func aiDecide(baseURL string, view *poker.GameView, pn uint) (botAction, error) {
+func aiDecide(baseURL string, view *poker.GameView, pn uint, histories []aiOpponentHistory) (botAction, error) {
 	if len(view.Players) > aiModelSeats {
 		return botAction{}, fmt.Errorf("model is %d-handed, table has %d seats", aiModelSeats, len(view.Players))
+	}
+	if histories == nil {
+		// Pydantic accepts an empty list for the optional history field, not
+		// JSON null. This also keeps standard checkpoints wire-compatible.
+		histories = []aiOpponentHistory{}
 	}
 	p := view.Players[pn]
 
@@ -256,19 +264,20 @@ func aiDecide(baseURL string, view *poker.GameView, pn uint) (botAction, error) 
 	}
 
 	req := aiActionRequest{
-		PlayerID:      int(pn),
-		Hand:          hand,
-		Community:     community,
-		Stage:         stage,
-		Pot:           pot,
-		MinBet:        minBet,
-		MinRaise:      minRaise,
-		BB:            bb,
-		Button:        int(view.DealerNum),
-		CurrentPlayer: int(view.ActionNum),
-		Players:       slots,
-		LegalActions:  legal,
-		Sample:        true,
+		PlayerID:          int(pn),
+		Hand:              hand,
+		Community:         community,
+		Stage:             stage,
+		Pot:               pot,
+		MinBet:            minBet,
+		MinRaise:          minRaise,
+		BB:                bb,
+		Button:            int(view.DealerNum),
+		CurrentPlayer:     int(view.ActionNum),
+		Players:           slots,
+		LegalActions:      legal,
+		OpponentHistories: histories,
+		Sample:            true,
 	}
 
 	body, err := json.Marshal(req)
@@ -308,10 +317,10 @@ func aiDecide(baseURL string, view *poker.GameView, pn uint) (botAction, error) 
 // built-in heuristic — a reachable service alone never turns normal bots
 // into AI bots. The heuristic is also the safety net whenever the service
 // errors out for an AI room mid-hand.
-func decideBotAction(kind string, view *poker.GameView, pn uint) botAction {
+func decideBotAction(kind string, view *poker.GameView, pn uint, histories []aiOpponentHistory) botAction {
 	if kind == botKindAI {
 		if url := os.Getenv("AI_INFERENCE_URL"); url != "" {
-			if act, err := aiDecide(url, view, pn); err == nil {
+			if act, err := aiDecide(url, view, pn, histories); err == nil {
 				return act
 			} else {
 				slog.Default().Warn("AI decide failed; using heuristic", "error", err)
