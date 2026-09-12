@@ -132,6 +132,44 @@ func TestCreateTableValidatesBotType(t *testing.T) {
 	}
 }
 
+// The Deep CFR model is 6-handed: AI rooms may not seat more than six
+// players, whatever the service's health. Six (or fewer) is fine. Tested
+// against the pure validator because a successful handleCreateTable would
+// start the table's run loop, which needs a real Redis client.
+func TestCreateTableAILimitedToSixSeats(t *testing.T) {
+	srv, _ := newInferenceServer(t)
+	withAIEnv(t, srv.URL)
+
+	// 7+ seats are refused even with a healthy service.
+	for _, seats := range []uint{7, 8} {
+		err := validateBotType(botKindAI, seats)
+		if err == nil || err.Error() != msgAIBotsTooManyPlayers {
+			t.Fatalf("ai with %d seats should fail with %q, got %v", seats, msgAIBotsTooManyPlayers, err)
+		}
+	}
+	// Six or fewer is accepted with the service up.
+	for _, seats := range []uint{2, 6} {
+		if err := validateBotType(botKindAI, seats); err != nil {
+			t.Fatalf("ai with %d seats should pass, got %v", seats, err)
+		}
+	}
+	// Normal rooms are never bound by the model's seat count.
+	for _, seats := range []uint{6, 7, 8} {
+		if err := validateBotType(botKindNormal, seats); err != nil {
+			t.Fatalf("normal with %d seats should pass, got %v", seats, err)
+		}
+	}
+	// The seat cap does not mask the health gate: at six seats an unhealthy
+	// service still refuses, at seven the seat error wins.
+	withAIEnv(t, "http://127.0.0.1:1")
+	if err := validateBotType(botKindAI, 6); err == nil || err.Error() != msgAIBotsUnavailable {
+		t.Fatalf("ai with 6 seats and no service should fail with %q, got %v", msgAIBotsUnavailable, err)
+	}
+	if err := validateBotType(botKindAI, 7); err == nil || err.Error() != msgAIBotsTooManyPlayers {
+		t.Fatalf("ai with 7 seats and no service should fail with %q, got %v", msgAIBotsTooManyPlayers, err)
+	}
+}
+
 // A normal room's bots never consult the inference server even when it is
 // up; an AI room's bots do, and fall back to the heuristic when it is gone.
 func TestDecideBotActionGatedByRoomKind(t *testing.T) {

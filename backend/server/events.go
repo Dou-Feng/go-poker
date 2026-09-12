@@ -2,6 +2,7 @@ package server
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"time"
@@ -456,6 +457,27 @@ func normalizeRoomConfig(sb, bb, buyIn, maxBuy, maxPlayers, handsLimit uint, tou
 	return roomConfig{sb, bb, buyIn, maxBuy, maxPlayers, handsLimit}
 }
 
+// validateBotType checks a create-table botType for the room being built:
+// unknown kinds, "ai" with more seats than the 6-handed model supports, and
+// "ai" while the inference service is down are all refused — before any
+// room exists. The caller has already normalized "" to botKindNormal.
+func validateBotType(botType string, maxPlayers uint) error {
+	if !botKindValid(botType) {
+		return errors.New("unknown bot type")
+	}
+	if botType == botKindAI {
+		// The Deep CFR net is 6-handed: AI rooms beyond that size would
+		// error on every decision, so they are refused up front.
+		if maxPlayers > aiModelSeats {
+			return errors.New(msgAIBotsTooManyPlayers)
+		}
+		if !aiServiceAvailable() {
+			return errors.New(msgAIBotsUnavailable)
+		}
+	}
+	return nil
+}
+
 func handleCreateTable(c *Client, tablename string, password string, sb uint, bb uint, buyIn uint, maxBuy uint, maxPlayers uint, handsLimit uint, tournament bool, actionTimeout uint, botType string) {
 	// The room's bot type is fixed at creation: "normal" (the default) bots
 	// always use the built-in heuristic; "ai" bots ask the inference server
@@ -465,12 +487,9 @@ func handleCreateTable(c *Client, tablename string, password string, sb uint, bb
 	if botType == "" {
 		botType = botKindNormal
 	}
-	if !botKindValid(botType) {
-		c.send <- createResult(actionCreateResult, false, "unknown bot type", "")
-		return
-	}
-	if botType == botKindAI && !aiServiceAvailable() {
-		c.send <- createResult(actionCreateResult, false, msgAIBotsUnavailable, "")
+	cfg := normalizeRoomConfig(sb, bb, buyIn, maxBuy, maxPlayers, handsLimit, tournament)
+	if err := validateBotType(botType, cfg.maxPlayers); err != nil {
+		c.send <- createResult(actionCreateResult, false, err.Error(), "")
 		return
 	}
 
@@ -490,7 +509,6 @@ func handleCreateTable(c *Client, tablename string, password string, sb uint, bb
 	table.host = c.accountUUID
 	table.hostMu.Unlock()
 
-	cfg := normalizeRoomConfig(sb, bb, buyIn, maxBuy, maxPlayers, handsLimit, tournament)
 	poker.Configure(table.game, cfg.sb, cfg.bb, cfg.buyIn, cfg.maxBuy, cfg.maxPlayers, cfg.handsLimit)
 	table.clock.timeout = normalizeActionTimeout(actionTimeout)
 

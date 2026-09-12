@@ -46,6 +46,12 @@ import (
 
 const aiRequestTimeout = 3 * time.Second
 
+// aiModelSeats is the player count the Deep CFR net was trained for. Rooms
+// with more seats than that cannot be created as AI rooms (see
+// handleCreateTable), and aiDecide refuses views beyond it as a belt-and-
+// braces guard.
+const aiModelSeats = 6
+
 // aiCard is a [suit, rank] pair in pokers numbering.
 type aiCard [2]int
 
@@ -97,9 +103,15 @@ func aiSuitBit(bit int) (int, error) {
 }
 
 func aiCardFrom(c eval.Card) (aiCard, error) {
+	if c == 0 {
+		// Undealt slot: the engine pre-allocates the community cards as five
+		// zero entries and players hold zero cards before the deal, so callers
+		// skip these rather than treat them as corruption.
+		return aiCard{}, nil
+	}
 	suit, err := aiSuitBit(poker.CardSuit(c))
 	if err != nil {
-		return aiCard{}, fmt.Errorf("card %#x: %w", c, err)
+		return aiCard{}, fmt.Errorf("card %#x: %w", uint32(c), err)
 	}
 	return aiCard{suit, poker.CardRank(c)}, nil
 }
@@ -163,8 +175,8 @@ func aiServiceAvailable() bool {
 // botAction shape as botDecide: for "raise", Amount is the chips to put in
 // this action (call amount + raise), matching what handleRaise expects.
 func aiDecide(baseURL string, view *poker.GameView, pn uint) (botAction, error) {
-	if len(view.Players) > 6 {
-		return botAction{}, fmt.Errorf("model is 6-handed, table has %d seats", len(view.Players))
+	if len(view.Players) > aiModelSeats {
+		return botAction{}, fmt.Errorf("model is %d-handed, table has %d seats", aiModelSeats, len(view.Players))
 	}
 	p := view.Players[pn]
 

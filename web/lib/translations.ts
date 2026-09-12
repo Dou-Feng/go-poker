@@ -266,6 +266,7 @@ export const translations = {
     botTypeAIHint:
       "bots decide with the Deep CFR model; needs the AI service to be up",
     aiBotsUnavailable: "AI bot service unavailable",
+    aiBotsTooManyPlayers: "AI bots support at most 6 players",
     unknownBotType: "unknown bot type",
     noBuyInsLeft: "no buy-ins left in this room",
     bustedOut: "you are out of chips and buy-ins — moved to the spectators",
@@ -539,6 +540,7 @@ export const translations = {
     botTypeAI: "AI 机器人",
     botTypeAIHint: "机器人由 Deep CFR 模型驱动，需要 AI 服务在线",
     aiBotsUnavailable: "AI 机器人服务不可用",
+    aiBotsTooManyPlayers: "AI 机器人最多支持 6 人牌局",
     unknownBotType: "未知的机器人类型",
     noBuyInsLeft: "本房间的买入次数已用完",
     bustedOut: "你已输光且没有剩余买入次数，已转为观战",
@@ -595,6 +597,7 @@ export const errorKeyByMessage: Record<string, TranslationKey> = {
   "cannot add bot while ready": "cannotAddBotReady",
   "seat is taken": "seatTaken",
   "AI bot service unavailable": "aiBotsUnavailable",
+  "AI bots support at most 6 players": "aiBotsTooManyPlayers",
   "unknown bot type": "unknownBotType",
   "busted: no buy-ins left": "bustedOut",
 };

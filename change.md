@@ -12,6 +12,8 @@
 
 - [x] 强化玩家下注金额：下注胶囊改为近黑高对比表面、亮金描边与微光，放大面额色筹码和粗体金色数字；恢复对手缩小座位中的反向缩放，让下注额保持接近本人座位的可读尺寸，金额变化继续使用筹码弹出动画。
 
+- [x] 6 人以上牌局禁止 AI 机器人：Deep CFR 模型只训练过 6 人局，`create-table` 的 `botType "ai"` 在座位数超过 6 时直接拒绝（`validateBotType`，返回「AI 机器人最多支持 6 人牌局」，且在房间创建之前校验）；`aiDecide` 内部同样以 `aiModelSeats` 常量守卫。前端建房对话框的人数输入超过 6 时，「AI 机器人」开关禁用并显示原因，已勾选的自动退回普通机器人，提交时再守卫一次（防绕过）。UT：`TestCreateTableAILimitedToSixSeats`（7/8 人拒绝、≤6 人通过、普通房不受座位限制、座位上限不遮蔽健康检查）。
+
 - [x] 机器人分类型，建房时选择：不再「AI 服务可用就把所有机器人切到 AI」——每个房间创建时固定机器人类型（`create-table` 新增 `botType`，`"normal"` 默认=内置启发式 / `"ai"`=Deep CFR 推理服务），服务端 `table.botKind` 保存并在 `table-list`（房间条目 `botType`）与 `update-game` 中下发；`decideBotAction` 按房间类型决策，AI 房间遇到服务报错时单步回退启发式。选择 `"ai"` 的门槛：`AI_INFERENCE_URL` 已配置**且**其 `/healthz` 探活通过（`aiServiceAvailable`，结果缓存 10s，`table-list` 携带 `aiAvailable`）；建房时服务不健康返回「AI 机器人服务不可用」且不创建房间，未知类型返回「未知的机器人类型」。前端建房对话框新增「AI 机器人」开关（仅 `aiAvailable` 时可选，副文案说明服务状态），大厅房间条目对 AI 房间显示徽标。AI 房间的机器人命名 `AI Ace…`（账号 `bot-ai-ace`，与普通机器人命名空间分开、计分板各自合并），头像 🧠；普通房间保持 `Bot Ace` / 🤖 不变。顺带修复 `aiDecide` 的一个 bug：翻牌前引擎把公共牌预分配为 5 个 0 槽位、未发牌玩家手牌也是 0，原 `aiCardFrom` 遇 0 直接报错导致 AI 机器人翻牌前永远回退启发式，现在 0 值视为「未发牌」跳过。UT：`backend/server/ai_bot_test.go`（健康探活与缓存、建房的 botType 校验与服务不可用拒绝且不留房间、按房间类型决策：普通房绝不请求推理服务 / AI 房请求且服务挂掉时回退、AI 房命名头像与 update-game/table-info 携带 botType、普通房行为不变）。
 
 - [x] 背景音乐默认音量下调为 5%（原 15%）：新用户进大厅 / 房间的 BGM 起播即 5%，可在 ⚙️ 设置里调大；设置面板中 BGM 的「静音恢复」与默认保持一致（恢复为 5%）。已有本地记忆的用户不受影响（沿用其保存值）。

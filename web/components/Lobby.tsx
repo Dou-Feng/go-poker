@@ -80,6 +80,43 @@ export default function Lobby() {
     return () => stopBgm();
   }, []);
 
+  const parseNumber = (
+    value: string,
+    fallback: number,
+    min?: number,
+    max?: number
+  ) => {
+    const n = Number(value);
+    if (value.trim() === "" || !Number.isFinite(n)) {
+      return fallback;
+    }
+    if (min !== undefined && n < min) {
+      return fallback;
+    }
+    if (max !== undefined && n > max) {
+      return fallback;
+    }
+    return n;
+  };
+
+  // The Deep CFR net is 6-handed: raising the seat count past six silently
+  // reverts an AI pick (the toggle also disables, and the submit guards
+  // again — this just keeps the switch honest).
+  const maxPlayersNum = parseNumber(maxPlayers, 6, 2, 8);
+  useEffect(() => {
+    if (maxPlayersNum > 6 && botType === "ai") {
+      setBotType("normal");
+    }
+  }, [maxPlayersNum, botType]);
+
+  // AI 开关不可选时的原因；null = 可选。服务不健康或座位超过模型支持的
+  // 6 人都会禁用（提示文案同步展示在开关下方）。
+  const aiDisabledReason = !appState.aiAvailable
+    ? t("aiBotsUnavailable")
+    : maxPlayersNum > 6
+    ? t("aiBotsTooManyPlayers")
+    : null;
+
   const join = (name: string, password?: string) => {
     if (!socket) {
       return;
@@ -110,25 +147,6 @@ export default function Lobby() {
     }
   };
 
-  const parseNumber = (
-    value: string,
-    fallback: number,
-    min?: number,
-    max?: number
-  ) => {
-    const n = Number(value);
-    if (value.trim() === "" || !Number.isFinite(n)) {
-      return fallback;
-    }
-    if (min !== undefined && n < min) {
-      return fallback;
-    }
-    if (max !== undefined && n > max) {
-      return fallback;
-    }
-    return n;
-  };
-
   const create = () => {
     if (!socket) {
       return;
@@ -155,10 +173,11 @@ export default function Lobby() {
         ? parseNumber(maxBuy, Math.max(600, buyInNum), buyInNum)
         : 0,
       tournament,
-      maxPlayers: parseNumber(maxPlayers, 6, 2, 8),
+      maxPlayers: maxPlayersNum,
       handsLimit: parseNumber(handsLimit, 20, 0),
       actionTimeout: parseNumber(actionTimeout, 40, 0, 300),
-      botType,
+      // Deep CFR 模型只训练过 6 人局：座位更多时即使已勾选也退回普通机器人。
+      botType: botType === "ai" && maxPlayersNum <= 6 ? "ai" : "normal",
     });
   };
 
@@ -519,24 +538,16 @@ export default function Lobby() {
               </div>
               <label
                 className={ui.tournament}
-                title={
-                  appState.aiAvailable
-                    ? t("botTypeAIHint")
-                    : t("aiBotsUnavailable")
-                }
+                title={aiDisabledReason ?? t("botTypeAIHint")}
               >
                 <span>
                   {t("botTypeAI")}
-                  <small>
-                    {appState.aiAvailable
-                      ? t("botTypeAIHint")
-                      : t("aiBotsUnavailable")}
-                  </small>
+                  <small>{aiDisabledReason ?? t("botTypeAIHint")}</small>
                 </span>
                 <input
                   type="checkbox"
                   role="switch"
-                  disabled={!appState.aiAvailable}
+                  disabled={aiDisabledReason !== null}
                   checked={botType === "ai"}
                   onChange={(e) =>
                     setBotType(e.target.checked ? "ai" : "normal")

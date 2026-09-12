@@ -76,6 +76,9 @@ const (
 	// msgAIBotsUnavailable rejects create-table botType "ai" while the
 	// inference service is down or not configured.
 	msgAIBotsUnavailable = "AI bot service unavailable"
+	// msgAIBotsTooManyPlayers rejects create-table botType "ai" when the
+	// room seats more players than the 6-handed model supports.
+	msgAIBotsTooManyPlayers = "AI bots support at most 6 players"
 )
 
 var (
