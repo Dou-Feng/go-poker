@@ -421,7 +421,7 @@ func handleAddChips(c *Client, amount uint) {
 }
 
 func handleListTables(c *Client) {
-	c.send <- createTableList(c.hub.listTables())
+	c.send <- createTableList(c.hub.listTables(), aiServiceAvailable())
 }
 
 // roomConfig is a create-table request with defaults applied. Tournament
@@ -456,7 +456,24 @@ func normalizeRoomConfig(sb, bb, buyIn, maxBuy, maxPlayers, handsLimit uint, tou
 	return roomConfig{sb, bb, buyIn, maxBuy, maxPlayers, handsLimit}
 }
 
-func handleCreateTable(c *Client, tablename string, password string, sb uint, bb uint, buyIn uint, maxBuy uint, maxPlayers uint, handsLimit uint, tournament bool, actionTimeout uint) {
+func handleCreateTable(c *Client, tablename string, password string, sb uint, bb uint, buyIn uint, maxBuy uint, maxPlayers uint, handsLimit uint, tournament bool, actionTimeout uint, botType string) {
+	// The room's bot type is fixed at creation: "normal" (the default) bots
+	// always use the built-in heuristic; "ai" bots ask the inference server
+	// and fall back to the heuristic per action if it errors. A reachable
+	// service alone never upgrades normal rooms — the host must have chosen
+	// it here, and "ai" is only accepted while the service is healthy.
+	if botType == "" {
+		botType = botKindNormal
+	}
+	if !botKindValid(botType) {
+		c.send <- createResult(actionCreateResult, false, "unknown bot type", "")
+		return
+	}
+	if botType == botKindAI && !aiServiceAvailable() {
+		c.send <- createResult(actionCreateResult, false, msgAIBotsUnavailable, "")
+		return
+	}
+
 	table, created, err := c.hub.createTableIfAbsent(tablename, password)
 	if err != nil {
 		c.send <- createResult(actionCreateResult, false, err.Error(), "")
@@ -466,6 +483,8 @@ func handleCreateTable(c *Client, tablename string, password string, sb uint, bb
 		c.send <- createResult(actionCreateResult, false, "room already exists", "")
 		return
 	}
+	table.botKind = botType
+
 	// The creator hosts the room (manages bots); see table.isHost.
 	table.hostMu.Lock()
 	table.host = c.accountUUID
@@ -1122,9 +1141,10 @@ func createResultWithUUID(action string, ok bool, message string, username strin
 	return bytes
 }
 
-func createTableList(tables []tableInfo) []byte {
+func createTableList(tables []tableInfo, aiAvailable bool) []byte {
 	resp := tableList{
 		base{actionTableList},
+		aiAvailable,
 		tables,
 	}
 	bytes, err := json.Marshal(resp)
@@ -1228,6 +1248,7 @@ func createUpdatedGame(c *Client) []byte {
 		ActionRemainingMs: remainingMs,
 		Locked:            c.table.password != "",
 		CreatedAt:         c.table.createdAt.UnixMilli(),
+		BotType:           c.table.botKind,
 	}
 
 	resp, err := json.Marshal(game)
@@ -1255,6 +1276,7 @@ func createUpdatedGameBytes(t *table) []byte {
 		ActionRemainingMs: remainingMs,
 		Locked:            t.password != "",
 		CreatedAt:         t.createdAt.UnixMilli(),
+		BotType:           t.botKind,
 	}
 
 	resp, err := json.Marshal(game)

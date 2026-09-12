@@ -44,6 +44,8 @@ export type AppState = {
   language: "en" | "zh";
   /** Host is placing/removing bots: empty seats show "+", bots are removable. */
   botMode: boolean;
+  /** The AI inference service is healthy, so new rooms may pick AI bots. */
+  aiAvailable: boolean;
 };
 
 export type TableInfo = {
@@ -53,6 +55,8 @@ export type TableInfo = {
   spectators: number;
   locked: boolean;
   tournament: boolean;
+  /** The room's bot brain: "normal" (heuristic) or "ai" (model-backed). */
+  botType: string;
 };
 
 export type PlayerStats = {
@@ -190,6 +194,8 @@ export type Game = {
   locked: boolean;
   /** Room creation time, Unix milliseconds. */
   createdAt: number;
+  /** The room's bot brain: "normal" (heuristic) or "ai" (model-backed). */
+  botType: string;
   handsPlayed: number;
   biggestPotAmt: number;
   biggestPotWinners: number[];

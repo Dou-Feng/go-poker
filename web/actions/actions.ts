@@ -166,6 +166,9 @@ export type CreateTableOptions = {
   tournament?: boolean;
   /** Seconds each player gets to act; 0 = no clock. */
   actionTimeout?: number;
+  /** The room's bot brain: "normal" (default heuristic) or "ai"
+   *  (model-backed; only accepted while the AI service is healthy). */
+  botType?: "normal" | "ai";
 };
 
 export function createTable(

@@ -32,8 +32,23 @@ import (
 const (
 	botAccountPrefix = "bot-"
 	botAvatar        = "🤖"
+	aiBotAvatar      = "🧠"
 	maxBotsPerTable  = 7
 )
+
+// Bot kinds: every room picks one at creation ("botType" in create-table).
+// botKindNormal (the default) is the built-in heuristic; botKindAI asks the
+// Deep CFR inference server (ai_client.go) for decisions, falling back to the
+// heuristic per action if the service errors mid-hand.
+const (
+	botKindNormal = "normal"
+	botKindAI     = "ai"
+)
+
+// botKindValid reports whether s is an accepted create-table bot type.
+func botKindValid(s string) bool {
+	return s == "" || s == botKindNormal || s == botKindAI
+}
 
 var botNames = []string{"Ace", "Bella", "Cash", "Dodge", "Echo", "Flush", "Gigi", "Hawk", "Ivy", "Jolt"}
 
@@ -58,6 +73,9 @@ const (
 	msgHostOnly          = "only the host can manage bots"
 	msgSeatTaken         = "seat is taken"
 	msgCannotAddBotReady = "cannot add bot while ready"
+	// msgAIBotsUnavailable rejects create-table botType "ai" while the
+	// inference service is down or not configured.
+	msgAIBotsUnavailable = "AI bot service unavailable"
 )
 
 var (
@@ -197,10 +215,23 @@ func botAccount(name string) string {
 	return botAccountPrefix + strings.ToLower(strings.ReplaceAll(strings.TrimPrefix(name, "Bot "), " ", "-"))
 }
 
+// botKindAvatar is the seat avatar for a room's bot kind.
+func botKindAvatar(kind string) string {
+	if kind == botKindAI {
+		return aiBotAvatar
+	}
+	return botAvatar
+}
+
 // botName picks a name that is not in use at the table and, in a tournament
 // room, whose account still has buy-ins left (a bot that busted out and was
-// removed keeps its ledger entry under its name).
+// removed keeps its ledger entry under its name). AI rooms name their bots
+// "AI …" so the two kinds stay distinguishable on the scoreboard.
 func (t *table) botName() string {
+	prefix := "Bot "
+	if t.botKind == botKindAI {
+		prefix = "AI "
+	}
 	used := map[string]bool{}
 	for _, b := range t.botClients() {
 		used[b.username] = true
@@ -210,13 +241,13 @@ func (t *table) botName() string {
 		buyIn = 200
 	}
 	for _, n := range botNames {
-		name := "Bot " + n
+		name := prefix + n
 		if !used[name] && t.canBuyIn(botAccount(name), buyIn) {
 			return name
 		}
 	}
 	for i := len(botNames) + 1; ; i++ {
-		name := fmt.Sprintf("Bot %d", i)
+		name := fmt.Sprintf("%s%d", prefix, i)
 		if !used[name] && t.canBuyIn(botAccount(name), buyIn) {
 			return name
 		}
@@ -301,7 +332,7 @@ func (t *table) seatBot(bot *Client, seatID uint) error {
 	if err := poker.SetUsername(t.game, position, bot.username); err != nil {
 		return err
 	}
-	if err := poker.SetAvatar(t.game, position, botAvatar, false); err != nil {
+	if err := poker.SetAvatar(t.game, position, botKindAvatar(t.botKind), false); err != nil {
 		return err
 	}
 	if err := poker.BuyIn(t.game, position, amount); err != nil {
@@ -482,7 +513,10 @@ func (t *table) botTick() {
 		if bot == nil {
 			return
 		}
-		decision := botDecide(view, view.ActionNum, mrand.Float64)
+		// The room's bot kind decides the brain: "ai" rooms ask the model
+		// (when the service is configured), normal rooms always use the
+		// heuristic (see ai_client.go).
+		decision := decideBotAction(t.botKind, view, view.ActionNum)
 		switch decision.kind {
 		case "fold":
 			t.broadcast <- createNewLog(fmt.Sprintf("%s folds", actor.Username))

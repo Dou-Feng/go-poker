@@ -61,6 +61,9 @@ export default function Lobby() {
   // 操作时限: seconds each player has to act before the server checks or
   // folds for them; 0 = no clock.
   const [actionTimeout, setActionTimeout] = useState("40");
+  // 机器人类型: "normal" 内置启发式（默认）或 "ai"（Deep CFR 推理服务）。
+  // 只有推理服务健康（table-list 携带的 aiAvailable）时才能选 AI。
+  const [botType, setBotType] = useState<"normal" | "ai">("normal");
   const { t } = useTranslation();
 
   useEffect(() => {
@@ -155,6 +158,7 @@ export default function Lobby() {
       maxPlayers: parseNumber(maxPlayers, 6, 2, 8),
       handsLimit: parseNumber(handsLimit, 20, 0),
       actionTimeout: parseNumber(actionTimeout, 40, 0, 300),
+      botType,
     });
   };
 
@@ -313,6 +317,11 @@ export default function Lobby() {
                         title={t("tournamentHint")}
                       >
                         {t("tournament")}
+                      </span>
+                    )}
+                    {room.botType === "ai" && (
+                      <span className={styles.badge} title={t("botTypeAIHint")}>
+                        {t("botTypeAI")}
                       </span>
                     )}
                     <p>
@@ -508,6 +517,32 @@ export default function Lobby() {
                   <small>0 = {t("unlimited")}</small>
                 </label>
               </div>
+              <label
+                className={ui.tournament}
+                title={
+                  appState.aiAvailable
+                    ? t("botTypeAIHint")
+                    : t("aiBotsUnavailable")
+                }
+              >
+                <span>
+                  {t("botTypeAI")}
+                  <small>
+                    {appState.aiAvailable
+                      ? t("botTypeAIHint")
+                      : t("aiBotsUnavailable")}
+                  </small>
+                </span>
+                <input
+                  type="checkbox"
+                  role="switch"
+                  disabled={!appState.aiAvailable}
+                  checked={botType === "ai"}
+                  onChange={(e) =>
+                    setBotType(e.target.checked ? "ai" : "normal")
+                  }
+                />
+              </label>
               <div className={ui.dialogActions}>
                 <button
                   type="button"

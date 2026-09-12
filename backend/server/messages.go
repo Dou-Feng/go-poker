@@ -199,6 +199,10 @@ type createTable struct {
 	// ActionTimeout is the seconds each player gets to act (0 = no clock);
 	// see clock.go.
 	ActionTimeout uint `json:"actionTimeout"`
+	// BotType picks the room's bot brain: "normal" (default, built-in
+	// heuristic) or "ai" (Deep CFR inference server). "ai" is only accepted
+	// while the inference service is healthy (aiServiceAvailable).
+	BotType string `json:"botType,omitempty"`
 }
 
 type addChips struct {
@@ -345,8 +349,9 @@ type updateGame struct {
 	// Room facts for the room-info panel: whether entry needs a password, and
 	// when the room was created (Unix milliseconds).
 	Locked    bool  `json:"locked,omitempty"`
-	CreatedAt int64 `json:"createdAt,omitempty"`
-}
+	CreatedAt int64 `json:"createdAt,omitempty"`	// BotType is the room's bot brain ("normal" or "ai"; see bot.go), fixed
+	// at creation. The room UI uses it to label the bots the host seats.
+	BotType string `json:"botType,omitempty"`}
 
 type updatePlayerUUID struct {
 	base             //actionUpdatePlayerUUID
@@ -369,11 +374,15 @@ type tableInfo struct {
 	Spectators int    `json:"spectators"`
 	Locked     bool   `json:"locked"`
 	Tournament bool   `json:"tournament"` // buy-in cap in force
+	BotType    string `json:"botType"`    // room's bot brain: "normal" | "ai"
 }
 
 type tableList struct {
-	base               // actionTableList
-	Tables []tableInfo `json:"tables"`
+	base // actionTableList
+	// AIAvailable tells the lobby whether the "ai" bot type may be picked
+	// for new rooms: the inference server is configured and healthy.
+	AIAvailable bool        `json:"aiAvailable"`
+	Tables      []tableInfo `json:"tables"`
 }
 
 type friendInfo struct {

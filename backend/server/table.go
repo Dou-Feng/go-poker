@@ -66,7 +66,10 @@ type table struct {
 	// persist is the test hook for saving that record (nil = Redis).
 	sessionID string
 	persist   func(SessionRecord) error
-	// Server-played seats and their pacing timer (see bot.go).
+	// Server-played seats and their pacing timer (see bot.go). botKind is
+	// the room's chosen bot brain (bot.go: "normal" heuristic or "ai"
+	// model-backed), fixed at creation.
+	botKind string
 	botState
 	// Per-turn action clock (see clock.go); zero timeout = off.
 	clock actionClock
@@ -101,6 +104,7 @@ func newTable(name string, redisClient *redis.Client, hub *Hub) *table {
 		ledger:        newSessionLedger(),
 		sessionID:     uuid.New().String(),
 		busted:        make(map[string]bool),
+		botKind:       botKindNormal,
 		botState:      botState{botDelays: defaultBotDelays},
 	}
 }
@@ -355,6 +359,7 @@ func (t *table) censoredGameFor(client *Client, m *updateGame) []byte {
 		ActionRemainingMs: m.ActionRemainingMs,
 		Locked:            m.Locked,
 		CreatedAt:         m.CreatedAt,
+		BotType:           m.BotType,
 	}
 
 	resp, err := json.Marshal(game)
@@ -417,6 +422,7 @@ func (m *updateGame) censoredFor(viewerUUID string) []byte {
 		ActionRemainingMs: m.ActionRemainingMs,
 		Locked:            m.Locked,
 		CreatedAt:         m.CreatedAt,
+		BotType:           m.BotType,
 	}
 
 	resp, err := json.Marshal(game)
@@ -452,6 +458,7 @@ func (t *table) info() tableInfo {
 		Spectators: spectators,
 		Locked:     t.password != "",
 		Tournament: view.Config.MaxBuy > 0,
+		BotType:    t.botKind,
 	}
 }
 

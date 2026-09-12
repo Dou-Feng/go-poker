@@ -40,6 +40,7 @@ const initialState: AppState = {
   // mismatch (the server has no `navigator`).
   language: "en",
   botMode: false,
+  aiAvailable: false,
 };
 
 type ACTIONTYPE =
@@ -67,7 +68,8 @@ type ACTIONTYPE =
   | { type: "setSettlement"; payload: Settlement | null }
   | { type: "setSessionView"; payload: SessionRecord | null }
   | { type: "setLanguage"; payload: Language }
-  | { type: "setBotMode"; payload: boolean };
+  | { type: "setBotMode"; payload: boolean }
+  | { type: "setAIAvailable"; payload: boolean };
 function reducer(state: AppState, action: ACTIONTYPE) {
   switch (action.type) {
     case "addMessage":
@@ -104,6 +106,8 @@ function reducer(state: AppState, action: ACTIONTYPE) {
       return { ...state, clientID: null, game: null, botMode: false };
     case "setBotMode":
       return { ...state, botMode: action.payload };
+    case "setAIAvailable":
+      return { ...state, aiAvailable: action.payload };
     case "updatePlayerID":
       return { ...state, clientID: action.payload };
     case "setTablename":

@@ -163,6 +163,7 @@ export function SocketProvider(props: SocketProviderProps) {
               actionTimeout: event.actionTimeout ?? 0,
               locked: event.locked ?? false,
               createdAt: event.createdAt ?? 0,
+              botType: event.botType ?? "normal",
               // The server sends time *left*, so a phone whose clock is off
               // by minutes still counts down correctly.
               actionDeadline:
@@ -255,6 +256,10 @@ export function SocketProvider(props: SocketProviderProps) {
             dispatch({
               type: "setTables",
               payload: (event.tables ?? []) as TableInfo[],
+            });
+            dispatch({
+              type: "setAIAvailable",
+              payload: !!event.aiAvailable,
             });
             return;
           case "create-result":
