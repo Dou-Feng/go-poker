@@ -255,9 +255,12 @@ export default function Seat({
               <div
                 key={player.bet}
                 className="gps-seat__bet-pill animate-chip-pop"
+                aria-label={`${t("bet")} ${player.bet}`}
               >
                 <Chip className="gps-seat__chip" amount={player.bet} />
-                <span className="type-num">{player.bet}</span>
+                <span className="gps-seat__bet-amount type-num">
+                  {player.bet}
+                </span>
               </div>
             </div>
           )}

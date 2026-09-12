@@ -106,9 +106,6 @@
 .poker-table-seat > div > button:not(.gp-seat-action) {
   margin: 0;
 }
-.poker-table-scene .seat-shrunk .gps-seat__bet {
-  transform: none;
-}
 .poker-table-scene[data-layout="landscape"] .poker-table-surface {
   inset: 13% 10% 14%;
 }

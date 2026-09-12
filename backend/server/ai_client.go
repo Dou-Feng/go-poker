@@ -97,17 +97,9 @@ func aiSuitBit(bit int) (int, error) {
 }
 
 func aiCardFrom(c eval.Card) (aiCard, error) {
-	if c == 0 {
-		// Undealt slot: the engine pre-allocates the community cards as
-		// five zero entries and players hold zero cards before the deal,
-		// so callers skip these rather than treat them as corruption.
-		return aiCard{}, nil
-	}
 	suit, err := aiSuitBit(poker.CardSuit(c))
 	if err != nil {
-		// uint32: eval.Card formats itself with a custom verb that would
-		// obscure the raw bits in diagnostics.
-		return aiCard{}, fmt.Errorf("card %#x: %w", uint32(c), err)
+		return aiCard{}, fmt.Errorf("card %#x: %w", c, err)
 	}
 	return aiCard{suit, poker.CardRank(c)}, nil
 }

@@ -64,6 +64,11 @@ export default function RaiseInput({ onClose }: raiseProps) {
   }, [currentPot, maxBet, currentBet, minRaise, allInTotal]);
 
   const [amount, setAmount] = useState(minRaise);
+  // Keep the player's actual preset choice separate from the resulting
+  // amount. Multiple presets can clamp to the same legal minimum; deriving
+  // selection from the number would make tapping 1/2 pot appear to do
+  // nothing because "min" is the first preset with that value.
+  const [activePreset, setActivePreset] = useState<Preset | null>("min");
 
   if (!game || !actor) {
     return null;
@@ -74,10 +79,6 @@ export default function RaiseInput({ onClose }: raiseProps) {
   const step = Math.max(1, bigBlind);
   const fill =
     allInTotal > minRaise ? (value - minRaise) / (allInTotal - minRaise) : 1;
-  const selected = (Object.keys(PRESET_TEXT) as Preset[]).find(
-    (p) => presetValue[p] === value
-  );
-
   const confirm = () => {
     if (socket) {
       playTickedAction(isAllIn ? "allin" : "heroBet");
@@ -137,10 +138,12 @@ export default function RaiseInput({ onClose }: raiseProps) {
             key={preset}
             className={classNames(
               "gp-preset",
-              selected === preset && "is-selected"
+              activePreset === preset && "is-selected"
             )}
+            aria-pressed={activePreset === preset}
             onClick={() => {
               playSfx("tick");
+              setActivePreset(preset);
               setAmount(presetValue[preset]);
             }}
           >
@@ -167,7 +170,10 @@ export default function RaiseInput({ onClose }: raiseProps) {
             max={allInTotal}
             step={1}
             value={value}
-            onChange={(e) => setAmount(Number(e.target.value))}
+            onChange={(e) => {
+              setActivePreset(null);
+              setAmount(Number(e.target.value));
+            }}
             style={{ ["--fill" as string]: fill }}
             aria-label="加注金额"
           />
@@ -178,6 +184,7 @@ export default function RaiseInput({ onClose }: raiseProps) {
             type="button"
             onClick={() => {
               playSfx("tick");
+              setActivePreset(null);
               setAmount(clamp(value - step));
             }}
             disabled={value <= minRaise}
@@ -193,6 +200,7 @@ export default function RaiseInput({ onClose }: raiseProps) {
             type="button"
             onClick={() => {
               playSfx("tick");
+              setActivePreset(null);
               setAmount(clamp(value + step));
             }}
             disabled={value >= allInTotal}
