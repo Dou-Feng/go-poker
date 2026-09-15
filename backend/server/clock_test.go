@@ -53,14 +53,13 @@ func TestActionClockChecksOrFolds(t *testing.T) {
 
 	// Next hand: the first actor calls, the other player is now to act and can
 	// check; the clock checks for them instead of folding.
-	stub := &Client{table: tbl, send: make(chan []byte, 8)} // acts for whoever is on
-	handleDealGame(stub)
+	handleDealGame(actionClient(t, tbl))
 	view = tbl.game.GenerateOmniView()
 	if !view.Running {
 		t.Fatalf("next hand must be running (both still ready)")
 	}
 	first := view.ActionNum
-	handleCall(stub)
+	handleCall(actionClient(t, tbl))
 	view = tbl.game.GenerateOmniView()
 	second := view.ActionNum
 	if second == first {
@@ -104,7 +103,7 @@ func TestActionClockFollowsTurns(t *testing.T) {
 	}
 
 	// The acting player acts: a new turn, fresh deadline.
-	handleCall(&Client{table: tbl, send: make(chan []byte, 8)})
+	handleCall(actionClient(t, tbl))
 	_, left3 := tbl.actionClockState()
 	if left3 <= left2 {
 		t.Fatalf("a new turn must start a fresh clock: %d -> %d", left2, left3)

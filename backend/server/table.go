@@ -265,7 +265,10 @@ func (t *table) evictPlayer(playerUUID string) (string, bool) {
 	if pre.In && pre.Stack > 0 {
 		stats.Folds++
 	}
-	if _, err := t.flushSession(pre.AccountUUID, pre.TotalBuyIn, pre.Stack, stats); err != nil {
+	// PendingBuyIn was already debited from the wallet and included in
+	// TotalBuyIn, but has not reached Stack. Return it when the seat leaves.
+	refundableStack := pre.Stack + pre.PendingBuyIn
+	if _, err := t.flushSession(pre.AccountUUID, pre.TotalBuyIn, refundableStack, stats); err != nil {
 		slog.Default().Warn("Flush player", "error", err)
 	}
 	// Their result is final: refresh the shared session scoreboard now, so

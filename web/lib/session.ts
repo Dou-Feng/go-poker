@@ -11,6 +11,7 @@ const KEY = "gopoker-session";
 // server's user-info reply arrives.
 const USER_KEY = "gopoker-user";
 const USERNAME_KEY = "gopoker-username";
+const TOKEN_KEY = "gopoker-token";
 // Tab marker (sessionStorage): which account THIS tab authenticated. Only the
 // tab that logged in may replay the shared login on reconnect — a second tab
 // of the same browser must land on the login screen instead of kicking the
@@ -30,6 +31,20 @@ export function saveUser(accountUUID: string) {
     return;
   }
   window.localStorage.setItem(USER_KEY, accountUUID);
+}
+
+export function loadToken(): string | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
+  return window.localStorage.getItem(TOKEN_KEY);
+}
+
+export function saveToken(token: string) {
+  if (typeof window === "undefined") {
+    return;
+  }
+  window.localStorage.setItem(TOKEN_KEY, token);
 }
 
 export function loadUsername(): string | null {
@@ -52,6 +67,7 @@ export function clearUser() {
   }
   window.localStorage.removeItem(USER_KEY);
   window.localStorage.removeItem(USERNAME_KEY);
+  window.localStorage.removeItem(TOKEN_KEY);
 }
 
 // markTabAuth records that this tab authenticated as the given account.

@@ -73,9 +73,12 @@ type ACTIONTYPE =
 function reducer(state: AppState, action: ACTIONTYPE) {
   switch (action.type) {
     case "addMessage":
-      return { ...state, messages: [...state.messages, action.payload] };
+      return {
+        ...state,
+        messages: [...state.messages, action.payload].slice(-200),
+      };
     case "addLog":
-      return { ...state, logs: [...state.logs, action.payload] };
+      return { ...state, logs: [...state.logs, action.payload].slice(-300) };
     case "setUsername":
       return { ...state, username: action.payload };
     case "setUuid":
@@ -93,6 +96,8 @@ function reducer(state: AppState, action: ACTIONTYPE) {
         history: [],
         sessionView: null,
         profile: null,
+        messages: [],
+        logs: [],
       };
     case "leaveRoom":
       return {
@@ -101,9 +106,18 @@ function reducer(state: AppState, action: ACTIONTYPE) {
         game: null,
         table: null,
         botMode: false,
+        messages: [],
+        logs: [],
       };
     case "clearGame":
-      return { ...state, clientID: null, game: null, botMode: false };
+      return {
+        ...state,
+        clientID: null,
+        game: null,
+        botMode: false,
+        messages: [],
+        logs: [],
+      };
     case "setBotMode":
       return { ...state, botMode: action.payload };
     case "setAIAvailable":
@@ -141,7 +155,7 @@ function reducer(state: AppState, action: ACTIONTYPE) {
     case "setLanguage":
       return { ...state, language: action.payload };
     default:
-      throw new Error();
+      return state;
   }
 }
 

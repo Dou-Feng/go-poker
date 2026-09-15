@@ -24,6 +24,7 @@ import {
   loadUsername,
   markTabAuth,
   saveSession,
+  saveToken,
   saveUser,
   saveUsername,
 } from "../lib/session";
@@ -205,6 +206,9 @@ export function SocketProvider(props: SocketProviderProps) {
                 markTabAuth(event.uuid);
                 dispatch({ type: "setUuid", payload: event.uuid });
               }
+              if (event.token) {
+                saveToken(event.token);
+              }
               saveUsername(event.username);
               dispatch({ type: "setUsername", payload: event.username });
               dispatch({ type: "setAuthError", payload: null });
@@ -221,6 +225,9 @@ export function SocketProvider(props: SocketProviderProps) {
                 saveUser(event.uuid);
                 markTabAuth(event.uuid);
                 dispatch({ type: "setUuid", payload: event.uuid });
+              }
+              if (event.token) {
+                saveToken(event.token);
               }
               saveUsername(event.username);
               dispatch({ type: "setUsername", payload: event.username });
@@ -271,6 +278,23 @@ export function SocketProvider(props: SocketProviderProps) {
               });
             }
             return;
+          case "join-result":
+            if (event.ok) {
+              dispatch({ type: "clearGame" });
+              dispatch({ type: "setTablename", payload: event.tablename });
+              saveSession({
+                username: loadUsername() ?? "",
+                table: event.tablename,
+                clientID: null,
+              });
+              dispatch({ type: "setAuthError", payload: null });
+            } else {
+              dispatch({
+                type: "setAuthError",
+                payload: event.message ?? "Could not join room",
+              });
+            }
+            return;
           case "user-info": {
             const stats: PlayerStats = event.stats ?? {
               handsPlayed: 0,
@@ -282,6 +306,7 @@ export function SocketProvider(props: SocketProviderProps) {
               maxPotWon: 0,
               vpip: 0,
               vpipByPos: [0, 0, 0, 0, 0, 0],
+              handsByPos: [0, 0, 0, 0, 0, 0],
             };
             if (event.self) {
               saveUser(event.uuid);
@@ -389,7 +414,8 @@ export function SocketProvider(props: SocketProviderProps) {
             ws?.send(JSON.stringify({ action: "get-user" }));
             return;
           default:
-            throw new Error();
+            console.warn("unknown websocket action", event.action);
+            return;
         }
       };
     };

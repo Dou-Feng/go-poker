@@ -1,8 +1,8 @@
-FROM golang:1.18.2-alpine as builder
+FROM golang:1.24.3-alpine AS builder
 RUN mkdir /build
 ADD . /build/
 WORKDIR /build
-RUN go build cmd/go-poker/main.go
+RUN go build -o /build/main ./cmd/go-poker
 
 FROM alpine
 RUN adduser -S -D -H -h /app appuser

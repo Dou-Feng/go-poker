@@ -134,10 +134,11 @@ export function setAvatar(socket: WebSocket, avatar: string) {
   });
 }
 
-export function reconnectUser(socket: WebSocket, uuid: string) {
+export function reconnectUser(socket: WebSocket, uuid: string, token: string) {
   send(socket, {
     action: "reconnect-user",
     uuid: uuid,
+    token: token,
   });
 }
 

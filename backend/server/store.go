@@ -1,6 +1,10 @@
 package server
 
 import (
+	"crypto/rand"
+	"crypto/sha256"
+	"crypto/subtle"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -23,11 +27,42 @@ type UserRecord struct {
 	UUID         string            `json:"uuid"`
 	Username     string            `json:"username"`
 	PasswordHash string            `json:"passwordHash"`
+	SessionHash  string            `json:"sessionHash,omitempty"`
 	Chips        uint              `json:"chips"`
 	Avatar       string            `json:"avatar"`
 	AvatarImage  bool              `json:"avatarImage"`
 	Friends      []string          `json:"friends"` // account UUIDs
 	Stats        poker.PlayerStats `json:"stats"`
+}
+
+// newSessionToken returns a bearer token for browser reconnects and stores
+// only its SHA-256 digest on the account. Account and seat UUIDs are public
+// identifiers in game snapshots, so neither is suitable as a credential.
+func newSessionToken(user *UserRecord) (string, error) {
+	raw := make([]byte, 32)
+	if _, err := rand.Read(raw); err != nil {
+		return "", err
+	}
+	token := base64.RawURLEncoding.EncodeToString(raw)
+	user.SessionHash = hashSessionToken(token)
+	return token, nil
+}
+
+func hashSessionToken(token string) string {
+	sum := sha256.Sum256([]byte(token))
+	return base64.RawURLEncoding.EncodeToString(sum[:])
+}
+
+func validSessionToken(user *UserRecord, token string) bool {
+	if user == nil || token == "" || user.SessionHash == "" {
+		return false
+	}
+	want, err := base64.RawURLEncoding.DecodeString(user.SessionHash)
+	if err != nil {
+		return false
+	}
+	got := sha256.Sum256([]byte(token))
+	return len(want) == len(got) && subtle.ConstantTimeCompare(want, got[:]) == 1
 }
 
 func hashPassword(password string) (string, error) {
@@ -232,6 +267,7 @@ func mergeStats(dst *poker.PlayerStats, src poker.PlayerStats) {
 	dst.VPIP += src.VPIP
 	for i := range src.VPIPByPos {
 		dst.VPIPByPos[i] += src.VPIPByPos[i]
+		dst.HandsByPos[i] += src.HandsByPos[i]
 	}
 	if src.MaxPotWon > dst.MaxPotWon {
 		dst.MaxPotWon = src.MaxPotWon

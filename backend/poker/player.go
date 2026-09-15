@@ -30,6 +30,7 @@ type PlayerStats struct {
 	MaxPotWon   uint                `json:"maxPotWon"`
 	VPIP        uint                `json:"vpip"`
 	VPIPByPos   [PosLabelCount]uint `json:"vpipByPos"`
+	HandsByPos  [PosLabelCount]uint `json:"handsByPos"`
 }
 
 // PlayerState is the player state machine (change.md「玩家状态」章节):
@@ -82,6 +83,9 @@ type player struct {
 	// BestHand is populated on showdown for revealed/all-in players: the
 	// name of their best five-card hand (e.g. "full house").
 	BestHand string `json:"bestHand,omitempty"`
+	// Per-hand guards keep rates based on hands rather than action/pot count.
+	VoluntaryPreflop bool `json:"-"`
+	WonThisHand      bool `json:"-"`
 }
 
 // setState assigns a state and keeps the derived fast-path flags in sync.

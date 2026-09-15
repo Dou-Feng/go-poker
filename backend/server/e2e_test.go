@@ -22,11 +22,12 @@ import (
 // wsClient is one browser: it reads every server message into a queue and
 // remembers the latest update-game view.
 type wsClient struct {
-	t    *testing.T
-	name string
-	conn *websocket.Conn
-	msgs chan map[string]any
-	uuid string // per-seat player uuid, from update-player-uuid
+	t     *testing.T
+	name  string
+	conn  *websocket.Conn
+	msgs  chan map[string]any
+	uuid  string // per-seat player uuid, from update-player-uuid
+	token string // account session token, from register/login result
 }
 
 func dialWS(t *testing.T, name string, addr string) *wsClient {
@@ -74,6 +75,9 @@ func (c *wsClient) await(what string, timeout time.Duration, pred func(m map[str
 			}
 			if m["action"] == actionUpdatePlayerUUID {
 				c.uuid, _ = m["uuid"].(string)
+			}
+			if m["action"] == actionRegisterResult || m["action"] == actionLoginResult {
+				c.token, _ = m["token"].(string)
 			}
 			if pred(m) {
 				return m
@@ -170,6 +174,9 @@ func register(c *wsClient, username, uuid string) {
 	m := c.await("register-result", 3*time.Second, isAction(actionRegisterResult))
 	if ok, _ := m["ok"].(bool); !ok {
 		c.t.Fatalf("%s: register failed: %v", c.name, m["message"])
+	}
+	if c.token == "" {
+		c.t.Fatalf("%s: register result did not include a session token", c.name)
 	}
 }
 
@@ -357,7 +364,7 @@ func TestE2ESurrenderAfterSocketReconnect(t *testing.T) {
 
 	// New socket for the same browser tab: replay exactly what index.tsx does.
 	fresh := dialWS(t, busted.name+"-reconnected", addr)
-	fresh.send(map[string]any{"action": actionReconnect, "uuid": account})
+	fresh.send(map[string]any{"action": actionReconnect, "uuid": account, "token": busted.token})
 	fresh.send(map[string]any{"action": actionJoinTable, "tablename": "e2e2", "playerUUID": busted.uuid, "reconnect": true})
 	fresh.await("seat restored", 3*time.Second, isAction(actionUpdatePlayerUUID))
 	if fresh.uuid != busted.uuid {

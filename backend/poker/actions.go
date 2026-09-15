@@ -110,9 +110,10 @@ func bet(g *Game, pn uint, data uint) error {
 			g.players[pn].Stats.ThreeBets++
 		}
 	}
-	if g.getStage() == PreFlop && betVal > 0 {
+	if g.getStage() == PreFlop && betVal > 0 && !g.players[pn].VoluntaryPreflop {
 		g.players[pn].Stats.VPIP++
 		g.players[pn].Stats.VPIPByPos[g.positionLabel(pn)]++
+		g.players[pn].VoluntaryPreflop = true
 	}
 
 	g.updateRoundInfo()
@@ -243,8 +244,8 @@ func setSeatID(g *Game, pn uint, data uint) error {
 	// if data > g.config.MaxPlayers {
 	// 	return Error
 	// }
-	if data == 0 {
-		panic("cannot insert player at position zero")
+	if data == 0 || (g.config.MaxPlayers != 0 && data > g.config.MaxPlayers) {
+		return ErrInvalidPosition
 	}
 
 	for _, p := range g.players {
@@ -345,6 +346,7 @@ func deal(g *Game, pn uint, data uint) error {
 				g.players[i].In = true
 				g.players[i].State = PlayerPlaying
 				g.players[i].Stats.HandsPlayed++
+				g.players[i].Stats.HandsByPos[g.positionLabel(uint(i))]++
 			} else {
 				g.players[i].Cards[0] = 0
 				g.players[i].Cards[1] = 0
@@ -353,6 +355,8 @@ func deal(g *Game, pn uint, data uint) error {
 			g.players[i].Called = false
 			g.players[i].Revealed = false
 			g.players[i].BestHand = ""
+			g.players[i].VoluntaryPreflop = false
+			g.players[i].WonThisHand = false
 		}
 
 		g.players[g.sbNum].putInChips(g.config.SmallBlind)
@@ -390,6 +394,11 @@ func deal(g *Game, pn uint, data uint) error {
 	// lands on PreFlop; Flop/Turn advance one street each. In the new enum
 	// the betting stages are contiguous, so +1 is the next street.
 	g.setStageAndBetting(stage+1, true)
+	// Posting the blinds can consume every remaining chip. Re-evaluate the
+	// round immediately so all-in blinds are skipped and the board runs out.
+	if stage == NotReady {
+		g.updateRoundInfo()
+	}
 
 	return nil
 }

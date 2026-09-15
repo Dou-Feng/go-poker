@@ -218,12 +218,12 @@ func TestAIHandActionHistory(t *testing.T) {
 	beforeCall := tbl.game.GenerateOmniView()
 	caller := beforeCall.ActionNum
 	callAmount := beforeCall.Players[beforeCall.BBNum].Bet - beforeCall.Players[caller].Bet
-	handleCall(&Client{table: tbl})
+	handleCall(actionClient(t, tbl))
 
 	beforeRaise := tbl.game.GenerateOmniView()
 	raiser := beforeRaise.ActionNum
 	raiseAmount := uint(aiPot(beforeRaise)) // a pot-sized opening raise
-	handleRaise(&Client{table: tbl}, raiseAmount)
+	handleRaise(actionClient(t, tbl), raiseAmount)
 
 	view := tbl.game.GenerateOmniView()
 	histories := tbl.aiOpponentHistories(view, view.ActionNum)
@@ -264,7 +264,7 @@ func TestAIHandActionHistory(t *testing.T) {
 	foldTable := bettingHandTable(t)
 	foldView := foldTable.game.GenerateOmniView()
 	folder := foldView.ActionNum
-	handleFold(&Client{table: foldTable})
+	handleFold(actionClient(t, foldTable))
 	foldHistories := foldTable.aiOpponentHistories(
 		foldTable.game.GenerateOmniView(), (folder+1)%uint(len(foldView.Players)),
 	)

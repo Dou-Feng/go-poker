@@ -91,6 +91,24 @@ func findPlayer(view *poker.GameView, uuid string) (int, bool) {
 	return -1, false
 }
 
+// actionClient returns a client authenticated as the player whose turn it is.
+// Production betting handlers reject clients that do not own that seat.
+func actionClient(t *testing.T, tbl *table) *Client {
+	t.Helper()
+	view := tbl.game.GenerateOmniView()
+	if int(view.ActionNum) >= len(view.Players) {
+		t.Fatalf("action player %d is out of range", view.ActionNum)
+	}
+	p := view.Players[view.ActionNum]
+	return &Client{
+		table:       tbl,
+		uuid:        p.UUID,
+		accountUUID: p.AccountUUID,
+		username:    p.Username,
+		send:        make(chan []byte, 16),
+	}
+}
+
 // waitFor polls cond until it holds or the deadline passes.
 func waitFor(t *testing.T, what string, cond func() bool) {
 	t.Helper()
@@ -374,7 +392,7 @@ func TestReconnectAfterEvictionExpiresSession(t *testing.T) {
 
 	// Within the grace period: the seat is restored and the timer cancelled.
 	tbl.markPlayerOffline(a)
-	back := &Client{hub: hub, send: make(chan []byte, 16)}
+	back := &Client{hub: hub, accountUUID: "acc-a", send: make(chan []byte, 16)}
 	handleJoinTable(back, tbl.name, "", a, true)
 	if back.table != tbl || back.uuid != a || back.accountUUID != "acc-a" {
 		t.Fatalf("reconnect should restore the seat: table=%v uuid=%q account=%q", back.table == tbl, back.uuid, back.accountUUID)
@@ -435,6 +453,37 @@ func TestReconnectAfterEvictionExpiresSession(t *testing.T) {
 	}
 	if hub.findTable("no-such-room") != nil {
 		t.Fatalf("a reconnect must never create a room")
+	}
+}
+
+func TestEvictionRefundsPendingBuyIn(t *testing.T) {
+	tbl, rec := newTestTable(t)
+	a := seat(t, tbl, "acc-a", 1, true)
+	seat(t, tbl, "acc-b", 2, true)
+	if !autoStartIfReady(tbl) {
+		t.Fatal("hand did not start")
+	}
+
+	view := tbl.game.GenerateOmniView()
+	pos, ok := findPlayer(view, a)
+	if !ok {
+		t.Fatal("player not found")
+	}
+	if err := poker.BuyIn(tbl.game, uint(pos), 100); err != nil {
+		t.Fatalf("queue rebuy: %v", err)
+	}
+	queued := tbl.game.GenerateOmniView().Players[pos]
+	if queued.PendingBuyIn != 100 {
+		t.Fatalf("pending buy-in = %d, want 100", queued.PendingBuyIn)
+	}
+
+	tbl.evictPlayer(a)
+	calls := rec.snapshot()
+	if len(calls) != 1 {
+		t.Fatalf("flush calls = %d, want 1", len(calls))
+	}
+	if want := queued.Stack + queued.PendingBuyIn; calls[0].Stack != want {
+		t.Fatalf("refund = %d, want stack + pending buy-in = %d", calls[0].Stack, want)
 	}
 }
 

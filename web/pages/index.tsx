@@ -13,6 +13,7 @@ import { joinTable, reconnectUser } from "../actions/actions";
 import { preloadIdleAssets } from "../lib/preload";
 import {
   loadSession,
+  loadToken,
   loadUser,
   loadUsername,
   tabAuthAccount,
@@ -71,7 +72,8 @@ export default function IndexPage() {
     }
 
     const user = loadUser();
-    if (!user || tabAuthAccount() !== user) {
+    const token = loadToken();
+    if (!user || !token || tabAuthAccount() !== user) {
       return;
     }
     const send = (fn: () => void) => {
@@ -81,7 +83,7 @@ export default function IndexPage() {
         socket.addEventListener("open", fn, { once: true });
       }
     };
-    send(() => reconnectUser(socket, user));
+    send(() => reconnectUser(socket, user, token));
 
     const session = loadSession();
     if (session && session.table) {

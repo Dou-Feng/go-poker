@@ -346,6 +346,14 @@ func (c *Client) processEvents(rawMessage []byte) error {
 	if baseMessage.Action == "" {
 		return errors.New("deserialize message")
 	}
+	if actionNeedsAuthentication(baseMessage.Action) && c.accountUUID == "" {
+		c.trySend(createError("not logged in"))
+		return nil
+	}
+	if actionNeedsTable(baseMessage.Action) && c.table == nil {
+		c.trySend(createError("not in a room"))
+		return nil
+	}
 
 	switch baseMessage.Action {
 
@@ -444,7 +452,7 @@ func (c *Client) processEvents(rawMessage []byte) error {
 		if err != nil {
 			return err
 		}
-		handleReconnectUser(c, reconnect.UUID)
+		handleReconnectUser(c, reconnect.UUID, reconnect.Token)
 		return nil
 
 	case actionListTables:
@@ -618,5 +626,34 @@ func (c *Client) processEvents(rawMessage []byte) error {
 
 	default:
 		return errors.New("unexpected message action")
+	}
+}
+
+// actionNeedsAuthentication is the protocol boundary. Every action except
+// establishing an identity (or answering a heartbeat) requires a verified
+// account, even if the individual handler also performs narrower checks.
+func actionNeedsAuthentication(action string) bool {
+	switch action {
+	case actionRegisterUser, actionLogin, actionReconnect, actionPing:
+		return false
+	default:
+		return true
+	}
+}
+
+// actionNeedsTable prevents lobby clients from reaching handlers that assume
+// c.table is non-nil. It is deliberately kept next to the dispatcher so a new
+// room action has one obvious place to declare its precondition.
+func actionNeedsTable(action string) bool {
+	switch action {
+	case actionLeaveTable, actionSendMessage, actionSendLog, actionNewPlayer,
+		actionRebuy, actionUndoBuyIn, actionToggleReady, actionMoveSeat,
+		actionVoteSettle, actionShowHand, actionSpectate, actionTakeSeat,
+		actionStartGame, actionResetGame, actionDealGame, actionPlayerCall,
+		actionPlayerCheck, actionPlayerRaise, actionPlayerFold, actionAddBot,
+		actionRemoveBot, actionVoiceSignal:
+		return true
+	default:
+		return false
 	}
 }

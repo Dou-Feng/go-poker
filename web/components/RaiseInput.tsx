@@ -6,6 +6,7 @@ import { playSfx, playTickedAction } from "../lib/sfx";
 import InputButton from "./InputButton";
 import Chip from "./Chip";
 import classNames from "classnames";
+import { raisePresetAmounts, totalPot } from "../lib/betting";
 
 type raiseProps = {
   /** Hide the panel (close button, or after the raise is sent). */
@@ -25,9 +26,8 @@ const PRESET_TEXT: Record<Preset, { zh: string; en: string }> = {
 
 // Raise panel above the action bar (styles/raisepanel.css): quick amounts,
 // a slider with −/+ nudges in big-blind steps, and the bar's own BET /
-// ALL-IN key to confirm. Amounts are the player's total bet for the street
-// (what the slider shows); the server receives the increment on top of what
-// they already have in.
+// ALL-IN key to confirm. Every displayed amount is the number of chips this
+// action adds, matching the amount sent to the server.
 export default function RaiseInput({ onClose }: raiseProps) {
   const socket = useSocket();
   const { appState } = useContext(AppContext);
@@ -39,31 +39,31 @@ export default function RaiseInput({ onClose }: raiseProps) {
   const currentBet = actor?.bet ?? 0;
   const currentStack = actor?.stack ?? 0;
   const maxBet = game ? Math.max(...game.players.map((p) => p.bet)) : 0;
-  const allInTotal = currentStack + currentBet;
-  // Minimum legal total; a short stack that cannot make a full raise can
-  // still shove, so the floor never exceeds the all-in amount.
-  const minRaise = Math.min(maxBet + (game?.minRaise ?? 0), allInTotal);
-  const currentPot =
-    game && game.pots.length !== 0
-      ? game.pots[0].amount
-      : bigBlind + smallBlind;
+  // Minimum chips to add: call the outstanding amount, then complete one
+  // minimum raise. A short stack can still shove below that floor.
+  const minAmount = Math.min(
+    Math.max(0, maxBet + (game?.minRaise ?? 0) - currentBet),
+    currentStack
+  );
+  const currentPot = game
+    ? totalPot(game.pots, game.players)
+    : bigBlind + smallBlind;
 
   const clamp = (v: number) =>
-    Math.min(allInTotal, Math.max(minRaise, Math.round(v)));
+    Math.min(currentStack, Math.max(minAmount, Math.round(v)));
 
   // Quick amounts are pot-sized raises relative to the current pot.
   const presetValue = useMemo(() => {
-    const potBet = currentPot + 2 * (maxBet - currentBet);
-    return {
-      min: clamp(minRaise),
-      half: clamp(Math.ceil(potBet / 2)),
-      pot: clamp(potBet),
-      double: clamp(potBet * 2),
-    } as Record<Preset, number>;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentPot, maxBet, currentBet, minRaise, allInTotal]);
+    return raisePresetAmounts(
+      currentPot,
+      currentBet,
+      maxBet,
+      minAmount,
+      currentStack
+    ) as Record<Preset, number>;
+  }, [currentPot, maxBet, currentBet, minAmount, currentStack]);
 
-  const [amount, setAmount] = useState(minRaise);
+  const [amount, setAmount] = useState(minAmount);
   // Keep the player's actual preset choice separate from the resulting
   // amount. Multiple presets can clamp to the same legal minimum; deriving
   // selection from the number would make tapping 1/2 pot appear to do
@@ -75,10 +75,12 @@ export default function RaiseInput({ onClose }: raiseProps) {
   }
 
   const value = clamp(amount);
-  const isAllIn = value >= allInTotal;
+  const isAllIn = value >= currentStack;
   const step = Math.max(1, bigBlind);
   const fill =
-    allInTotal > minRaise ? (value - minRaise) / (allInTotal - minRaise) : 1;
+    currentStack > minAmount
+      ? (value - minAmount) / (currentStack - minAmount)
+      : 1;
   const confirm = () => {
     if (socket) {
       playTickedAction(isAllIn ? "allin" : "heroBet");
@@ -86,9 +88,11 @@ export default function RaiseInput({ onClose }: raiseProps) {
         socket,
         isAllIn
           ? appState.username + " is all in"
+          : maxBet > currentBet
+          ? appState.username + " raises to " + (currentBet + value)
           : appState.username + " bets " + value
       );
-      playerRaise(socket, value - currentBet);
+      playerRaise(socket, value);
     }
     onClose();
   };
@@ -155,10 +159,10 @@ export default function RaiseInput({ onClose }: raiseProps) {
 
       <section className="gp-raise-panel__amount-section">
         <div className="gp-raise-panel__amount-copy">
-          <strong>加注金额</strong>
-          <span>AMOUNT</span>
+          <strong>本次投入</strong>
+          <span>ADD CHIPS</span>
           <small className="type-num">
-            {minRaise} - {allInTotal}
+            {minAmount} - {currentStack}
           </small>
         </div>
 
@@ -166,8 +170,8 @@ export default function RaiseInput({ onClose }: raiseProps) {
           <input
             className="gp-raise-slider"
             type="range"
-            min={minRaise}
-            max={allInTotal}
+            min={minAmount}
+            max={currentStack}
             step={1}
             value={value}
             onChange={(e) => {
@@ -187,7 +191,7 @@ export default function RaiseInput({ onClose }: raiseProps) {
               setActivePreset(null);
               setAmount(clamp(value - step));
             }}
-            disabled={value <= minRaise}
+            disabled={value <= minAmount}
             aria-label="减少"
           >
             −
@@ -203,7 +207,7 @@ export default function RaiseInput({ onClose }: raiseProps) {
               setActivePreset(null);
               setAmount(clamp(value + step));
             }}
-            disabled={value >= allInTotal}
+            disabled={value >= currentStack}
             aria-label="增加"
           >
             +

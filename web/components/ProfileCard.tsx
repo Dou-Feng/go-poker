@@ -486,7 +486,12 @@ export default function ProfileCard() {
                 <dl className={`${s.detailGrid} ${s.positionGrid}`}>
                   {POSITION_KEYS.map((key, i) => (
                     <div className={s.positionMetric} key={key}>
-                      <dd>{rate(stats?.vpipByPos?.[i] ?? 0, hands)}</dd>
+                      <dd>
+                        {rate(
+                          stats?.vpipByPos?.[i] ?? 0,
+                          stats?.handsByPos?.[i] ?? 0
+                        )}
+                      </dd>
                       <span>{POSITION_CODES[i]}</span>
                       <dt>{t(key)}</dt>
                     </div>

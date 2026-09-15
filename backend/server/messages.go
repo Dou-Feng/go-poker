@@ -174,8 +174,9 @@ type setAvatar struct {
 }
 
 type reconnectUser struct {
-	base        // actionReconnect
-	UUID string `json:"uuid"`
+	base         // actionReconnect
+	UUID  string `json:"uuid"`
+	Token string `json:"token"`
 }
 
 type listTables struct {
@@ -277,6 +278,7 @@ const (
 	actionUpdateGame           string = "update-game"
 	actionUpdatePlayerUUID     string = "update-player-uuid"
 	actionRegisterResult       string = "register-result"
+	actionJoinResult           string = "join-result"
 	actionTableList            string = "table-list"
 	actionCreateResult         string = "create-result"
 	actionUserInfo             string = "user-info"
@@ -349,9 +351,10 @@ type updateGame struct {
 	// Room facts for the room-info panel: whether entry needs a password, and
 	// when the room was created (Unix milliseconds).
 	Locked    bool  `json:"locked,omitempty"`
-	CreatedAt int64 `json:"createdAt,omitempty"`	// BotType is the room's bot brain ("normal" or "ai"; see bot.go), fixed
+	CreatedAt int64 `json:"createdAt,omitempty"` // BotType is the room's bot brain ("normal" or "ai"; see bot.go), fixed
 	// at creation. The room UI uses it to label the bots the host seats.
-	BotType string `json:"botType,omitempty"`}
+	BotType string `json:"botType,omitempty"`
+}
 
 type updatePlayerUUID struct {
 	base             //actionUpdatePlayerUUID
@@ -365,6 +368,14 @@ type result struct {
 	Message  string `json:"message"`
 	Username string `json:"username,omitempty"`
 	UUID     string `json:"uuid,omitempty"`
+	Token    string `json:"token,omitempty"`
+}
+
+type joinResult struct {
+	base             // actionJoinResult
+	Ok        bool   `json:"ok"`
+	Message   string `json:"message,omitempty"`
+	Tablename string `json:"tablename"`
 }
 
 type tableInfo struct {

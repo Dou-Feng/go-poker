@@ -26,15 +26,16 @@ func handleJoinTable(c *Client, tablename string, password string, playerUUID st
 
 	table, _, err := c.hub.createTableIfAbsent(tablename, "")
 	if err != nil {
-		c.send <- createError(err.Error())
+		c.send <- createJoinResult(false, tablename, err.Error())
 		return
 	}
 	if table.password != "" && table.password != password {
-		c.send <- createError("wrong password")
+		c.send <- createJoinResult(false, tablename, "wrong password")
 		return
 	}
 	c.table = table
 	table.register <- c
+	c.send <- createJoinResult(true, tablename, "")
 
 	if c.username != "" {
 		table.broadcast <- createNewMessage(gameAdminName, fmt.Sprintf("%s has joined", c.username))
@@ -58,7 +59,7 @@ func handleReconnectTable(c *Client, tablename string, password string, playerUU
 		// A seated player reconnecting within the offline grace period gets
 		// their seat back. They already passed the password check when they
 		// first joined, so it is not required again.
-		if !tableHasPlayer(table, playerUUID) {
+		if c.accountUUID == "" || !tablePlayerBelongsTo(table, playerUUID, c.accountUUID) {
 			c.send <- createSessionExpired(tablename, "room closed")
 			return
 		}
@@ -95,12 +96,25 @@ func tableHasPlayer(t *table, playerUUID string) bool {
 	return false
 }
 
+func tablePlayerBelongsTo(t *table, playerUUID, accountUUID string) bool {
+	view := t.game.GenerateOmniView()
+	for i := range view.Players {
+		if view.Players[i].UUID == playerUUID {
+			return accountUUID != "" && view.Players[i].AccountUUID == accountUUID
+		}
+	}
+	return false
+}
+
 // reconnectPlayer restores a client's seat and identity from a per-session
 // player uuid. It reports whether the player was found at the table.
 func reconnectPlayer(c *Client, playerUUID string) bool {
+	if c.table == nil || c.accountUUID == "" {
+		return false
+	}
 	view := c.table.game.GenerateOmniView()
 	for i := range view.Players {
-		if view.Players[i].UUID == playerUUID {
+		if view.Players[i].UUID == playerUUID && view.Players[i].AccountUUID == c.accountUUID {
 			c.uuid = playerUUID
 			c.username = view.Players[i].Username
 			c.accountUUID = view.Players[i].AccountUUID
@@ -122,6 +136,20 @@ func createSessionExpired(tablename string, message string) []byte {
 	bytes, err := json.Marshal(resp)
 	if err != nil {
 		slog.Default().Warn("Marshal session expired", "error", err)
+	}
+	return bytes
+}
+
+func createJoinResult(ok bool, tablename string, message string) []byte {
+	resp := joinResult{
+		base:      base{actionJoinResult},
+		Ok:        ok,
+		Message:   message,
+		Tablename: tablename,
+	}
+	bytes, err := json.Marshal(resp)
+	if err != nil {
+		slog.Default().Warn("Marshal join result", "error", err)
 	}
 	return bytes
 }
@@ -156,6 +184,12 @@ func handleRegisterUser(c *Client, username string, accountUUID string, password
 		avatar = "🙂"
 	}
 	user := &UserRecord{UUID: accountUUID, Username: username, PasswordHash: hash, Chips: initialChips, Avatar: avatar}
+	token, err := newSessionToken(user)
+	if err != nil {
+		c.hub.unregisterUser(accountUUID)
+		c.send <- createResult(actionRegisterResult, false, "could not create session", "")
+		return
+	}
 	if err := saveUser(c.hub.rdb, user); err != nil {
 		c.hub.unregisterUser(accountUUID)
 		c.send <- createResult(actionRegisterResult, false, "could not save user", "")
@@ -167,7 +201,7 @@ func handleRegisterUser(c *Client, username string, accountUUID string, password
 
 	c.username = username
 	c.accountUUID = accountUUID
-	c.send <- createResultWithUUID(actionRegisterResult, true, "", username, accountUUID)
+	c.send <- createAuthResult(actionRegisterResult, username, accountUUID, token)
 	c.cacheAvatar(user)
 	c.send <- createUserInfo(c.hub.rdb, user, true)
 	// A fresh account cannot have a live session yet; bound for uniformity
@@ -203,9 +237,14 @@ func handleLogin(c *Client, identifier string, password string) {
 		c.send <- createResult(actionLoginResult, false, "invalid username or password", "")
 		return
 	}
+	token, err := newSessionToken(user)
+	if err != nil || saveUser(c.hub.rdb, user) != nil {
+		c.send <- createResult(actionLoginResult, false, "could not create session", "")
+		return
+	}
 	c.username = user.Username
 	c.accountUUID = user.UUID
-	c.send <- createResultWithUUID(actionLoginResult, true, "", user.Username, user.UUID)
+	c.send <- createAuthResult(actionLoginResult, user.Username, user.UUID, token)
 	c.cacheAvatar(user)
 	c.send <- createUserInfo(c.hub.rdb, user, true)
 	// Single session per account: a second login kicks the previous
@@ -216,12 +255,9 @@ func handleLogin(c *Client, identifier string, password string) {
 // handleReconnectUser re-associates a returning client (identified by their
 // remembered account UUID in localStorage) with their account. Passwords are
 // only required at initial login/registration.
-func handleReconnectUser(c *Client, accountUUID string) {
-	if accountUUID == "" {
-		return
-	}
+func handleReconnectUser(c *Client, accountUUID, token string) {
 	user, err := loadUser(c.hub.rdb, accountUUID)
-	if err != nil || user.PasswordHash == "" {
+	if err != nil || user.PasswordHash == "" || !validSessionToken(user, token) {
 		// The saved login points at an account that no longer exists (e.g.
 		// Redis was reset). Tell the client so it drops the stale login
 		// instead of sitting in a lobby with no account behind it. An empty
@@ -540,22 +576,27 @@ func handleLeaveTable(c *Client, tablename string) {
 	c.table = nil
 }
 
-func handleSendMessage(c *Client, username string, message string) {
-	c.table.broadcast <- createNewMessage(username, message)
+func handleSendMessage(c *Client, _ string, message string) {
+	// The display name comes from the authenticated account. Treat the wire
+	// field as legacy input so a modified client cannot impersonate someone.
+	c.table.broadcast <- createNewMessage(c.username, message)
 }
 
 func handleSendLog(c *Client, message string) {
 	c.table.broadcast <- createNewLog(message)
 }
 
-func handleNewPlayer(c *Client, username string) {
-	c.username = username
+func handleNewPlayer(c *Client, _ string) {
 	c.send <- createUpdatedGame(c)
-	c.table.broadcast <- createNewMessage(gameAdminName, fmt.Sprintf("%s has joined", username))
+	c.table.broadcast <- createNewMessage(gameAdminName, fmt.Sprintf("%s has joined", c.username))
 }
 
 func handleTakeSeat(c *Client, username string, seatID uint, buyIn uint) {
 	view := c.table.game.GenerateOmniView()
+	if seatID == 0 || (view.Config.MaxPlayers != 0 && seatID > view.Config.MaxPlayers) {
+		c.send <- createError("invalid seat")
+		return
+	}
 
 	// Nobody sits down while a hand is in progress: tapping an empty seat
 	// then claims it for the next hand instead (see reserve.go).
@@ -769,6 +810,10 @@ func handleUndoRebuy(c *Client) {
 }
 
 func handleStartGame(c *Client) {
+	if !clientOwnsSeat(c) {
+		c.send <- createError("you are not seated")
+		return
+	}
 	err := c.table.game.Start()
 	if err != nil {
 		fmt.Println(err)
@@ -861,6 +906,10 @@ func autoStartIfReady(t *table) bool {
 }
 
 func handleResetGame(c *Client) {
+	if !c.table.isHost(c) {
+		c.send <- createError(msgHostOnly)
+		return
+	}
 	c.table.game.Reset()
 	c.table.resetSession()
 	// A full room reset clears every seat, so the bots seated on them must go
@@ -871,6 +920,10 @@ func handleResetGame(c *Client) {
 
 func handleDealGame(c *Client) {
 	if c.table == nil {
+		return
+	}
+	if !clientOwnsSeat(c) {
+		c.send <- createError("you are not seated")
 		return
 	}
 	view := c.table.game.GenerateOmniView()
@@ -939,15 +992,17 @@ func handleDealGame(c *Client) {
 	c.table.broadcastGame()
 }
 
+func clientOwnsSeat(c *Client) bool {
+	return c != nil && c.table != nil && c.accountUUID != "" && c.uuid != "" &&
+		tablePlayerBelongsTo(c.table, c.uuid, c.accountUUID)
+}
+
 func handleCall(c *Client) {
 	c.table.actionMu.Lock()
 	defer c.table.actionMu.Unlock()
 	view := c.table.game.GenerateOmniView()
-	if len(view.Players) == 0 {
-		return
-	}
-	pn := view.ActionNum
-	if pn >= uint(len(view.Players)) {
+	pn, ok := authorizedActor(c, view)
+	if !ok {
 		return
 	}
 	currentPlayer := view.Players[pn]
@@ -979,8 +1034,8 @@ func handleRaise(c *Client, raise uint) {
 	c.table.actionMu.Lock()
 	defer c.table.actionMu.Unlock()
 	view := c.table.game.GenerateOmniView()
-	pn := view.ActionNum
-	if pn >= uint(len(view.Players)) {
+	pn, ok := authorizedActor(c, view)
+	if !ok {
 		return
 	}
 	err := poker.Bet(c.table.game, pn, raise)
@@ -997,8 +1052,8 @@ func handleCheck(c *Client) {
 	c.table.actionMu.Lock()
 	defer c.table.actionMu.Unlock()
 	view := c.table.game.GenerateOmniView()
-	pn := view.ActionNum
-	if pn >= uint(len(view.Players)) {
+	pn, ok := authorizedActor(c, view)
+	if !ok {
 		return
 	}
 	err := poker.Bet(c.table.game, pn, 0)
@@ -1014,8 +1069,8 @@ func handleFold(c *Client) {
 	c.table.actionMu.Lock()
 	defer c.table.actionMu.Unlock()
 	view := c.table.game.GenerateOmniView()
-	pn := view.ActionNum
-	if pn >= uint(len(view.Players)) {
+	pn, ok := authorizedActor(c, view)
+	if !ok {
 		return
 	}
 	err := poker.Fold(c.table.game, pn, 0)
@@ -1025,6 +1080,25 @@ func handleFold(c *Client) {
 	}
 	c.table.recordAIFold(view, pn)
 	c.table.broadcastGame()
+}
+
+// authorizedActor binds a betting command to the connection that owns the
+// current seat. Looking up ActionNum alone lets any spectator act for whoever
+// happens to be on turn.
+func authorizedActor(c *Client, view *poker.GameView) (uint, bool) {
+	if c == nil || c.table == nil || c.accountUUID == "" || c.uuid == "" || view == nil {
+		return 0, false
+	}
+	pn := view.ActionNum
+	if pn >= uint(len(view.Players)) {
+		return 0, false
+	}
+	p := view.Players[pn]
+	if p.UUID != c.uuid || p.AccountUUID != c.accountUUID {
+		c.trySend(createError("not your turn"))
+		return 0, false
+	}
+	return pn, true
 }
 
 // handleVoteSettle registers a vote to settle the current session early.
@@ -1168,10 +1242,20 @@ func createResultWithUUID(action string, ok bool, message string, username strin
 		message,
 		username,
 		accountUUID,
+		"",
 	}
 	bytes, err := json.Marshal(resp)
 	if err != nil {
 		slog.Default().Warn("Marshal result", "error", err)
+	}
+	return bytes
+}
+
+func createAuthResult(action, username, accountUUID, token string) []byte {
+	resp := result{base{action}, true, "", username, accountUUID, token}
+	bytes, err := json.Marshal(resp)
+	if err != nil {
+		slog.Default().Warn("Marshal auth result", "error", err)
 	}
 	return bytes
 }

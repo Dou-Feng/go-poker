@@ -1,20 +1,30 @@
 # go-poker
 
-Real time multiplayer poker application powered by go, react, websockets and redis pubsub
+Real-time multiplayer poker powered by Go, Next.js, WebSockets, and Redis pub/sub.
 
-## demo
+## Demo
 
 https://poker.evanslack.dev
 
-## ui
+## UI
 
 <img width="800" alt="gopoker-screenshot" src="https://github.com/evanofslack/go-poker/assets/51209817/08c93fd3-0814-40e8-ab10-74d613ad996a">
 
-## getting started
+## Getting started
 
-Can run from a prebuilt container: `evanofslack/go-poker:latest`
+Copy `.env.example` to `.env`, keep `REDIS_PASSWORD` and the password inside
+`REDIS_URL` in sync, then start the prebuilt image:
 
-First copy `.env.example` to `.env` and change values if needed
+```bash
+cp .env.example .env
+docker compose up -d
+```
+
+The application is available at `http://localhost:8080` by default. The
+compose file uses `evanofslack/go-poker:latest` and starts the required Redis
+service.
+
+An equivalent minimal compose configuration is:
 
 ```yaml
 services:
@@ -45,10 +55,28 @@ volumes:
   redis:
 ```
 
-## development
+## Development
 
-Can run application built from local code
+Build the complete application from local code:
 
 ```bash
-docker-compose -f dev/docker-compose.yaml up --build
+docker compose -f docker-compose-dev.yaml up --build
 ```
+
+For hot reload, use:
+
+```bash
+make hot
+```
+
+For native development, start Redis, the Go server, and Next.js in separate
+terminals. Set `REDIS_URL` to an address reachable from the host rather than
+the Docker-only hostname `redis`.
+
+```bash
+make redis
+make go
+make next
+```
+
+Run the backend and frontend checks with `make test`.

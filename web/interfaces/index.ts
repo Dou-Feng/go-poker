@@ -75,6 +75,7 @@ export type PlayerStats = {
   maxPotWon: number;
   vpip: number;
   vpipByPos: number[];
+  handsByPos: number[];
 };
 
 export type Profile = {

@@ -221,7 +221,7 @@ func TestReserveSeatToggleAndRefusals(t *testing.T) {
 	handleTakeSeat(e, "acc-e", 3, 200) // 2 seated + 1 claim
 	poker.Configure(tbl.game, 1, 2, 200, 400, 3, 0)
 	handleTakeSeat(d, "acc-d", 4, 200)
-	if got := lastError(t, d); got != "seat is taken" {
+	if got := lastError(t, d); got != "invalid seat" {
 		t.Fatalf("seat beyond the table: got %q", got)
 	}
 	poker.Configure(tbl.game, 1, 2, 200, 400, 4, 0)

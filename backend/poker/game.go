@@ -433,6 +433,14 @@ func (g *Game) recordBiggestPot(amt uint, winners []uint) {
 	}
 }
 
+func (g *Game) recordHandWin(pn uint) {
+	if g.players[pn].WonThisHand {
+		return
+	}
+	g.players[pn].WonThisHand = true
+	g.players[pn].Stats.HandsWon++
+}
+
 func (g *Game) updateRoundInfo() {
 	// Fold any player who has left the table but is still in the hand. This
 	// runs on the next hand evaluation (e.g. the next action) so a departed
@@ -509,7 +517,7 @@ func (g *Game) updateRoundInfo() {
 			won += p.TotalBet
 			g.players[inPlayerNums[0]].Stack += p.TotalBet
 		}
-		g.players[inPlayerNums[0]].Stats.HandsWon++
+		g.recordHandWin(inPlayerNums[0])
 		if won > g.players[inPlayerNums[0]].Stats.MaxPotWon {
 			g.players[inPlayerNums[0]].Stats.MaxPotWon = won
 		}
@@ -701,7 +709,7 @@ func (g *Game) resolveShowdown() {
 					continue
 				}
 				g.players[num].Stack += award
-				g.players[num].Stats.HandsWon++
+				g.recordHandWin(num)
 				if award > g.players[num].Stats.MaxPotWon {
 					g.players[num].Stats.MaxPotWon = award
 				}
@@ -791,6 +799,9 @@ func Configure(g *Game, sb uint, bb uint, buyIn uint, maxBuy uint, maxPlayers ui
 // Start checks that all players (except those who have left) are ready, then
 // deals the first hand (moving the table from NotReady into PreFlop).
 func (g *Game) Start() error {
+	g.mtx.Lock()
+	defer g.mtx.Unlock()
+
 	if g.getStage() != NotReady {
 		return ErrStartGame
 	}
@@ -799,7 +810,7 @@ func (g *Game) Start() error {
 			return ErrStartGame
 		}
 	}
-	err := Deal(g, g.dealerNum, 0)
+	err := deal(g, g.dealerNum, 0)
 	if err != nil {
 		return err
 	}
@@ -808,6 +819,9 @@ func (g *Game) Start() error {
 
 // Reset resets the game to a blank game
 func (g *Game) Reset() {
+	g.mtx.Lock()
+	defer g.mtx.Unlock()
+
 	g.players = []player{}
 	g.departedPlayers = []player{}
 	g.pots = []Pot{}
@@ -860,6 +874,9 @@ func RunoutNext(g *Game) error {
 }
 
 func (g *Game) AddPlayer() uint {
+	g.mtx.Lock()
+	defer g.mtx.Unlock()
+
 	g.players = append(g.players, player{})
 	g.players[len(g.players)-1].initialize()
 	return uint(len(g.players) - 1)

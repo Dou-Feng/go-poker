@@ -12,10 +12,10 @@ import {
   getHistory,
 } from "../actions/actions";
 import {
-  saveSession,
   clearSession,
   clearTabAuth,
   clearUser,
+  saveSession,
 } from "../lib/session";
 import Settings from "./Settings";
 import { startBgm, stopBgm } from "../lib/sfx";
@@ -122,13 +122,6 @@ export default function Lobby() {
       return;
     }
     dispatch({ type: "setAuthError", payload: null });
-    dispatch({ type: "clearGame" });
-    dispatch({ type: "setTablename", payload: name });
-    saveSession({
-      username: appState.username ?? "",
-      table: name,
-      clientID: null,
-    });
     joinTable(socket, name, undefined, password);
   };
 
@@ -139,8 +132,6 @@ export default function Lobby() {
     }
     if (joinTarget === room.name) {
       join(room.name, joinPassword);
-      setJoinTarget(null);
-      setJoinPassword("");
     } else {
       setJoinTarget(room.name);
       setJoinPassword("");
@@ -208,6 +199,7 @@ export default function Lobby() {
           maxPotWon: 0,
           vpip: 0,
           vpipByPos: [0, 0, 0, 0, 0, 0],
+          handsByPos: [0, 0, 0, 0, 0, 0],
         },
       },
     });
@@ -436,8 +428,6 @@ export default function Lobby() {
                       onKeyDown={(e) => {
                         if (e.key === "Enter") {
                           join(room.name, joinPassword);
-                          setJoinTarget(null);
-                          setJoinPassword("");
                         }
                       }}
                     />
