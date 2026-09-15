@@ -4,6 +4,7 @@ import { AppContext } from "../providers/AppStore";
 import { setAvatar, getUser } from "../actions/actions";
 import { useTranslation } from "../hooks/useTranslation";
 import { API_BASE } from "../lib/api";
+import { loadToken } from "../lib/session";
 
 const AVATARS = ["🙂", "😎", "🦊", "🐸", "🐯", "🐼", "🐨", "🐷"];
 
@@ -34,11 +35,13 @@ export default function AvatarPicker({ onClose }: AvatarPickerProps) {
       return;
     }
     const fd = new FormData();
-    fd.append("uuid", appState.uuid ?? "");
     fd.append("file", file);
+    const token = loadToken();
     try {
-      const res = await fetch(`${API_BASE}/api/avatar`, {
+      const uuid = encodeURIComponent(appState.uuid ?? "");
+      const res = await fetch(`${API_BASE}/api/avatar?uuid=${uuid}`, {
         method: "POST",
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
         body: fd,
       });
       if (res.ok) {

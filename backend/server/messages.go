@@ -86,9 +86,9 @@ type joinTable struct {
 	PlayerUUID string `json:"playerUUID,omitempty"`
 	Password   string `json:"password,omitempty"`
 	// Reconnect marks a join replayed from a saved browser session (page
-	// reload / socket reconnect) rather than a deliberate lobby join. A
-	// reconnect never creates a room: if the room is gone or the seat was
-	// lost, the server answers with actionSessionExpired instead.
+	// reload / socket reconnect) rather than a deliberate lobby join. Rooms
+	// are created only through create-table; if this seat or room is gone,
+	// the server answers with actionSessionExpired instead.
 	Reconnect bool `json:"reconnect,omitempty"`
 }
 

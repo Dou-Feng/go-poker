@@ -12,6 +12,7 @@ import { useSocket } from "../hooks/useSocket";
 import { TranslationKey } from "../lib/translations";
 import { addFriend, changeUsername, getUser } from "../actions/actions";
 import { API_BASE } from "../lib/api";
+import { loadToken } from "../lib/session";
 import { useVoice } from "../hooks/useVoice";
 import { voice } from "../lib/voice";
 import Avatar from "./Avatar";
@@ -133,11 +134,13 @@ export default function ProfileCard() {
       return;
     }
     const fd = new FormData();
-    fd.append("uuid", appState.uuid ?? "");
     fd.append("file", file);
+    const token = loadToken();
     try {
-      const res = await fetch(`${API_BASE}/api/avatar`, {
+      const uuid = encodeURIComponent(appState.uuid ?? "");
+      const res = await fetch(`${API_BASE}/api/avatar?uuid=${uuid}`, {
         method: "POST",
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
         body: fd,
       });
       if (res.ok) {

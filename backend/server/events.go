@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strings"
 	"time"
 
 	"github.com/evanofslack/go-poker/poker"
@@ -24,9 +25,9 @@ func handleJoinTable(c *Client, tablename string, password string, playerUUID st
 		return
 	}
 
-	table, _, err := c.hub.createTableIfAbsent(tablename, "")
-	if err != nil {
-		c.send <- createJoinResult(false, tablename, err.Error())
+	table := c.hub.findTable(tablename)
+	if table == nil {
+		c.send <- createJoinResult(false, tablename, "room not found")
 		return
 	}
 	if table.password != "" && table.password != password {
@@ -469,6 +470,15 @@ type roomConfig struct {
 	sb, bb, buyIn, maxBuy, maxPlayers, handsLimit uint
 }
 
+const (
+	minRoomPlayers uint = 2
+	maxRoomPlayers uint = 8
+	maxRoomChips   uint = 1_000_000_000
+	maxHandsLimit  uint = 100_000
+	maxRoomNameLen      = 64
+	maxRoomPassLen      = 128
+)
+
 func normalizeRoomConfig(sb, bb, buyIn, maxBuy, maxPlayers, handsLimit uint, tournament bool) roomConfig {
 	if sb == 0 {
 		sb = 5
@@ -486,11 +496,45 @@ func normalizeRoomConfig(sb, bb, buyIn, maxBuy, maxPlayers, handsLimit uint, tou
 	case !tournament:
 		maxBuy = 0
 	case maxBuy == 0:
-		maxBuy = buyIn * 2
+		if buyIn > maxRoomChips/2 {
+			maxBuy = maxRoomChips
+		} else {
+			maxBuy = buyIn * 2
+		}
 	case maxBuy < buyIn:
 		maxBuy = buyIn
 	}
 	return roomConfig{sb, bb, buyIn, maxBuy, maxPlayers, handsLimit}
+}
+
+// validateRoomConfig is the trust boundary for create-table messages. The UI
+// applies the same common limits, but websocket callers can bypass it.
+func validateRoomConfig(tablename, password string, cfg roomConfig) error {
+	if tablename == "" || tablename != strings.TrimSpace(tablename) || len(tablename) > maxRoomNameLen {
+		return errors.New("invalid room name")
+	}
+	if len(password) > maxRoomPassLen {
+		return errors.New("room password is too long")
+	}
+	if cfg.maxPlayers < minRoomPlayers || cfg.maxPlayers > maxRoomPlayers {
+		return fmt.Errorf("max players must be between %d and %d", minRoomPlayers, maxRoomPlayers)
+	}
+	if cfg.sb == 0 || cfg.bb == 0 || cfg.sb >= cfg.bb {
+		return errors.New("small blind must be less than big blind")
+	}
+	if cfg.sb > maxRoomChips || cfg.bb > maxRoomChips {
+		return errors.New("blind is too large")
+	}
+	if cfg.buyIn < cfg.bb || cfg.buyIn > maxRoomChips {
+		return errors.New("buy-in must cover the big blind and stay within the table limit")
+	}
+	if cfg.maxBuy > maxRoomChips {
+		return errors.New("maximum buy-in is too large")
+	}
+	if cfg.handsLimit > maxHandsLimit {
+		return errors.New("hand limit is too large")
+	}
+	return nil
 }
 
 // validateBotType checks a create-table botType for the room being built:
@@ -524,6 +568,10 @@ func handleCreateTable(c *Client, tablename string, password string, sb uint, bb
 		botType = botKindNormal
 	}
 	cfg := normalizeRoomConfig(sb, bb, buyIn, maxBuy, maxPlayers, handsLimit, tournament)
+	if err := validateRoomConfig(tablename, password, cfg); err != nil {
+		c.send <- createResult(actionCreateResult, false, err.Error(), "")
+		return
+	}
 	if err := validateBotType(botType, cfg.maxPlayers); err != nil {
 		c.send <- createResult(actionCreateResult, false, err.Error(), "")
 		return
@@ -591,7 +639,7 @@ func handleNewPlayer(c *Client, _ string) {
 	c.table.broadcast <- createNewMessage(gameAdminName, fmt.Sprintf("%s has joined", c.username))
 }
 
-func handleTakeSeat(c *Client, username string, seatID uint, buyIn uint) {
+func handleTakeSeat(c *Client, _ string, seatID uint, buyIn uint) {
 	view := c.table.game.GenerateOmniView()
 	if seatID == 0 || (view.Config.MaxPlayers != 0 && seatID > view.Config.MaxPlayers) {
 		c.send <- createError("invalid seat")
@@ -638,7 +686,8 @@ func handleTakeSeat(c *Client, username string, seatID uint, buyIn uint) {
 	}
 
 	// Deduct the buy-in from the user's account balance before seating.
-	user, err := loadUser(c.hub.rdb, c.accountUUID)
+	store := c.table.userStore()
+	user, err := store.load(c.accountUUID)
 	if err != nil {
 		c.send <- createError("could not load user")
 		return
@@ -648,7 +697,7 @@ func handleTakeSeat(c *Client, username string, seatID uint, buyIn uint) {
 		return
 	}
 	user.Chips -= amount
-	if err := saveUser(c.hub.rdb, user); err != nil {
+	if err := store.save(user); err != nil {
 		c.send <- createError("could not save user")
 		return
 	}
@@ -660,7 +709,7 @@ func handleTakeSeat(c *Client, username string, seatID uint, buyIn uint) {
 	if err != nil {
 		slog.Default().Warn("Set account uuid", "error", err)
 	}
-	err = poker.SetUsername(c.table.game, position, username)
+	err = poker.SetUsername(c.table.game, position, c.username)
 	if err != nil {
 		slog.Default().Warn("Set username", "error", err)
 	}

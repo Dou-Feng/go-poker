@@ -114,8 +114,8 @@ func (h *Hub) tableCapReached() bool {
 }
 
 // findTable returns the live table with the given name, or nil if none exists.
-// Unlike createTableIfAbsent it never creates a table, so reconnect attempts
-// to a recycled room don't resurrect an empty copy of it.
+// Unlike createTableIfAbsent it never creates a table, so join and reconnect
+// attempts cannot resurrect an empty copy of a missing room.
 func (h *Hub) findTable(name string) *table {
 	h.tablesMu.Lock()
 	defer h.tablesMu.Unlock()

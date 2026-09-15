@@ -11,14 +11,19 @@ import (
 	"image/jpeg"
 	_ "image/png"
 	"io"
-	"log/slog"
 	"net/http"
 	"strconv"
+	"strings"
 
+	"github.com/go-redis/redis/v8"
 	_ "golang.org/x/image/webp" // decode-only WebP support
 )
 
-const maxAvatarUpload = 10 << 20 // 10 MB
+const (
+	maxAvatarUpload    = 10 << 20 // 10 MB compressed request body
+	maxAvatarDimension = 8192
+	maxAvatarPixels    = 16_777_216 // 4096 x 4096; comfortably fits phone photos
+)
 
 // errUnsupportedImage reports a file that could not be decoded as a supported
 // image format (jpg, png, gif, webp).
@@ -33,6 +38,74 @@ func avatarKey(uuid string) string {
 
 type avatarSet struct {
 	Sizes map[int]string `json:"sizes"` // size -> base64-encoded jpeg
+}
+
+// avatarStore keeps HTTP avatar tests independent of Redis and gives the
+// handler one boundary for both the account credential and image data.
+type avatarStore interface {
+	load(uuid string) (*UserRecord, error)
+	saveAvatar(uuid, token string, raw []byte) error
+}
+
+type redisAvatarStore struct{ rdb *redis.Client }
+
+func (s redisAvatarStore) load(uuid string) (*UserRecord, error) {
+	return loadUser(s.rdb, uuid)
+}
+
+var errAvatarUnauthorized = errors.New("avatar session changed")
+
+func (s redisAvatarStore) saveAvatar(uuid, token string, avatarRaw []byte) error {
+	for attempts := 0; attempts < 3; attempts++ {
+		err := s.rdb.Watch(ctx, func(tx *redis.Tx) error {
+			userRaw, err := tx.Get(ctx, userKey(uuid)).Bytes()
+			if err == redis.Nil {
+				return errAvatarUnauthorized
+			}
+			if err != nil {
+				return err
+			}
+			var current UserRecord
+			if err := json.Unmarshal(userRaw, &current); err != nil {
+				return err
+			}
+			// Processing several resized images takes time. Recheck the token in
+			// the transaction so a logout/login rotation during processing wins.
+			if !validSessionToken(&current, token) {
+				return errAvatarUnauthorized
+			}
+			current.AvatarImage = true
+			updatedUser, err := json.Marshal(&current)
+			if err != nil {
+				return err
+			}
+			_, err = tx.TxPipelined(ctx, func(pipe redis.Pipeliner) error {
+				pipe.Set(ctx, avatarKey(uuid), avatarRaw, 0)
+				pipe.Set(ctx, userKey(uuid), updatedUser, 0)
+				return nil
+			})
+			return err
+		}, userKey(uuid))
+		if err != redis.TxFailedErr {
+			return err
+		}
+	}
+	return redis.TxFailedErr
+}
+
+func bearerToken(r *http.Request) string {
+	parts := strings.Fields(r.Header.Get("Authorization"))
+	if len(parts) != 2 || !strings.EqualFold(parts[0], "Bearer") {
+		return ""
+	}
+	return parts[1]
+}
+
+func validAvatarDimensions(cfg image.Config) bool {
+	if cfg.Width <= 0 || cfg.Height <= 0 || cfg.Width > maxAvatarDimension || cfg.Height > maxAvatarDimension {
+		return false
+	}
+	return int64(cfg.Width)*int64(cfg.Height) <= maxAvatarPixels
 }
 
 // resize returns a nearest-neighbor scaled copy of src.
@@ -63,6 +136,27 @@ func encodeJPEG(img image.Image) (string, error) {
 }
 
 func (s *Server) uploadAvatar(w http.ResponseWriter, r *http.Request) {
+	uuid := r.URL.Query().Get("uuid")
+	if uuid == "" {
+		http.Error(w, "missing uuid", http.StatusBadRequest)
+		return
+	}
+	if !validUUID(uuid) {
+		http.Error(w, "invalid uuid", http.StatusBadRequest)
+		return
+	}
+	token := bearerToken(r)
+	user, err := s.avatars.load(uuid)
+	if err != nil {
+		http.Error(w, "could not load user", http.StatusInternalServerError)
+		return
+	}
+	if !validSessionToken(user, token) {
+		w.Header().Set("WWW-Authenticate", "Bearer")
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
 	r.Body = http.MaxBytesReader(w, r.Body, maxAvatarUpload)
 	if err := r.ParseMultipartForm(maxAvatarUpload); err != nil {
 		var maxBytes *http.MaxBytesError
@@ -71,12 +165,6 @@ func (s *Server) uploadAvatar(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		http.Error(w, "invalid upload", http.StatusBadRequest)
-		return
-	}
-
-	uuid := r.FormValue("uuid")
-	if uuid == "" {
-		http.Error(w, "missing uuid", http.StatusBadRequest)
 		return
 	}
 
@@ -90,6 +178,16 @@ func (s *Server) uploadAvatar(w http.ResponseWriter, r *http.Request) {
 	data, err := io.ReadAll(file)
 	if err != nil {
 		http.Error(w, "read error", http.StatusBadRequest)
+		return
+	}
+
+	cfg, _, err := image.DecodeConfig(bytes.NewReader(data))
+	if err != nil {
+		http.Error(w, errUnsupportedImage.Error(), http.StatusBadRequest)
+		return
+	}
+	if !validAvatarDimensions(cfg) {
+		http.Error(w, "image dimensions too large", http.StatusBadRequest)
 		return
 	}
 
@@ -114,17 +212,14 @@ func (s *Server) uploadAvatar(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "marshal error", http.StatusInternalServerError)
 		return
 	}
-	if err := s.hub.rdb.Set(ctx, avatarKey(uuid), raw, 0).Err(); err != nil {
+	if err := s.avatars.saveAvatar(uuid, token, raw); err != nil {
+		if errors.Is(err, errAvatarUnauthorized) {
+			w.Header().Set("WWW-Authenticate", "Bearer")
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
 		http.Error(w, "store error", http.StatusInternalServerError)
 		return
-	}
-
-	// Mark the account as having a custom image avatar.
-	if user, err := loadUser(s.hub.rdb, uuid); err == nil {
-		user.AvatarImage = true
-		if err := saveUser(s.hub.rdb, user); err != nil {
-			slog.Default().Warn("Save avatar flag", "error", err)
-		}
 	}
 
 	w.Header().Set("Content-Type", "application/json")

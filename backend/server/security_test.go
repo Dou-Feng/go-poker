@@ -123,6 +123,87 @@ func TestWrongRoomPasswordDoesNotAttachClient(t *testing.T) {
 	}
 }
 
+func TestJoiningMissingRoomDoesNotCreateIt(t *testing.T) {
+	hub := newSessionHub()
+	c := newTestClient(hub, "account")
+	c.username = "player"
+
+	handleJoinTable(c, "missing-room", "", "", false)
+	if c.table != nil || hub.findTable("missing-room") != nil || len(hub.tables) != 0 {
+		t.Fatal("joining a missing room created or attached to a table")
+	}
+	var result joinResult
+	if err := json.Unmarshal(<-c.send, &result); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if result.Action != actionJoinResult || result.Ok || result.Message != "room not found" {
+		t.Fatalf("unexpected join result: %+v", result)
+	}
+}
+
+func TestRoomConfigRejectsUnsafeValues(t *testing.T) {
+	valid := normalizeRoomConfig(5, 10, 200, 0, 6, 20, false)
+	if err := validateRoomConfig("friendly-room", "secret", valid); err != nil {
+		t.Fatalf("valid room rejected: %v", err)
+	}
+
+	cases := []struct {
+		name     string
+		room     string
+		password string
+		cfg      roomConfig
+	}{
+		{name: "blank room", room: "   ", cfg: valid},
+		{name: "padded room", room: " room ", cfg: valid},
+		{name: "long room", room: string(make([]byte, maxRoomNameLen+1)), cfg: valid},
+		{name: "long password", room: "room", password: string(make([]byte, maxRoomPassLen+1)), cfg: valid},
+		{name: "one player", room: "room", cfg: roomConfig{sb: 5, bb: 10, buyIn: 200, maxPlayers: 1}},
+		{name: "too many players", room: "room", cfg: roomConfig{sb: 5, bb: 10, buyIn: 200, maxPlayers: 9}},
+		{name: "reversed blinds", room: "room", cfg: roomConfig{sb: 20, bb: 10, buyIn: 200, maxPlayers: 6}},
+		{name: "short buy-in", room: "room", cfg: roomConfig{sb: 5, bb: 10, buyIn: 9, maxPlayers: 6}},
+		{name: "oversized chips", room: "room", cfg: roomConfig{sb: 5, bb: 10, buyIn: maxRoomChips + 1, maxPlayers: 6}},
+		{name: "oversized hand limit", room: "room", cfg: roomConfig{sb: 5, bb: 10, buyIn: 200, maxPlayers: 6, handsLimit: maxHandsLimit + 1}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if err := validateRoomConfig(tc.room, tc.password, tc.cfg); err == nil {
+				t.Fatal("unsafe room config was accepted")
+			}
+		})
+	}
+}
+
+func TestInvalidRoomConfigDoesNotCreateRoom(t *testing.T) {
+	hub := newSessionHub()
+	c := newTestClient(hub, "host")
+	handleCreateTable(c, "bad-room", "", 5, 10, 200, 0, maxRoomPlayers+1, 0, false, 0, botKindNormal)
+
+	var res result
+	if err := json.Unmarshal(<-c.send, &res); err != nil {
+		t.Fatalf("decode create response: %v", err)
+	}
+	if res.Ok || len(hub.tables) != 0 {
+		t.Fatalf("invalid config created a room: result=%+v tables=%d", res, len(hub.tables))
+	}
+}
+
+func TestTakeSeatUsesAuthenticatedUsername(t *testing.T) {
+	tbl, _ := newTestTable(t)
+	store := newMemUserStore()
+	store.save(&UserRecord{UUID: "account", Username: "real-name", Chips: 1000})
+	tbl.users = store
+	hub := newSessionHub(tbl)
+	c := newTestClient(hub, "account")
+	c.username = "real-name"
+	c.table = tbl
+
+	handleTakeSeat(c, "forged-name", 1, 200)
+	view := tbl.game.GenerateOmniView()
+	if len(view.Players) != 1 || view.Players[0].Username != "real-name" {
+		t.Fatalf("seat used an untrusted username: %+v", view.Players)
+	}
+}
+
 func TestChatUsesAuthenticatedUsername(t *testing.T) {
 	tbl, _ := newTestTable(t)
 	c := &Client{table: tbl, username: "real-name"}

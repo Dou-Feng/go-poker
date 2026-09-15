@@ -36,6 +36,7 @@ type Server struct {
 	server   *http.Server
 	router   *chi.Mux
 	hub      *Hub
+	avatars  avatarStore
 
 	// When TLS is enabled the plain listener/server only answer ACME
 	// challenges and redirect to https; the app is served from tlsListener.
@@ -69,6 +70,7 @@ func newServer(hub *Hub, ln net.Listener, settings tlsSettings) (*Server, error)
 		server:   newHTTPServer(ln.Addr().String()),
 		router:   chi.NewRouter(),
 		hub:      hub,
+		avatars:  redisAvatarStore{rdb: hub.rdb},
 	}
 
 	s.server.Handler = s.router
