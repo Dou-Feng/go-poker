@@ -8,6 +8,8 @@
 
 ## 补丁
 
+- [x] 修复审查发现的四项房间完整性问题：已离场座位不可重连或再次返款，所有离场/结算路径按座位 UUID 防止重复支付；房主只能在两手之间重置，先返还筹码（含待到账补码）并保存战绩，退款失败保留未退款座位供重试；普通/预约/机器人入座统一使用原子建座接口，抢座、换座、开局、补码和重置通过房间锁协调，已占座位与扣款失败不再生成无效座位；进入另一房间或建房前必须先退出当前房间，同房间重复加入不重复注册。回归测试：`backend/server/room_integrity_test.go`、`backend/poker/seating_test.go`，覆盖重复离场、退款重试、并发抢座、重置与补码并发及跨房间请求。
+
 - [x] 接入带对手建模（OM）的 Deep CFR checkpoint：`table` 在每次成功 `Bet/Fold`（含机器人和行动超时）前抓取局面，按玩家记录本手的 5 类 `action_id` 与训练同构的 25 维上下文；AI 决策请求新增 `opponent_histories`，排除行动者自身并在新手牌/新会话时清空。推理服务改用 `create_agent_for_checkpoint` 自动加载普通或 OM agent，OM 推理在请求级隔离下通过 `record_opponent_action` 重放历史并注入对手特征，普通 checkpoint 与空历史保持兼容。UT：Go `TestAIHandActionHistory` / `TestAIDecideSendsOpponentHistories`；模型仓库 `test_inference_server.py` / `test_opponent_modeling_features.py`。
 
 - [x] 修复 PC 大厅顶部状态条过宽：大厅主体的 880px 外框含左右各 32px 内边距，因此顶部账户/工具栏在桌面端按实际内容宽度 816px 布局，两侧边界与房间卡片精确对齐；手机端宽度规则保持不变。

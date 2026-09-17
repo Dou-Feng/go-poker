@@ -96,7 +96,7 @@ func (h *Hub) findSeatByAccount(accountUUID string) (*table, string) {
 	for t := range h.tables {
 		view := t.game.GenerateOmniView()
 		for i := range view.Players {
-			if view.Players[i].AccountUUID == accountUUID {
+			if view.Players[i].AccountUUID == accountUUID && !view.Players[i].Left {
 				found = append(found, seatRef{t, view.Players[i].UUID})
 			}
 		}

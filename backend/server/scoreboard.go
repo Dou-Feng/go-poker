@@ -142,7 +142,7 @@ func sessionPlayers(view *poker.GameView) []SessionPlayer {
 
 	for i := range view.Players {
 		p := &view.Players[i]
-		addOrMerge(p.AccountUUID, p.UUID, p.Username, p.Avatar, p.AvatarImage, p.Bot, p.TotalBuyIn, p.Stack, p.Stats)
+		addOrMerge(p.AccountUUID, p.UUID, p.Username, p.Avatar, p.AvatarImage, p.Bot, p.TotalBuyIn, p.Stack+p.PendingBuyIn, p.Stats)
 	}
 	for i := range view.DepartedPlayers {
 		p := &view.DepartedPlayers[i]
@@ -152,7 +152,7 @@ func sessionPlayers(view *poker.GameView) []SessionPlayer {
 		if p.TotalBuyIn == 0 || p.Stats.HandsPlayed == 0 {
 			continue
 		}
-		addOrMerge(p.AccountUUID, p.UUID, p.Username, p.Avatar, p.AvatarImage, p.Bot, p.TotalBuyIn, p.Stack, p.Stats)
+		addOrMerge(p.AccountUUID, p.UUID, p.Username, p.Avatar, p.AvatarImage, p.Bot, p.TotalBuyIn, p.Stack+p.PendingBuyIn, p.Stats)
 	}
 	// An account that has not played a single hand yet (just sat down, a bot
 	// just added) has no result and is not on the board.

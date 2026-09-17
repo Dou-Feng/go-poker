@@ -301,6 +301,8 @@ func seatTaken(view *poker.GameView, seatID uint) bool {
 // seatBot buys the bot into seatID (0 = first free seat) and readies it.
 // Between hands only; the caller broadcasts.
 func (t *table) seatBot(bot *Client, seatID uint) error {
+	t.seatMu.Lock()
+	defer t.seatMu.Unlock()
 	view := t.game.GenerateOmniView()
 	if view.Running {
 		return errBotRunning
@@ -324,29 +326,19 @@ func (t *table) seatBot(bot *Client, seatID uint) error {
 		return errSeatTaken
 	}
 
-	position := t.game.AddPlayer()
-	bot.uuid = t.game.GenerateOmniView().Players[position].UUID
-	if err := poker.SetAccountUUID(t.game, position, bot.accountUUID); err != nil {
+	id, err := t.game.SeatPlayer(poker.SeatConfig{
+		AccountUUID: bot.accountUUID, Username: bot.username,
+		Avatar: botKindAvatar(t.botKind), SeatID: seatID, BuyIn: amount,
+		Bot: true, Ready: true,
+	})
+	if err != nil {
 		return err
 	}
-	if err := poker.SetBot(t.game, position, true); err != nil {
-		return err
-	}
-	if err := poker.SetUsername(t.game, position, bot.username); err != nil {
-		return err
-	}
-	if err := poker.SetAvatar(t.game, position, botKindAvatar(t.botKind), false); err != nil {
-		return err
-	}
-	if err := poker.BuyIn(t.game, position, amount); err != nil {
-		return err
-	}
+	t.clientsMu.Lock()
+	bot.uuid = id
+	t.clientsMu.Unlock()
 	t.ledger.add(bot.accountUUID, amount)
-	// Ready before SetSeatID re-sorts players (see seatQueuedClient).
-	if err := poker.ToggleReady(t.game, position, 0); err != nil {
-		return err
-	}
-	return poker.SetSeatID(t.game, position, seatID)
+	return nil
 }
 
 // removeBot takes the most recently added bot (or the one holding seat uuid)
@@ -482,19 +474,13 @@ func (t *table) botTick() {
 				}
 				changed = true
 			case p.Stack == 0:
-				if t.canBuyIn(b.accountUUID, amount) {
-					if err := poker.BuyIn(t.game, p.Position, amount); err == nil {
-						t.ledger.add(b.accountUUID, amount)
-					}
-				} else {
+				if !t.prepareBotSeat(b, amount) {
 					t.evictPlayer(b.uuid)
 					t.dropBotClient(b)
 				}
 				changed = true
 			case !p.Ready && !p.Left:
-				if err := poker.ToggleReady(t.game, p.Position, 0); err != nil {
-					slog.Default().Warn("Bot ready", "error", err)
-				}
+				t.prepareBotSeat(b, 0)
 				changed = true
 			}
 			// Positions shift after seating/eviction: refresh the view.
@@ -547,6 +533,31 @@ func (t *table) botTick() {
 			handleDealGame(bot)
 		}
 	}
+}
+
+// Resolve the UUID again under the seating lock: another player may have
+// moved, joined or left since botTick took its snapshot.
+func (t *table) prepareBotSeat(bot *Client, amount uint) bool {
+	t.seatMu.Lock()
+	defer t.seatMu.Unlock()
+	view := t.game.GenerateOmniView()
+	p := playerByUUID(view, bot.uuid)
+	if view.Running || p == nil || p.Left {
+		return true
+	}
+	if amount > 0 && p.Stack == 0 {
+		if !t.canBuyIn(bot.accountUUID, amount) {
+			return false
+		}
+		if err := poker.BuyIn(t.game, p.Position, amount); err == nil {
+			t.ledger.add(bot.accountUUID, amount)
+		}
+	} else if amount == 0 && !p.Ready {
+		if err := poker.ToggleReady(t.game, p.Position, 0); err != nil {
+			slog.Default().Warn("Bot ready", "error", err)
+		}
+	}
+	return true
 }
 
 func (t *table) botByUUID(uuid string) *Client {

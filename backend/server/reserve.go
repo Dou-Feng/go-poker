@@ -219,21 +219,64 @@ func (t *table) seatReservedPlayers() {
 	}
 }
 
-// seatReservedClient buys the claim's holder into the claimed seat (or the
-// first free one if it was taken meanwhile). Same order as handleTakeSeat:
-// wallet debit, account, name, avatar, buy-in, seat id. The player is left
-// NOT ready on purpose (see the file comment).
+// seatReservedClient uses the same transaction as immediate seating.
 func (t *table) seatReservedClient(c *Client, r seatReservation) error {
+	t.seatMu.Lock()
+	defer t.seatMu.Unlock()
 	view := t.game.GenerateOmniView()
-	for i := range view.Players {
-		if view.Players[i].UUID == c.uuid || view.Players[i].AccountUUID == c.accountUUID {
-			return nil // already seated (reconnected with a seat, say)
+	for _, p := range view.Players {
+		if p.AccountUUID == c.accountUUID {
+			return nil
 		}
+	}
+	seatID := r.SeatID
+	if seatTaken(view, seatID) {
+		seatID = 1
+		for seatTaken(view, seatID) && (view.Config.MaxPlayers == 0 || seatID <= view.Config.MaxPlayers) {
+			seatID++
+		}
+	}
+	if err := t.seatHumanLocked(c, seatID, view.Config.BuyIn); err != nil {
+		return err
+	}
+	t.broadcast <- createNewLog(fmt.Sprintf("%s sits down at seat %d for %d", c.username, seatID, view.Config.BuyIn))
+	return nil
+}
+
+func (t *table) seatHuman(c *Client, seatID, buyIn uint) error {
+	t.seatMu.Lock()
+	defer t.seatMu.Unlock()
+	return t.seatHumanLocked(c, seatID, buyIn)
+}
+
+// seatHumanLocked validates before charging. All seat writers and starts use
+// seatMu, and the engine publishes the complete player in one locked mutation.
+func (t *table) seatHumanLocked(c *Client, seatID, buyIn uint) error {
+	view := t.game.GenerateOmniView()
+	if view.Stage != poker.NotReady {
+		return errors.New("game already running")
+	}
+	if seatID == 0 || (view.Config.MaxPlayers != 0 && seatID > view.Config.MaxPlayers) {
+		return errors.New("invalid seat")
+	}
+	for _, p := range view.Players {
+		if p.AccountUUID == c.accountUUID {
+			return errors.New("already seated")
+		}
+	}
+	if seatTaken(view, seatID) {
+		return errors.New("seat is taken")
 	}
 	if view.Config.MaxPlayers != 0 && uint(len(view.Players)) >= view.Config.MaxPlayers {
 		return errors.New("table is full")
 	}
+	if holder, claimed := t.seatReservedBy(seatID); claimed && holder != c.accountUUID {
+		return errors.New("seat is taken")
+	}
 	amount := view.Config.BuyIn
+	if amount == 0 {
+		amount = buyIn
+	}
 	if amount == 0 {
 		return errors.New("amount must be positive")
 	}
@@ -252,36 +295,24 @@ func (t *table) seatReservedClient(c *Client, r seatReservation) error {
 	if err := store.save(user); err != nil {
 		return errors.New("could not save user")
 	}
-
-	seatID := r.SeatID
-	if seatTaken(view, seatID) {
-		seatID = 1
-		for seatTaken(view, seatID) {
-			seatID++
+	id, err := t.game.SeatPlayer(poker.SeatConfig{
+		AccountUUID: c.accountUUID, Username: c.username,
+		Avatar: user.Avatar, AvatarImage: user.AvatarImage,
+		SeatID: seatID, BuyIn: amount,
+	})
+	if err != nil {
+		user.Chips += amount
+		if refundErr := store.save(user); refundErr != nil {
+			return fmt.Errorf("could not refund failed buy-in: %w", refundErr)
 		}
+		return err
 	}
-
-	position := t.game.AddPlayer()
-	c.uuid = t.game.GenerateOmniView().Players[position].UUID
+	t.ledger.add(c.accountUUID, amount)
+	t.clientsMu.Lock()
+	c.uuid = id
+	t.clientsMu.Unlock()
+	c.cacheAvatar(user)
 	c.trySend(createUpdatedPlayerUUID(c))
-	if err := poker.SetAccountUUID(t.game, position, c.accountUUID); err != nil {
-		slog.Default().Warn("Set account uuid", "error", err)
-	}
-	if err := poker.SetUsername(t.game, position, c.username); err != nil {
-		slog.Default().Warn("Set username", "error", err)
-	}
-	if err := poker.SetAvatar(t.game, position, user.Avatar, user.AvatarImage); err != nil {
-		slog.Default().Warn("Set avatar", "error", err)
-	}
-	if err := poker.BuyIn(t.game, position, amount); err != nil {
-		slog.Default().Warn("Buy in", "error", err)
-	} else {
-		t.ledger.add(c.accountUUID, amount)
-	}
-	if err := poker.SetSeatID(t.game, position, seatID); err != nil {
-		slog.Default().Warn("Set seat id", "error", err)
-	}
 	c.trySend(createUserInfo(t.rdb, user, true))
-	t.broadcast <- createNewLog(fmt.Sprintf("%s sits down at seat %d for %d", c.username, seatID, amount))
 	return nil
 }

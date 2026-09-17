@@ -53,6 +53,11 @@ type table struct {
 	offlineMu     sync.Mutex
 	offlineAfter  time.Duration // grace period before an offline player is evicted
 	flush         flushFunc     // nil means flushPlayerSession against t.rdb
+	// Departures and resets share the seat lock so a stack cannot be paid
+	// while its seat is being changed or bought into.
+	seatMu    sync.Mutex // serializes seating, seat changes, starts and resets
+	payoutMu  sync.Mutex
+	paidSeats map[string]uint
 	// reserved holds the seats spectators claimed for the next hand, by
 	// account (see reserve.go). users is the wallet store; nil means Redis.
 	reserved        map[string]seatReservation
@@ -124,6 +129,25 @@ func (t *table) flushSession(accountUUID string, totalBuyIn uint, stack uint, st
 		return t.flush(accountUUID, t.name, totalBuyIn, stack, stats)
 	}
 	return flushPlayerSession(t.rdb, accountUUID, t.name, t.sessionID, totalBuyIn, stack, stats)
+}
+
+// flushSeat pays each seat once, including when a reset is retried after a
+// partial storage failure. Re-seating creates a new UUID and a new payout.
+func (t *table) flushSeat(seatUUID, accountUUID string, totalBuyIn, stack uint, stats poker.PlayerStats) (uint, error) {
+	t.payoutMu.Lock()
+	defer t.payoutMu.Unlock()
+	if balance, ok := t.paidSeats[seatUUID]; ok {
+		return balance, nil
+	}
+	balance, err := t.flushSession(accountUUID, totalBuyIn, stack, stats)
+	if err != nil {
+		return 0, err
+	}
+	if t.paidSeats == nil {
+		t.paidSeats = make(map[string]uint)
+	}
+	t.paidSeats[seatUUID] = balance
+	return balance, nil
 }
 
 func (t *table) run() {
@@ -235,6 +259,8 @@ func (t *table) timeoutPlayer(playerUUID string) {
 // seat is released when the hand ends (resetForNextHand). The player's
 // username is returned along with whether they were seated at all.
 func (t *table) evictPlayer(playerUUID string) (string, bool) {
+	t.seatMu.Lock()
+	defer t.seatMu.Unlock()
 	view := t.game.GenerateOmniView()
 	pos := -1
 	for i := range view.Players {
@@ -250,6 +276,9 @@ func (t *table) evictPlayer(playerUUID string) (string, bool) {
 	// Snapshot the player before folding so the session can be settled even
 	// when the fold immediately ends the hand and drops the player.
 	pre := view.Players[pos]
+	if pre.Left {
+		return "", false
+	}
 
 	// Mark the player as left; they fold on their turn (or immediately if
 	// it is already their turn).
@@ -268,7 +297,7 @@ func (t *table) evictPlayer(playerUUID string) (string, bool) {
 	// PendingBuyIn was already debited from the wallet and included in
 	// TotalBuyIn, but has not reached Stack. Return it when the seat leaves.
 	refundableStack := pre.Stack + pre.PendingBuyIn
-	if _, err := t.flushSession(pre.AccountUUID, pre.TotalBuyIn, refundableStack, stats); err != nil {
+	if _, err := t.flushSeat(pre.UUID, pre.AccountUUID, pre.TotalBuyIn, refundableStack, stats); err != nil {
 		slog.Default().Warn("Flush player", "error", err)
 	}
 	// Their result is final: refresh the shared session scoreboard now, so
@@ -554,6 +583,8 @@ func (t *table) maybeSettle() bool {
 // settle flushes every seated player's session, broadcasts the settlement
 // screen, and resets the table for a fresh session.
 func (t *table) settle() {
+	t.seatMu.Lock()
+	defer t.seatMu.Unlock()
 	t.settleMu.Lock()
 	t.settleVotes = make(map[string]bool)
 	t.settleAfterHand = false
@@ -583,7 +614,7 @@ func (t *table) settle() {
 	// Record each player's session (history + lifetime stats + chips back),
 	// then the final shared scoreboard everyone's history entry points at.
 	for _, p := range view.Players {
-		if _, err := t.flushSession(p.AccountUUID, p.TotalBuyIn, p.Stack, p.Stats); err != nil {
+		if _, err := t.flushSeat(p.UUID, p.AccountUUID, p.TotalBuyIn, p.Stack+p.PendingBuyIn, p.Stats); err != nil {
 			slog.Default().Warn("Settle flush", "error", err)
 		}
 	}
@@ -675,6 +706,8 @@ func (t *table) toggleSpectate(c *Client) {
 // applySpectate removes a reserved player from the game and turns their client
 // into a spectator. It reports whether the player was removed.
 func (t *table) applySpectate(c *Client) bool {
+	t.seatMu.Lock()
+	defer t.seatMu.Unlock()
 	if c.uuid == "" {
 		return false
 	}
@@ -700,7 +733,7 @@ func (t *table) applySpectate(c *Client) bool {
 	if err := poker.RemovePlayer(t.game, uint(pos)); err != nil {
 		slog.Default().Warn("Spectate remove", "error", err)
 	}
-	if _, err := t.flushSession(pre.AccountUUID, pre.TotalBuyIn, pre.Stack, stats); err != nil {
+	if _, err := t.flushSeat(pre.UUID, pre.AccountUUID, pre.TotalBuyIn, pre.Stack+pre.PendingBuyIn, stats); err != nil {
 		slog.Default().Warn("Spectate flush", "error", err)
 	}
 	t.persistSession(false)
@@ -777,6 +810,8 @@ func (t *table) clearBusted() {
 // autoSpectateBusted moves players who are busted with no remaining buy-ins to
 // the spectator side, between hands.
 func (t *table) autoSpectateBusted() {
+	t.seatMu.Lock()
+	defer t.seatMu.Unlock()
 	for {
 		view := t.game.GenerateOmniView()
 		if view.Running || view.Stage != poker.NotReady {
@@ -795,7 +830,7 @@ func (t *table) autoSpectateBusted() {
 		}
 
 		p := view.Players[pos]
-		if _, err := t.flushSession(p.AccountUUID, p.TotalBuyIn, p.Stack, p.Stats); err != nil {
+		if _, err := t.flushSeat(p.UUID, p.AccountUUID, p.TotalBuyIn, p.Stack+p.PendingBuyIn, p.Stats); err != nil {
 			slog.Default().Warn("Auto spectate flush", "error", err)
 		}
 		t.clearClientUUID(p.UUID)

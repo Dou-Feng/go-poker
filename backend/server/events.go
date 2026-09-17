@@ -16,12 +16,23 @@ import (
 const gameAdminName string = "system"
 
 func handleJoinTable(c *Client, tablename string, password string, playerUUID string, reconnect bool) {
+	if c.table != nil && c.table.name != tablename {
+		c.trySend(createJoinResult(false, tablename, "already in a room"))
+		return
+	}
 	// A join carrying a per-session player uuid is always a session replay:
 	// the lobby never sends one. Treat it as a reconnect even when the client
 	// did not set the flag, so a phone still running an older frontend bundle
 	// cannot resurrect a recycled room.
 	if reconnect || playerUUID != "" {
 		handleReconnectTable(c, tablename, password, playerUUID)
+		return
+	}
+	if c.table != nil {
+		// A replay for the current room is idempotent: keep its seat and
+		// subscription rather than registering another join notification.
+		c.trySend(createJoinResult(true, tablename, ""))
+		c.trySend(createUpdatedGame(c))
 		return
 	}
 
@@ -50,6 +61,10 @@ func handleJoinTable(c *Client, tablename string, password string, playerUUID st
 // the client is told the session expired so it returns to the lobby instead
 // of landing in an empty, un-joinable copy of the old room.
 func handleReconnectTable(c *Client, tablename string, password string, playerUUID string) {
+	if c.table != nil && c.table.name != tablename {
+		c.trySend(createJoinResult(false, tablename, "already in a room"))
+		return
+	}
 	table := c.hub.findTable(tablename)
 	if table == nil {
 		c.send <- createSessionExpired(tablename, "room closed")
@@ -90,7 +105,7 @@ func handleReconnectTable(c *Client, tablename string, password string, playerUU
 func tableHasPlayer(t *table, playerUUID string) bool {
 	view := t.game.GenerateOmniView()
 	for i := range view.Players {
-		if view.Players[i].UUID == playerUUID {
+		if view.Players[i].UUID == playerUUID && !view.Players[i].Left {
 			return true
 		}
 	}
@@ -100,7 +115,7 @@ func tableHasPlayer(t *table, playerUUID string) bool {
 func tablePlayerBelongsTo(t *table, playerUUID, accountUUID string) bool {
 	view := t.game.GenerateOmniView()
 	for i := range view.Players {
-		if view.Players[i].UUID == playerUUID {
+		if view.Players[i].UUID == playerUUID && !view.Players[i].Left {
 			return accountUUID != "" && view.Players[i].AccountUUID == accountUUID
 		}
 	}
@@ -115,7 +130,7 @@ func reconnectPlayer(c *Client, playerUUID string) bool {
 	}
 	view := c.table.game.GenerateOmniView()
 	for i := range view.Players {
-		if view.Players[i].UUID == playerUUID && view.Players[i].AccountUUID == c.accountUUID {
+		if view.Players[i].UUID == playerUUID && view.Players[i].AccountUUID == c.accountUUID && !view.Players[i].Left {
 			c.uuid = playerUUID
 			c.username = view.Players[i].Username
 			c.accountUUID = view.Players[i].AccountUUID
@@ -559,6 +574,10 @@ func validateBotType(botType string, maxPlayers uint) error {
 }
 
 func handleCreateTable(c *Client, tablename string, password string, sb uint, bb uint, buyIn uint, maxBuy uint, maxPlayers uint, handsLimit uint, tournament bool, actionTimeout uint, botType string) {
+	if c.table != nil {
+		c.trySend(createResult(actionCreateResult, false, "already in a room", ""))
+		return
+	}
 	// The room's bot type is fixed at creation: "normal" (the default) bots
 	// always use the built-in heuristic; "ai" bots ask the inference server
 	// and fall back to the heuristic per action if it errors. A reachable
@@ -642,96 +661,18 @@ func handleNewPlayer(c *Client, _ string) {
 func handleTakeSeat(c *Client, _ string, seatID uint, buyIn uint) {
 	view := c.table.game.GenerateOmniView()
 	if seatID == 0 || (view.Config.MaxPlayers != 0 && seatID > view.Config.MaxPlayers) {
-		c.send <- createError("invalid seat")
+		c.trySend(createError("invalid seat"))
 		return
 	}
-
-	// Nobody sits down while a hand is in progress: tapping an empty seat
-	// then claims it for the next hand instead (see reserve.go).
 	if view.Running {
 		handleReserveSeat(c, seatID)
 		return
 	}
-
-	// Reject if this account is already seated at the table.
-	for i := range view.Players {
-		if view.Players[i].AccountUUID == c.accountUUID {
-			c.send <- createError("already seated")
-			return
-		}
-	}
-
-	// Respect the table's max-player limit.
-	if view.Config.MaxPlayers != 0 && uint(len(view.Players)) >= view.Config.MaxPlayers {
-		c.send <- createError("table is full")
+	if err := c.table.seatHuman(c, seatID, buyIn); err != nil {
+		c.trySend(createError(err.Error()))
 		return
-	}
-	// A seat somebody claimed during the hand that just ended is theirs.
-	if holder, claimed := c.table.seatReservedBy(seatID); claimed && holder != c.accountUUID {
-		c.send <- createError("seat is taken")
-		return
-	}
-
-	// Use the room's fixed buy-in when one is configured.
-	amount := view.Config.BuyIn
-	if amount == 0 {
-		amount = buyIn
-	}
-
-	// The room's max buy-in applies to the account for the whole session, so
-	// a player who busted out cannot re-sit for a fresh stack.
-	if !c.table.canBuyIn(c.accountUUID, amount) {
-		c.send <- createError(msgNoBuyInsLeft)
-		return
-	}
-
-	// Deduct the buy-in from the user's account balance before seating.
-	store := c.table.userStore()
-	user, err := store.load(c.accountUUID)
-	if err != nil {
-		c.send <- createError("could not load user")
-		return
-	}
-	if user.Chips < amount {
-		c.send <- createError("not enough chips")
-		return
-	}
-	user.Chips -= amount
-	if err := store.save(user); err != nil {
-		c.send <- createError("could not save user")
-		return
-	}
-
-	position := c.table.game.AddPlayer()
-	c.uuid = c.table.game.GenerateOmniView().Players[position].UUID
-	c.send <- createUpdatedPlayerUUID(c)
-	err = poker.SetAccountUUID(c.table.game, position, c.accountUUID)
-	if err != nil {
-		slog.Default().Warn("Set account uuid", "error", err)
-	}
-	err = poker.SetUsername(c.table.game, position, c.username)
-	if err != nil {
-		slog.Default().Warn("Set username", "error", err)
-	}
-	err = poker.SetAvatar(c.table.game, position, user.Avatar, user.AvatarImage)
-	if err != nil {
-		slog.Default().Warn("Set avatar", "error", err)
-	}
-
-	err = poker.BuyIn(c.table.game, position, amount)
-	if err != nil {
-		slog.Default().Warn("Buy in", "error", err)
-	} else {
-		c.table.ledger.add(c.accountUUID, amount)
-	}
-
-	err = poker.SetSeatID(c.table.game, position, seatID)
-	if err != nil {
-		slog.Default().Warn("Set seat id", "error", err)
 	}
 	c.table.broadcastGame()
-	c.cacheAvatar(user)
-	c.send <- createUserInfo(c.hub.rdb, user, true)
 }
 
 func handleRebuy(c *Client, amount uint) {
@@ -739,13 +680,22 @@ func handleRebuy(c *Client, amount uint) {
 		c.send <- createError("not in a room")
 		return
 	}
+	if c.table.rebuy(c, amount) {
+		autoStartIfReady(c.table)
+		c.table.broadcastGame()
+	}
+}
+
+func (t *table) rebuy(c *Client, amount uint) bool {
+	t.seatMu.Lock()
+	defer t.seatMu.Unlock()
 
 	if amount == 0 {
 		c.send <- createError("amount must be positive")
-		return
+		return false
 	}
 
-	view := c.table.game.GenerateOmniView()
+	view := t.game.GenerateOmniView()
 
 	position := -1
 	for i := range view.Players {
@@ -756,7 +706,7 @@ func handleRebuy(c *Client, amount uint) {
 	}
 	if position < 0 {
 		c.send <- createError("you are not seated")
-		return
+		return false
 	}
 
 	// Refuse a rebuy that would push the player past the room's maximum
@@ -764,39 +714,39 @@ func handleRebuy(c *Client, amount uint) {
 	// own total and the account's session total (across re-seats) apply.
 	if view.Config.MaxBuy != 0 && view.Players[position].TotalBuyIn+amount > view.Config.MaxBuy {
 		c.send <- createError("max buy-in reached")
-		return
+		return false
 	}
-	if !c.table.canBuyIn(c.accountUUID, amount) {
+	if !t.canBuyIn(c.accountUUID, amount) {
 		c.send <- createError("max buy-in reached")
-		return
+		return false
 	}
 
-	user, err := loadUser(c.hub.rdb, c.accountUUID)
+	store := t.userStore()
+	user, err := store.load(c.accountUUID)
 	if err != nil {
 		c.send <- createError("could not load user")
-		return
+		return false
 	}
 	if user.Chips < amount {
 		c.send <- createError("not enough chips")
-		return
+		return false
 	}
 	user.Chips -= amount
-	if err := saveUser(c.hub.rdb, user); err != nil {
+	if err := store.save(user); err != nil {
 		c.send <- createError("could not save user")
-		return
+		return false
 	}
 
-	if err := poker.BuyIn(c.table.game, uint(position), amount); err != nil {
+	if err := poker.BuyIn(t.game, uint(position), amount); err != nil {
 		slog.Default().Warn("Rebuy", "error", err)
 	} else {
-		c.table.ledger.add(c.accountUUID, amount)
+		t.ledger.add(c.accountUUID, amount)
 	}
 	// Buying in never changes the player's ready state: they stay not-ready
 	// and must explicitly tap their avatar to get ready.
-	autoStartIfReady(c.table)
-	c.table.broadcastGame()
 	c.cacheAvatar(user)
-	c.send <- createUserInfo(c.hub.rdb, user, true)
+	c.send <- createUserInfo(t.rdb, user, true)
+	return true
 }
 
 func handleUndoRebuy(c *Client) {
@@ -804,12 +754,20 @@ func handleUndoRebuy(c *Client) {
 		c.send <- createError("not in a room")
 		return
 	}
+	if c.table.undoRebuy(c) {
+		c.table.broadcastGame()
+	}
+}
 
-	view := c.table.game.GenerateOmniView()
+func (t *table) undoRebuy(c *Client) bool {
+	t.seatMu.Lock()
+	defer t.seatMu.Unlock()
+
+	view := t.game.GenerateOmniView()
 	amount := view.Config.BuyIn
 	if amount == 0 {
 		c.send <- createError("amount must be positive")
-		return
+		return false
 	}
 
 	position := -1
@@ -821,49 +779,53 @@ func handleUndoRebuy(c *Client) {
 	}
 	if position < 0 {
 		c.send <- createError("you are not seated")
-		return
+		return false
 	}
 	if view.Players[position].In {
 		c.send <- createError("cannot undo during a hand")
-		return
+		return false
 	}
 	if view.Players[position].Ready {
 		c.send <- createError("cannot undo after ready")
-		return
+		return false
 	}
 	if view.Players[position].Stack < amount {
 		c.send <- createError("not enough chips")
-		return
+		return false
 	}
 
-	user, err := loadUser(c.hub.rdb, c.accountUUID)
+	store := t.userStore()
+	user, err := store.load(c.accountUUID)
 	if err != nil {
 		c.send <- createError("could not load user")
-		return
+		return false
 	}
 	user.Chips += amount
-	if err := saveUser(c.hub.rdb, user); err != nil {
+	if err := store.save(user); err != nil {
 		c.send <- createError("could not save user")
-		return
+		return false
 	}
 
-	if err := poker.UndoBuyIn(c.table.game, uint(position), amount); err != nil {
+	if err := poker.UndoBuyIn(t.game, uint(position), amount); err != nil {
 		slog.Default().Warn("Undo buy in", "error", err)
 	} else {
-		c.table.ledger.sub(c.accountUUID, amount)
+		t.ledger.sub(c.accountUUID, amount)
 	}
 
-	c.table.broadcastGame()
 	c.cacheAvatar(user)
-	c.send <- createUserInfo(c.hub.rdb, user, true)
+	c.send <- createUserInfo(t.rdb, user, true)
+	return true
 }
 
 func handleStartGame(c *Client) {
+	c.table.seatMu.Lock()
 	if !clientOwnsSeat(c) {
+		c.table.seatMu.Unlock()
 		c.send <- createError("you are not seated")
 		return
 	}
 	err := c.table.game.Start()
+	c.table.seatMu.Unlock()
 	if err != nil {
 		fmt.Println(err)
 		return
@@ -875,6 +837,7 @@ func handleStartGame(c *Client) {
 }
 
 func handleToggleReady(c *Client) {
+	c.table.seatMu.Lock()
 	view := c.table.game.GenerateOmniView()
 	position := -1
 	for i := range view.Players {
@@ -884,49 +847,61 @@ func handleToggleReady(c *Client) {
 		}
 	}
 	if position < 0 {
+		c.table.seatMu.Unlock()
 		c.send <- createError("you are not seated")
 		return
 	}
 	if err := poker.ToggleReady(c.table.game, uint(position), 0); err != nil {
+		c.table.seatMu.Unlock()
 		slog.Default().Warn("Toggle ready", "error", err)
 		return
 	}
+	c.table.seatMu.Unlock()
 	autoStartIfReady(c.table)
 	c.table.broadcastGame()
 }
 
 func handleMoveSeat(c *Client, seatID uint) {
-	if seatID == 0 {
-		c.send <- createError("invalid seat")
-		return
-	}
-	view := c.table.game.GenerateOmniView()
-	position := -1
-	for i := range view.Players {
-		if view.Players[i].UUID == c.uuid {
-			position = i
-			break
-		}
-	}
-	if position < 0 {
-		c.send <- createError("you are not seated")
-		return
-	}
-	if view.Players[position].Ready {
-		c.send <- createError("cannot move while ready")
-		return
-	}
-	if err := poker.SetSeatID(c.table.game, uint(position), seatID); err != nil {
-		slog.Default().Warn("Move seat", "error", err)
-		c.send <- createError("seat is taken")
+	err := c.table.moveSeat(c.uuid, seatID)
+	if err != nil {
+		c.trySend(createError(err.Error()))
 		return
 	}
 	c.table.broadcastGame()
 }
 
+func (t *table) moveSeat(playerUUID string, seatID uint) error {
+	t.seatMu.Lock()
+	defer t.seatMu.Unlock()
+	if seatID == 0 {
+		return errors.New("invalid seat")
+	}
+	view := t.game.GenerateOmniView()
+	position := -1
+	for i := range view.Players {
+		if view.Players[i].UUID == playerUUID {
+			position = i
+			break
+		}
+	}
+	if position < 0 {
+		return errors.New("you are not seated")
+	}
+	if view.Players[position].Ready {
+		return errors.New("cannot move while ready")
+	}
+	if err := poker.SetSeatID(t.game, uint(position), seatID); err != nil {
+		slog.Default().Warn("Move seat", "error", err)
+		return errors.New("seat is taken")
+	}
+	return nil
+}
+
 // autoStartIfReady starts the game once at least two seated players are ready.
 // It returns true when the game was started.
 func autoStartIfReady(t *table) bool {
+	t.seatMu.Lock()
+	defer t.seatMu.Unlock()
 	view := t.game.GenerateOmniView()
 	if view.Running {
 		return false
@@ -959,12 +934,43 @@ func handleResetGame(c *Client) {
 		c.send <- createError(msgHostOnly)
 		return
 	}
-	c.table.game.Reset()
-	c.table.resetSession()
+	if err := c.table.resetWithRefunds(); err != nil {
+		c.trySend(createError(err.Error()))
+		c.table.broadcastGame()
+		return
+	}
 	// A full room reset clears every seat, so the bots seated on them must go
 	// too (otherwise they linger as ghosts and pop back on a re-seat).
 	c.table.dropAllBots()
 	c.table.broadcastGame()
+}
+
+// A reset is only allowed between hands. Remove each refunded seat before
+// proceeding, so a partial failure leaves only unpaid stacks on the table.
+func (t *table) resetWithRefunds() error {
+	t.seatMu.Lock()
+	defer t.seatMu.Unlock()
+	view := t.game.GenerateOmniView()
+	if view.Stage != poker.NotReady {
+		return errors.New("game already running")
+	}
+	for i := len(view.Players) - 1; i >= 0; i-- {
+		p := view.Players[i]
+		if _, err := t.flushSeat(p.UUID, p.AccountUUID, p.TotalBuyIn, p.Stack+p.PendingBuyIn, p.Stats); err != nil {
+			return errors.New("could not refund players")
+		}
+		if err := poker.RemovePlayer(t.game, uint(i)); err != nil {
+			return err
+		}
+		t.clearClientUUID(p.UUID)
+	}
+	t.persistSession(true)
+	t.game.Reset()
+	t.resetSession()
+	t.reserveMu.Lock()
+	t.reserved = make(map[string]seatReservation)
+	t.reserveMu.Unlock()
+	return nil
 }
 
 func handleDealGame(c *Client) {
