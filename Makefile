@@ -20,5 +20,11 @@ test :
 hot :
 	docker compose -f docker-compose-hot.yaml up --build
 
+dev :
+	docker compose -f docker-compose-dev.yaml up --build
+
+dev-down:
+	docker compose -f docker-compose-dev.yaml down
+
 deploy :
 	./deploy.sh
