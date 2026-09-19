@@ -252,6 +252,10 @@ func (t *table) seatHuman(c *Client, seatID, buyIn uint) error {
 // seatHumanLocked validates before charging. All seat writers and starts use
 // seatMu, and the engine publishes the complete player in one locked mutation.
 func (t *table) seatHumanLocked(c *Client, seatID, buyIn uint) error {
+	if t.settlementPending.Load() {
+		return errors.New(msgSettlementPending)
+	}
+
 	view := t.game.GenerateOmniView()
 	if view.Stage != poker.NotReady {
 		return errors.New("game already running")

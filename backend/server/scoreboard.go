@@ -185,9 +185,9 @@ func settlementRows(view *poker.GameView) []settlementPlayer {
 // persistSession rewrites the shared scoreboard of the current room session
 // (see SessionRecord). Called whenever a player's result becomes final and at
 // settlement; a nil store (tests without Redis and without a hook) is a no-op.
-func (t *table) persistSession(settled bool) {
+func (t *table) persistSession(settled bool) error {
 	if t.persist == nil && t.rdb == nil {
-		return
+		return nil
 	}
 	rec := SessionRecord{
 		ID:      t.sessionID,
@@ -197,7 +197,7 @@ func (t *table) persistSession(settled bool) {
 		Players: sessionPlayers(t.game.GenerateOmniView()),
 	}
 	if len(rec.Players) == 0 {
-		return
+		return nil
 	}
 	var err error
 	if t.persist != nil {
@@ -208,6 +208,7 @@ func (t *table) persistSession(settled bool) {
 	if err != nil {
 		slog.Default().Warn("Persist session record", "error", err)
 	}
+	return err
 }
 
 // notifyAccount sends one message to every connected client of the account.

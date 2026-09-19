@@ -34,7 +34,7 @@ func Bet(g *Game, pn uint, data uint) error {
 
 func bet(g *Game, pn uint, data uint) error {
 
-	if !g.getBetting() {
+	if !g.getBetting() || pn >= uint(len(g.players)) {
 		return ErrIllegalAction
 	}
 
@@ -44,8 +44,9 @@ func bet(g *Game, pn uint, data uint) error {
 
 	p := g.getPlayer(pn)
 
-	// A player who is already all-in cannot act again.
-	if p.allIn() {
+	// Validate the wager before computing raise rights; chip transfer alone
+	// must not silently clamp an oversized request after it changes minRaise.
+	if !p.In || p.allIn() || data > p.Stack || data > ^uint(0)-p.Bet {
 		return ErrIllegalAction
 	}
 
@@ -57,7 +58,7 @@ func bet(g *Game, pn uint, data uint) error {
 	var minBet uint = g.toCall()
 	callAmount := minBet - p.Bet
 	total := p.Bet + betVal
-	allIn := betVal >= p.Stack
+	allIn := betVal == p.Stack
 
 	if !g.canOpen(pn) {
 		//Won't hit now, reserved for future implementations
@@ -78,7 +79,7 @@ func bet(g *Game, pn uint, data uint) error {
 		// extra chips in front of them came from a short all-in. A short
 		// all-in does not reopen the betting: they may only call or fold.
 		return ErrIllegalAction
-	case total >= minBet+g.minRaise:
+	case total >= minBet && total-minBet >= g.minRaise:
 		// A full raise: sets the new minimum raise and reopens the betting
 		// for everyone else.
 		g.minRaise = total - minBet
@@ -239,11 +240,9 @@ func SetSeatID(g *Game, pn uint, data uint) error {
 }
 
 func setSeatID(g *Game, pn uint, data uint) error {
-
-	// Seat must be less than maximum number of allowable players.
-	// if data > g.config.MaxPlayers {
-	// 	return Error
-	// }
+	if g.getStage() != NotReady {
+		return ErrIllegalAction
+	}
 	if data == 0 || (g.config.MaxPlayers != 0 && data > g.config.MaxPlayers) {
 		return ErrInvalidPosition
 	}
@@ -415,10 +414,12 @@ func Fold(g *Game, pn uint, data uint) error {
 }
 
 func fold(g *Game, pn uint, data uint) error {
-
+	if !g.getBetting() || pn >= uint(len(g.players)) {
+		return ErrIllegalAction
+	}
 	p := g.getPlayer(pn)
 
-	if g.actionNum != pn {
+	if g.actionNum != pn || !p.In {
 		return ErrIllegalAction
 	}
 
@@ -526,12 +527,17 @@ func SitOut(g *Game, pn uint, data uint) error {
 }
 
 // ToggleReady marks a player as "ready" if they are currently "not ready"
-// or "not ready" if they are currently "ready." If the player attempting it is in the current round
-// ToggleReady will return an error. If the player attempting it has no money, ToggleReady will return an error.
+// or "not ready" if they are currently "ready." It is only available between
+// hands. If the player attempting it has no money, ToggleReady returns an error.
 // ToggleReady ignores the value passed in as data.
 func ToggleReady(g *Game, pn uint, data uint) error {
 	g.mtx.Lock()
 	defer g.mtx.Unlock()
+	// Internal departure helpers may unready a player mid-hand, but a
+	// client can only change readiness between hands.
+	if g.getStage() != NotReady {
+		return ErrIllegalAction
+	}
 	return toggleReady(g, pn, data)
 }
 

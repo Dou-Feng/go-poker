@@ -8,6 +8,10 @@
 
 ## 补丁
 
+- [x] 修复自动结算后减少人数重新开局时的数组越界：`Game.Reset` 清理庄家、盲注、行动位置及下注轮状态，保留房间配置。消息处理层回归测试覆盖 6 人打满 3 手结算后，2 人重新入座准备、正确扣除盲注并继续下一手：`backend/server/settlement_reset_test.go`。
+
+- [x] 修复第二轮审查的五项问题：弃牌只允许下注阶段仍在局内的行动者执行，重复请求不再重复分配底池；下注先校验余额与溢出，再计算最小加注和重开加注权；服务端及引擎禁止牌局中取消准备、换座，正常离场仍可执行；自动结算的退款或共享战绩保存失败时保留房间并自动重试，按座位跳过已成功退款，期间冻结游戏操作并延后空房回收；房间内禁止重新登录、注册或切换恢复账号，会话接管也检查房间边界。测试覆盖原始 WebSocket 请求、部分退款成功后的重试、历史保存失败、定时恢复和退出时取消重试：`backend/poker/action_boundary_test.go`、`backend/server/action_boundary_test.go`、`backend/server/settlement_retry_test.go`。
+
 - [x] 修复审查发现的四项房间完整性问题：已离场座位不可重连或再次返款，所有离场/结算路径按座位 UUID 防止重复支付；房主只能在两手之间重置，先返还筹码（含待到账补码）并保存战绩，退款失败保留未退款座位供重试；普通/预约/机器人入座统一使用原子建座接口，抢座、换座、开局、补码和重置通过房间锁协调，已占座位与扣款失败不再生成无效座位；进入另一房间或建房前必须先退出当前房间，同房间重复加入不重复注册。回归测试：`backend/server/room_integrity_test.go`、`backend/poker/seating_test.go`，覆盖重复离场、退款重试、并发抢座、重置与补码并发及跨房间请求。
 
 - [x] 接入带对手建模（OM）的 Deep CFR checkpoint：`table` 在每次成功 `Bet/Fold`（含机器人和行动超时）前抓取局面，按玩家记录本手的 5 类 `action_id` 与训练同构的 25 维上下文；AI 决策请求新增 `opponent_histories`，排除行动者自身并在新手牌/新会话时清空。推理服务改用 `create_agent_for_checkpoint` 自动加载普通或 OM agent，OM 推理在请求级隔离下通过 `record_opponent_action` 重放历史并注入对手特征，普通 checkpoint 与空历史保持兼容。UT：Go `TestAIHandActionHistory` / `TestAIDecideSendsOpponentHistories`；模型仓库 `test_inference_server.py` / `test_opponent_modeling_features.py`。

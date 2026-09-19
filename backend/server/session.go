@@ -24,6 +24,12 @@ func (h *Hub) bindSession(c *Client) {
 	if h.sessions == nil {
 		h.sessions = make(map[string]*Client)
 	}
+	old := h.sessions[c.accountUUID]
+	if c.table != nil && old != nil && old != c && old.table != nil && old.table != c.table {
+		h.sessionsMu.Unlock()
+		c.trySend(createError("already in a room"))
+		return
+	}
 	// The same socket re-authenticated as a different account: release
 	// whatever account it held before.
 	for acc, held := range h.sessions {
@@ -31,7 +37,6 @@ func (h *Hub) bindSession(c *Client) {
 			delete(h.sessions, acc)
 		}
 	}
-	old := h.sessions[c.accountUUID]
 	h.sessions[c.accountUUID] = c
 	h.sessionsMu.Unlock()
 

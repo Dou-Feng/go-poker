@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/evanofslack/go-poker/poker"
@@ -58,6 +59,11 @@ type table struct {
 	seatMu    sync.Mutex // serializes seating, seat changes, starts and resets
 	payoutMu  sync.Mutex
 	paidSeats map[string]uint
+	// Failed settlement keeps its roster frozen until all payouts and the
+	// shared history record are saved. seatMu guards the retry timer.
+	settlementPending atomic.Bool
+	settlementRetry   *time.Timer
+	settlementDelay   time.Duration
 	// reserved holds the seats spectators claimed for the next hand, by
 	// account (see reserve.go). users is the wallet store; nil means Redis.
 	reserved        map[string]seatReservation
@@ -95,26 +101,27 @@ func newTable(name string, redisClient *redis.Client, hub *Hub) *table {
 	// Apply the default room config (SB 5 / BB 10, 6 players, buy-in 200 x2).
 	poker.Configure(game, 5, 10, 200, 400, 6, 0)
 	return &table{
-		name:          name,
-		rdb:           redisClient,
-		hub:           hub,
-		clients:       make(map[*Client]bool),
-		register:      make(chan *Client, 32),
-		unregister:    make(chan *Client, 32),
-		broadcast:     make(chan []byte, 64),
-		game:          game,
-		createdAt:     time.Now(),
-		password:      "",
-		stop:          make(chan struct{}),
-		offlineTimers: make(map[string]*time.Timer),
-		offlineAfter:  offlineTimeout,
-		reserved:      make(map[string]seatReservation),
-		settleVotes:   make(map[string]bool),
-		ledger:        newSessionLedger(),
-		sessionID:     uuid.New().String(),
-		busted:        make(map[string]bool),
-		botKind:       botKindNormal,
-		botState:      botState{botDelays: defaultBotDelays},
+		name:            name,
+		rdb:             redisClient,
+		hub:             hub,
+		clients:         make(map[*Client]bool),
+		register:        make(chan *Client, 32),
+		unregister:      make(chan *Client, 32),
+		broadcast:       make(chan []byte, 64),
+		game:            game,
+		createdAt:       time.Now(),
+		password:        "",
+		stop:            make(chan struct{}),
+		offlineTimers:   make(map[string]*time.Timer),
+		offlineAfter:    offlineTimeout,
+		reserved:        make(map[string]seatReservation),
+		settleVotes:     make(map[string]bool),
+		ledger:          newSessionLedger(),
+		sessionID:       uuid.New().String(),
+		busted:          make(map[string]bool),
+		botKind:         botKindNormal,
+		settlementDelay: time.Second,
+		botState:        botState{botDelays: defaultBotDelays},
 	}
 }
 
@@ -172,6 +179,12 @@ func (t *table) run() {
 
 func (t *table) shutdown() {
 	t.stopOnce.Do(func() {
+		t.seatMu.Lock()
+		close(t.stop)
+		if t.settlementRetry != nil {
+			t.settlementRetry.Stop()
+		}
+		t.seatMu.Unlock()
 		t.offlineMu.Lock()
 		for _, timer := range t.offlineTimers {
 			timer.Stop()
@@ -181,7 +194,6 @@ func (t *table) shutdown() {
 
 		t.stopBots()
 		t.stopActionClock()
-		close(t.stop)
 	})
 }
 
@@ -261,6 +273,9 @@ func (t *table) timeoutPlayer(playerUUID string) {
 func (t *table) evictPlayer(playerUUID string) (string, bool) {
 	t.seatMu.Lock()
 	defer t.seatMu.Unlock()
+	if t.settlementPending.Load() {
+		return "", false // the pending settlement owns this seat's payout
+	}
 	view := t.game.GenerateOmniView()
 	pos := -1
 	for i := range view.Players {
@@ -523,6 +538,9 @@ func (t *table) settleVoteList() []string {
 // (between hands only), settles the session if the hand limit has been reached
 // or a settle vote passed, then pushes the current game state to everyone.
 func (t *table) broadcastGame() {
+	if t.settlementPending.Load() {
+		return // the retry timer owns completion; do not start another hand
+	}
 	t.seatReservedPlayers()
 	if t.maybeSettleAfterHand() {
 		return
@@ -542,6 +560,8 @@ func (t *table) broadcastGame() {
 // and the hand in progress has finished (back to PreDeal). It reports whether
 // a settlement was triggered (and therefore already broadcast).
 func (t *table) maybeSettleAfterHand() bool {
+	t.seatMu.Lock()
+	defer t.seatMu.Unlock()
 	t.settleMu.Lock()
 	if t.settled || !t.settleAfterHand {
 		t.settleMu.Unlock()
@@ -556,27 +576,29 @@ func (t *table) maybeSettleAfterHand() bool {
 	t.settleAfterHand = false
 	t.settleMu.Unlock()
 
-	t.settle()
+	t.settleLocked()
 	return true
 }
 
 // maybeSettle ends the session once a fixed hand limit has been reached. It
 // reports whether a settlement was triggered (and therefore already broadcast).
 func (t *table) maybeSettle() bool {
+	t.seatMu.Lock()
+	defer t.seatMu.Unlock()
 	t.settleMu.Lock()
 	if t.settled {
 		t.settleMu.Unlock()
 		return false
 	}
 	view := t.game.GenerateOmniView()
-	if view.Config.HandsLimit == 0 || view.HandsPlayed < view.Config.HandsLimit {
+	if view.Stage != poker.NotReady || view.Config.HandsLimit == 0 || view.HandsPlayed < view.Config.HandsLimit {
 		t.settleMu.Unlock()
 		return false
 	}
 	t.settled = true
 	t.settleMu.Unlock()
 
-	t.settle()
+	t.settleLocked()
 	return true
 }
 
@@ -585,12 +607,25 @@ func (t *table) maybeSettle() bool {
 func (t *table) settle() {
 	t.seatMu.Lock()
 	defer t.seatMu.Unlock()
+	t.settleLocked()
+}
+
+// settleLocked leaves the game intact on failure. Already saved payouts are
+// remembered by flushSeat, so retrying a partial settlement is safe.
+func (t *table) settleLocked() {
+	view := t.game.GenerateOmniView()
+	if view.Stage != poker.NotReady {
+		return
+	}
+	t.settlementPending.Store(true)
 	t.settleMu.Lock()
+	t.settled = true
 	t.settleVotes = make(map[string]bool)
 	t.settleAfterHand = false
 	t.settleMu.Unlock()
 
-	view := t.game.GenerateOmniView()
+	t.stopBots()
+	t.stopActionClock()
 
 	// One row per account. Departed players already had their session flushed
 	// when they left, so they are only added to the display (not settled
@@ -616,9 +651,14 @@ func (t *table) settle() {
 	for _, p := range view.Players {
 		if _, err := t.flushSeat(p.UUID, p.AccountUUID, p.TotalBuyIn, p.Stack+p.PendingBuyIn, p.Stats); err != nil {
 			slog.Default().Warn("Settle flush", "error", err)
+			t.retrySettlementLater()
+			return
 		}
 	}
-	t.persistSession(true)
+	if err := t.persistSession(true); err != nil {
+		t.retrySettlementLater()
+		return
+	}
 
 	t.broadcast <- createSettlement(results, biggestWinner, view.BiggestPotAmt)
 	t.game.Reset()
@@ -626,7 +666,49 @@ func (t *table) settle() {
 	// The session's bots died with it: drop them so they cannot reappear on
 	// the empty seats when a player sits down for the next session.
 	t.dropAllBots()
+	if t.settlementRetry != nil {
+		t.settlementRetry.Stop()
+		t.settlementRetry = nil
+	}
+	t.settlementPending.Store(false)
 	t.broadcast <- createUpdatedGameBytes(t)
+}
+
+const msgSettlementPending = "settlement pending, retrying automatically"
+
+// Called with seatMu held. Only one retry may be queued per room.
+func (t *table) retrySettlementLater() {
+	if t.settlementRetry != nil {
+		return
+	}
+	t.broadcast <- createError(msgSettlementPending)
+	t.broadcast <- createUpdatedGameBytes(t)
+	t.settlementRetry = time.AfterFunc(t.settlementDelay, t.retrySettlement)
+}
+
+func (t *table) retrySettlement() {
+	t.seatMu.Lock()
+	t.settlementRetry = nil
+	select {
+	case <-t.stop:
+		t.seatMu.Unlock()
+		return
+	default:
+	}
+	if t.settlementPending.Load() {
+		t.settleLocked()
+	}
+	done := !t.settlementPending.Load()
+	t.seatMu.Unlock()
+	// Empty-room expiry may have been deferred while a refund was pending.
+	if done && t.hub != nil {
+		t.clientsMu.Lock()
+		empty := t.humanCount() == 0
+		t.clientsMu.Unlock()
+		if empty {
+			t.hub.destroyTable(t)
+		}
+	}
 }
 
 // voteSettle toggles a seated player's vote to settle the session early. Once
@@ -708,6 +790,9 @@ func (t *table) toggleSpectate(c *Client) {
 func (t *table) applySpectate(c *Client) bool {
 	t.seatMu.Lock()
 	defer t.seatMu.Unlock()
+	if t.settlementPending.Load() {
+		return false
+	}
 	if c.uuid == "" {
 		return false
 	}
@@ -812,6 +897,9 @@ func (t *table) clearBusted() {
 func (t *table) autoSpectateBusted() {
 	t.seatMu.Lock()
 	defer t.seatMu.Unlock()
+	if t.settlementPending.Load() {
+		return
+	}
 	for {
 		view := t.game.GenerateOmniView()
 		if view.Running || view.Stage != poker.NotReady {

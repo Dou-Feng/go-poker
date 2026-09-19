@@ -817,11 +817,20 @@ func (g *Game) Start() error {
 	return nil
 }
 
-// Reset resets the game to a blank game
+// Reset clears the session state while preserving the room configuration.
 func (g *Game) Reset() {
 	g.mtx.Lock()
 	defer g.mtx.Unlock()
 
+	// Positions refer to the old player slice and must not survive its removal.
+	g.dealerNum = 0
+	g.actionNum = 0
+	g.utgNum = 0
+	g.sbNum = 0
+	g.bbNum = 0
+	g.calledNum = 0
+	g.minRaise = 0
+	g.betsThisStreet = 0
 	g.players = []player{}
 	g.departedPlayers = []player{}
 	g.pots = []Pot{}

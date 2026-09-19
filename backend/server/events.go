@@ -171,6 +171,10 @@ func createJoinResult(ok bool, tablename string, message string) []byte {
 }
 
 func handleRegisterUser(c *Client, username string, accountUUID string, password string, avatar string) {
+	if c.table != nil {
+		c.trySend(createResult(actionRegisterResult, false, "already in a room", ""))
+		return
+	}
 	if username == "" || accountUUID == "" || password == "" {
 		c.send <- createResult(actionRegisterResult, false, "username and password required", "")
 		return
@@ -228,6 +232,10 @@ func handleRegisterUser(c *Client, username string, accountUUID string, password
 // handleLogin authenticates by account UUID first, then by username when the
 // username is unique across accounts.
 func handleLogin(c *Client, identifier string, password string) {
+	if c.table != nil {
+		c.trySend(createResult(actionLoginResult, false, "already in a room", ""))
+		return
+	}
 	if identifier == "" || password == "" {
 		c.send <- createResult(actionLoginResult, false, "invalid username or password", "")
 		return
@@ -272,6 +280,12 @@ func handleLogin(c *Client, identifier string, password string) {
 // remembered account UUID in localStorage) with their account. Passwords are
 // only required at initial login/registration.
 func handleReconnectUser(c *Client, accountUUID, token string) {
+	if c.table != nil && c.accountUUID != accountUUID {
+		// Keep the active account and room intact. This is a rejected account
+		// switch, not an expired login that should clear the browser session.
+		c.trySend(createError("already in a room"))
+		return
+	}
 	user, err := loadUser(c.hub.rdb, accountUUID)
 	if err != nil || user.PasswordHash == "" || !validSessionToken(user, token) {
 		// The saved login points at an account that no longer exists (e.g.
@@ -689,6 +703,10 @@ func handleRebuy(c *Client, amount uint) {
 func (t *table) rebuy(c *Client, amount uint) bool {
 	t.seatMu.Lock()
 	defer t.seatMu.Unlock()
+	if t.settlementPending.Load() {
+		c.trySend(createError(msgSettlementPending))
+		return false
+	}
 
 	if amount == 0 {
 		c.send <- createError("amount must be positive")
@@ -762,6 +780,10 @@ func handleUndoRebuy(c *Client) {
 func (t *table) undoRebuy(c *Client) bool {
 	t.seatMu.Lock()
 	defer t.seatMu.Unlock()
+	if t.settlementPending.Load() {
+		c.trySend(createError(msgSettlementPending))
+		return false
+	}
 
 	view := t.game.GenerateOmniView()
 	amount := view.Config.BuyIn
@@ -819,6 +841,12 @@ func (t *table) undoRebuy(c *Client) bool {
 
 func handleStartGame(c *Client) {
 	c.table.seatMu.Lock()
+	if c.table.settlementPending.Load() {
+		c.table.seatMu.Unlock()
+		c.trySend(createError(msgSettlementPending))
+		return
+	}
+
 	if !clientOwnsSeat(c) {
 		c.table.seatMu.Unlock()
 		c.send <- createError("you are not seated")
@@ -838,7 +866,18 @@ func handleStartGame(c *Client) {
 
 func handleToggleReady(c *Client) {
 	c.table.seatMu.Lock()
+	if c.table.settlementPending.Load() {
+		c.table.seatMu.Unlock()
+		c.trySend(createError(msgSettlementPending))
+		return
+	}
+
 	view := c.table.game.GenerateOmniView()
+	if view.Stage != poker.NotReady {
+		c.table.seatMu.Unlock()
+		c.trySend(createError("game already running"))
+		return
+	}
 	position := -1
 	for i := range view.Players {
 		if view.Players[i].UUID == c.uuid {
@@ -873,10 +912,17 @@ func handleMoveSeat(c *Client, seatID uint) {
 func (t *table) moveSeat(playerUUID string, seatID uint) error {
 	t.seatMu.Lock()
 	defer t.seatMu.Unlock()
+	if t.settlementPending.Load() {
+		return errors.New(msgSettlementPending)
+	}
+
 	if seatID == 0 {
 		return errors.New("invalid seat")
 	}
 	view := t.game.GenerateOmniView()
+	if view.Stage != poker.NotReady {
+		return errors.New("game already running")
+	}
 	position := -1
 	for i := range view.Players {
 		if view.Players[i].UUID == playerUUID {
@@ -902,6 +948,10 @@ func (t *table) moveSeat(playerUUID string, seatID uint) error {
 func autoStartIfReady(t *table) bool {
 	t.seatMu.Lock()
 	defer t.seatMu.Unlock()
+	if t.settlementPending.Load() {
+		return false
+	}
+
 	view := t.game.GenerateOmniView()
 	if view.Running {
 		return false
@@ -950,6 +1000,10 @@ func handleResetGame(c *Client) {
 func (t *table) resetWithRefunds() error {
 	t.seatMu.Lock()
 	defer t.seatMu.Unlock()
+	if t.settlementPending.Load() {
+		return errors.New(msgSettlementPending)
+	}
+
 	view := t.game.GenerateOmniView()
 	if view.Stage != poker.NotReady {
 		return errors.New("game already running")
@@ -977,6 +1031,11 @@ func handleDealGame(c *Client) {
 	if c.table == nil {
 		return
 	}
+	if c.table.settlementPending.Load() {
+		c.trySend(createError(msgSettlementPending))
+		return
+	}
+
 	if !clientOwnsSeat(c) {
 		c.send <- createError("you are not seated")
 		return

@@ -303,6 +303,10 @@ func seatTaken(view *poker.GameView, seatID uint) bool {
 func (t *table) seatBot(bot *Client, seatID uint) error {
 	t.seatMu.Lock()
 	defer t.seatMu.Unlock()
+	if t.settlementPending.Load() {
+		return errors.New(msgSettlementPending)
+	}
+
 	view := t.game.GenerateOmniView()
 	if view.Running {
 		return errBotRunning
@@ -540,6 +544,10 @@ func (t *table) botTick() {
 func (t *table) prepareBotSeat(bot *Client, amount uint) bool {
 	t.seatMu.Lock()
 	defer t.seatMu.Unlock()
+	if t.settlementPending.Load() {
+		return true
+	}
+
 	view := t.game.GenerateOmniView()
 	p := playerByUUID(view, bot.uuid)
 	if view.Running || p == nil || p.Left {

@@ -165,6 +165,9 @@ func (h *Hub) listTables() []tableInfo {
 
 // destroyTable removes a table from the hub and stops its goroutines.
 func (h *Hub) destroyTable(t *table) {
+	if t.settlementPending.Load() {
+		return // retrySettlement recycles an empty room after refunds succeed
+	}
 	h.tablesMu.Lock()
 	if _, ok := h.tables[t]; ok {
 		delete(h.tables, t)
