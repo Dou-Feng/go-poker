@@ -97,9 +97,11 @@ services:
       LIVEKIT_TLS_KEY_FILE: ${LIVEKIT_TLS_KEY_FILE:-${TLS_KEY_FILE:-}}
     volumes:
       - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./deploy/caddy-entrypoint.sh:/etc/caddy-entrypoint.sh:ro
       # Same mount point as the app: TLS_CERT_FILE/TLS_KEY_FILE are reused
       # verbatim instead of being repeated in a second variable.
       - ./certs:/app/certs:ro
+    entrypoint: ["/bin/sh", "/etc/caddy-entrypoint.sh"]
     depends_on:
       - livekit
 
