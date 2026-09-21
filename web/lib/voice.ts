@@ -183,6 +183,7 @@ function isSecureContext(): boolean {
 // reuse one module instance; a failed load is dropped so a flaky network can
 // be retried.
 type KrispModule = typeof import("@livekit/krisp-noise-filter");
+type KrispProcessor = ReturnType<KrispModule["KrispNoiseFilter"]>;
 let krispModule: Promise<KrispModule> | null = null;
 
 function loadKrisp(): Promise<KrispModule> {
@@ -193,6 +194,38 @@ function loadKrisp(): Promise<KrispModule> {
     });
   }
   return krispModule;
+}
+
+/** How long to keep trying to start the filter before giving up on it. */
+const KRISP_ENABLE_TIMEOUT_MS = 3000;
+const KRISP_ENABLE_RETRY_MS = 150;
+
+/**
+ * Start the filter, waiting for its WASM pipeline to come up.
+ *
+ * The model is initialized asynchronously (a worker plus a ~6 MB wasm
+ * module), and the plugin's enable() throws while that is still in flight —
+ * auto-enabling on readiness only happens when the plugin is constructed with
+ * `enableOnceReady`, which we do not pass. Enabling immediately after
+ * setProcessor therefore fails on anything but a warm cache, which is exactly
+ * the case a first-time user hits. Retry until the pipeline reports ready, or
+ * give up so the caller can publish the plain track instead.
+ */
+async function enableKrisp(processor: KrispProcessor): Promise<boolean> {
+  const deadline = Date.now() + KRISP_ENABLE_TIMEOUT_MS;
+  for (;;) {
+    try {
+      await processor.setEnabled(true);
+      return true;
+    } catch {
+      if (Date.now() >= deadline) {
+        return false;
+      }
+      await new Promise((resolve) =>
+        setTimeout(resolve, KRISP_ENABLE_RETRY_MS)
+      );
+    }
+  }
 }
 
 /** Live bookkeeping for one remote participant (keyed by account UUID). */
@@ -791,27 +824,21 @@ class VoiceManager {
       if (request !== this.micRequest || revision !== this.captureRevision) {
         return;
       }
-      let failed = false;
-      if (on) {
-        // Nothing published yet (still connecting): publishMic attaches it.
-        failed = this.published
-          ? !(await this.attachKrisp(this.published))
-          : false;
-      } else {
-        await this.detachKrisp();
+      // The filter has to exist *before* the track is published (see
+      // publishMic), so switching it mid-call republishes the mic: the
+      // capture and its WebAudio chain are untouched, only the published
+      // track is rebuilt. publishMic reverts the preference and reports the
+      // error itself when the filter cannot start.
+      if (this.published) {
+        this.unpublishMic(true);
+        await this.publishMic();
       }
       if (request !== this.micRequest || revision !== this.captureRevision) {
         return;
       }
-      if (failed) {
-        this.emit({
-          noiseCancellation: false,
-          error: "noiseCancellationFailed",
-        });
-        this.persist();
-      }
-      // Whatever ended up active decides how the hardware is constrained:
-      // browser suppression is requested only while the AI filter is idle.
+      // Whatever ended up in the chain decides how the hardware is
+      // constrained: browser suppression runs only while the AI filter is
+      // not the one handling noise.
       try {
         await this.applyCaptureConstraints();
       } catch {
@@ -857,11 +884,13 @@ class VoiceManager {
   }
 
   /**
-   * Attach the AI noise filter to a published track. Returns false when the
-   * filter is unavailable (unsupported browser, load failure) or could not
-   * be set up, in which case the caller keeps browser noise suppression.
+   * Set the AI noise filter up on a track that is not published yet. Returns
+   * false when the filter is unavailable (unsupported browser, load failure)
+   * or could not be started, in which case the caller publishes the plain
+   * track — a player must never be left with no audio because an enhancement
+   * failed.
    */
-  private async attachKrisp(track: LocalAudioTrack): Promise<boolean> {
+  private async startKrisp(track: LocalAudioTrack): Promise<boolean> {
     // Processors need an AudioContext on the track (livekit-client throws
     // otherwise). We always publish a track built from our WebAudio graph,
     // so ours is the same context the graph runs on — sample rates match and
@@ -876,34 +905,15 @@ class VoiceManager {
       }
       const processor = mod.KrispNoiseFilter();
       await track.setProcessor(processor);
-      // LiveKit only auto-enables a processor through its onPublish hook,
-      // which fires when the track is published *with* the processor already
-      // attached. Attaching one to an already-published track (the player
-      // flipping the switch mid-hand) skips that, so enable it explicitly —
-      // setEnabled is a no-op when the state already matches.
-      try {
-        await processor.setEnabled(true);
-      } catch (err) {
+      if (!(await enableKrisp(processor))) {
         // Half-installed filter: leave the chain as we found it.
         await track.stopProcessor().catch(() => {});
-        throw err;
+        return false;
       }
       return true;
     } catch (err) {
       console.warn("voice: AI noise filter", err);
       return false;
-    }
-  }
-
-  private async detachKrisp() {
-    const track = this.published;
-    if (!track) {
-      return;
-    }
-    try {
-      await track.stopProcessor();
-    } catch (err) {
-      console.warn("voice: stop AI noise filter", err);
     }
   }
 
@@ -938,6 +948,8 @@ class VoiceManager {
    */
   reloadSettings() {
     const stored = loadSettings();
+    const filterChanged =
+      stored.noiseCancellation !== this.state.noiseCancellation;
     this.state = {
       ...this.state,
       micVolume: stored.micVolume,
@@ -955,11 +967,35 @@ class VoiceManager {
     // them to a live capture track (no-op when the mic is off, startMic then
     // picks up the new state).
     void this.applyCaptureConstraints().catch(() => {});
+    // The filter rides the published track, so a changed preference means the
+    // track has to be rebuilt (same path as the settings switch itself).
+    if (filterChanged && this.published) {
+      this.captureChange = this.captureChange.then(async () => {
+        if (!this.published) {
+          return;
+        }
+        this.unpublishMic(true);
+        await this.publishMic();
+        await this.applyCaptureConstraints().catch(() => {});
+      });
+    }
   }
 
   // ---- microphone -----------------------------------------------------
 
-  /** Publish the processed mic track to LiveKit (no-op while disconnected). */
+  /**
+   * Publish the mic track (no-op while disconnected or already published).
+   *
+   * The AI filter, when enabled, is attached to the track *before* it is
+   * published: that is the plugin's supported lifecycle (LiveKit calls the
+   * processor's onPublish hook as the track goes out, which is what actually
+   * starts it). Attaching it to an already-published track instead leaves a
+   * processor that never ran as the sender's source — the symptom being a mic
+   * that looks on and sends silence.
+   *
+   * If the filter cannot be started, the plain track is published instead: a
+   * player must never lose their voice to a failed enhancement.
+   */
   private async publishMic() {
     const room = this.lk;
     if (
@@ -979,23 +1015,21 @@ class VoiceManager {
       true,
       this.micCtx ?? undefined
     );
-    this.published = local;
-    // Attach the AI filter before the track goes out — LiveKit then creates
-    // the sender from processedTrack, so the first audio is already cleaned.
+    let filtered = false;
     if (this.state.noiseCancellation) {
-      const attached = await this.attachKrisp(local);
-      // Browser suppression was left off at capture time in anticipation of
-      // the model; re-apply the constraints either way so the hardware track
-      // matches whatever is actually in the chain.
-      void this.applyCaptureConstraints().catch(() => {});
-      if (!attached) {
-        this.emit({
-          noiseCancellation: false,
-          error: "noiseCancellationFailed",
-        });
-        this.persist();
-      }
+      filtered = await this.startKrisp(local);
     }
+    this.published = local;
+    if (this.state.noiseCancellation && !filtered) {
+      this.emit({
+        noiseCancellation: false,
+        error: "noiseCancellationFailed",
+      });
+      this.persist();
+    }
+    // Browser suppression mirrors whatever ended up in the chain: it is off
+    // while the model runs, and back on the moment it does not.
+    void this.applyCaptureConstraints().catch(() => {});
     try {
       await room.localParticipant.publishTrack(local, {
         source: Track.Source.Microphone,
@@ -1008,14 +1042,26 @@ class VoiceManager {
     }
   }
 
-  /** Stop publishing (and stop sending) our mic. */
-  private unpublishMic() {
+  /**
+   * Stop publishing. keepCapture leaves the captured track (and its WebAudio
+   * chain) running, which is what a republish needs: stopping it would leave
+   * nothing to publish.
+   *
+   * The processor is torn down explicitly: livekit-client only stops its
+   * stats monitor on unpublish, so the plugin's wasm worker and worklet nodes
+   * would otherwise survive every toggle and mic cycle.
+   */
+  private unpublishMic(keepCapture = false) {
     const room = this.lk;
     const track = this.published;
     this.published = null;
-    if (room && track) {
+    if (!track) {
+      return;
+    }
+    void track.stopProcessor().catch(() => {});
+    if (room) {
       try {
-        room.localParticipant.unpublishTrack(track, true);
+        room.localParticipant.unpublishTrack(track, !keepCapture);
       } catch {
         // room already gone
       }

@@ -250,9 +250,7 @@ export const translations = {
     voiceSettingsFailed:
       "Could not change microphone settings. The previous setting was kept.",
     othersVolume: "Others' voice volume",
-    echoCancellation: "Echo cancellation",
-    echoCancellationHint:
-      "Browser acoustic echo cancellation. Keep on with speakers; try off with a headset if your voice sounds clipped.",
+    echoCancellation: "Echo & mic processing",
     noiseCancellation: "AI noise cancellation",
     noiseCancellationHint:
       "Filters keyboard, fans and background chatter with a local speech model (downloaded on first use, runs on this device). Replaces the browser's own noise suppression.",
@@ -542,9 +540,7 @@ export const translations = {
     micVolumeHint: "100% 为原始音量；对方听不清时可调高。",
     voiceSettingsFailed: "无法修改麦克风设置，已保留原设置。",
     othersVolume: "他人语音音量",
-    echoCancellation: "回声消除",
-    echoCancellationHint:
-      "浏览器自带的声学回声消除。用外放请保持开启；戴耳机时若声音被削可尝试关闭。",
+    echoCancellation: "麦克风增强",
     noiseCancellation: "AI 降噪",
     noiseCancellationHint:
       "本地语音模型过滤键盘声、风扇与背景人声（首次开启时下载，在本机运行）。会取代浏览器自带的降噪。",

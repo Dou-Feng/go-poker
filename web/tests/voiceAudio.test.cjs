@@ -316,19 +316,25 @@ function harness(options = {}) {
           ? {
               isKrispNoiseFilterSupported: () =>
                 options.krispSupported !== false,
-              // Mirrors the real plugin: the filter only actually runs once
-              // setEnabled(true) is called (the SDK does that from its
-              // onPublish hook, which voice.ts cannot rely on when the
-              // processor is attached after publishing).
+              // Mirrors the real plugin: enable() throws until the wasm
+              // pipeline reports ready (it initializes asynchronously), and
+              // auto-enable-on-ready only happens when the plugin is built
+              // with enableOnceReady, which voice.ts does not pass.
               KrispNoiseFilter: () => ({
                 name: "livekit-noise-filter",
                 enabled: false,
+                enableAttempts: 0,
                 isEnabled() {
                   return this.enabled;
                 },
                 async setEnabled(on) {
+                  this.enableAttempts++;
                   if (options.krispEnableFails) {
                     throw new Error("krisp enable failed");
+                  }
+                  // Not ready yet: the plugin throws instead of queueing.
+                  if (this.enableAttempts <= (options.krispNotReadyFor ?? 0)) {
+                    throw new Error("WASM_OR_WORKER_NOT_READY");
                   }
                   this.enabled = on;
                 },
@@ -689,17 +695,22 @@ test("AI noise cancellation replaces browser noise suppression on the published 
   // Off by default: the browser's own suppression does the work.
   assert.equal(h.voice.getState().noiseCancellation, false);
   assert.equal(h.captures[0].audio.noiseSuppression, true);
-  const track = h.localTracks[0];
-  assert.equal(track.processor, null);
+  assert.equal(h.localTracks.length, 1);
+  assert.equal(h.localTracks[0].processor, null);
 
   await h.voice.setNoiseCancellation(true);
   await flush();
 
-  // The model is attached to the published track and the hardware track
-  // stops suppressing (two stages at once would smear speech).
+  // Switching the filter republishes the mic (the plugin's lifecycle needs
+  // the processor attached before the track goes out), so the model rides a
+  // fresh track while the old one is torn down.
   assert.equal(h.voice.getState().noiseCancellation, true);
-  assert.equal(track.processor.name, "livekit-noise-filter");
-  assert.equal(track.processor.isEnabled(), true);
+  assert.equal(h.localTracks.length, 2);
+  const filtered = h.localTracks.at(-1);
+  assert.equal(filtered.processor.name, "livekit-noise-filter");
+  assert.equal(filtered.processor.isEnabled(), true);
+  assert.equal(h.localTracks[0].stoppedProcessor, true);
+  // The hardware track stops suppressing: two stages at once smears speech.
   assert.equal(h.constraints.at(-1).noiseSuppression, false);
   assert.equal(h.constraints.at(-1).autoGainControl, true);
   assert.equal(
@@ -709,8 +720,10 @@ test("AI noise cancellation replaces browser noise suppression on the published 
 
   await h.voice.setNoiseCancellation(false);
   await flush();
-  assert.equal(track.processor, null);
-  assert.equal(track.stoppedProcessor, true);
+  // Back to a plain track, with the filtered one cleaned up.
+  assert.equal(h.localTracks.length, 3);
+  assert.equal(h.localTracks.at(-1).processor, null);
+  assert.equal(filtered.stoppedProcessor, true);
   assert.equal(h.constraints.at(-1).noiseSuppression, true);
   assert.equal(
     JSON.parse(h.storage.get("gopoker-voice")).noiseCancellation,
@@ -800,4 +813,48 @@ test("a voice server that cannot be reached surfaces a visible error", async () 
   assert.equal(h.voice.getState().error, "voiceConnectFailed");
   h.voice.clearError();
   assert.equal(h.voice.getState().error, null);
+});
+
+test("the AI filter waits for its wasm pipeline instead of giving up", async () => {
+  // The model initializes asynchronously and the plugin's enable() throws
+  // until it is ready — which is exactly what a first-time user hits (cold
+  // wasm, no cache). Enabling must ride that out, not silently disable the
+  // filter... and never publish an unstarted processor as the live source.
+  const h = harness({ krispNotReadyFor: 2 });
+  h.voice.setLiveKitToken("ws://lk", "tok", 3600);
+  await h.voice.setMic(true);
+  await flush();
+
+  await h.voice.setNoiseCancellation(true);
+  await flush();
+
+  assert.equal(h.voice.getState().noiseCancellation, true);
+  assert.equal(h.voice.getState().error, null);
+  const filtered = h.localTracks.at(-1);
+  assert.equal(filtered.processor.isEnabled(), true);
+  assert.ok(
+    filtered.processor.enableAttempts > 2,
+    "expected retries until the pipeline reported ready"
+  );
+});
+
+test("a filter that never becomes ready falls back to the plain mic track", async () => {
+  // enableOnceReady is not set when the plugin is built without options, so a
+  // pipeline that never comes up throws forever. The player must keep a
+  // working mic: publish the plain track, revert the preference, say so.
+  const h = harness({ krispEnableFails: true });
+  h.voice.setLiveKitToken("ws://lk", "tok", 3600);
+  await h.voice.setMic(true);
+  await flush();
+
+  await h.voice.setNoiseCancellation(true);
+  await flush();
+
+  assert.equal(h.voice.getState().noiseCancellation, false);
+  assert.equal(h.voice.getState().error, "noiseCancellationFailed");
+  assert.equal(h.voice.getState().micOn, true);
+  // The published track is the plain one — no processor left dangling.
+  assert.equal(h.localTracks.at(-1).processor, null);
+  // Browser suppression is back on, so the mic is never left unhandled.
+  assert.equal(h.constraints.at(-1).noiseSuppression, true);
 });

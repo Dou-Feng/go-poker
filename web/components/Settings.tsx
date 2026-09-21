@@ -210,7 +210,6 @@ export default function Settings({ buttonClassName }: SettingsProps) {
                       role="switch"
                       aria-label={t("echoCancellation")}
                       aria-checked={v.echoCancellation}
-                      title={t("echoCancellationHint")}
                       className={optionButton(v.echoCancellation)}
                     >
                       {v.echoCancellation ? t("on") : t("off")}
