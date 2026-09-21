@@ -1,23 +1,25 @@
 module github.com/evanofslack/go-poker
 
-go 1.24
+go 1.26
 
 require (
 	github.com/alexclewontin/riverboat/eval v0.2.2
 	github.com/go-chi/chi/v5 v5.0.7
 	github.com/go-chi/cors v1.2.0
 	github.com/go-redis/redis/v8 v8.11.5
-	github.com/google/uuid v1.3.0
+	github.com/golang-jwt/jwt/v5 v5.3.1
+	github.com/google/uuid v1.6.0
 	github.com/gorilla/websocket v1.5.0
 	github.com/joho/godotenv v1.5.1
-	golang.org/x/crypto v0.24.0
+	golang.org/x/crypto v0.55.0
 	golang.org/x/image v0.18.0
 )
 
 require (
-	github.com/cespare/xxhash/v2 v2.1.2 // indirect
+	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/chehsunliu/poker v0.1.0 // indirect
 	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
-	golang.org/x/net v0.21.0 // indirect
-	golang.org/x/text v0.16.0 // indirect
+	github.com/fsnotify/fsnotify v1.10.1 // indirect
+	golang.org/x/net v0.58.0 // indirect
+	golang.org/x/text v0.41.0 // indirect
 )

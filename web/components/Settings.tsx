@@ -216,6 +216,21 @@ export default function Settings({ buttonClassName }: SettingsProps) {
                       {v.echoCancellation ? t("on") : t("off")}
                     </button>
                   </div>
+                  <div className="flex flex-row items-center justify-between">
+                    <p className="text-sm text-ink">{t("noiseCancellation")}</p>
+                    <button
+                      onClick={() =>
+                        void voice.setNoiseCancellation(!v.noiseCancellation)
+                      }
+                      role="switch"
+                      aria-label={t("noiseCancellation")}
+                      aria-checked={v.noiseCancellation}
+                      title={t("noiseCancellationHint")}
+                      className={optionButton(v.noiseCancellation)}
+                    >
+                      {v.noiseCancellation ? t("on") : t("off")}
+                    </button>
+                  </div>
                 </div>
               )}
             </div>

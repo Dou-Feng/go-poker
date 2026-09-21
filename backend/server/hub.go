@@ -27,9 +27,9 @@ type Hub struct {
 	// guard holds the abuse protections (rate limits, connection and room
 	// caps). Tests that build a Hub literal leave it nil, which disables them.
 	guard *guard
-	// turn is the STUN/TURN configuration handed to voice-chat clients (see
-	// turn.go). The zero value offers STUN on the page host and no TURN.
-	turn turnSettings
+	// livekit holds the LiveKit access-token configuration handed to
+	// voice-chat clients (see livekit.go). The zero value disables voice.
+	livekit livekitSettings
 }
 
 // errTooManyTables is returned when the live-room cap (MAX_TABLES) is hit.
@@ -49,13 +49,10 @@ func newHub() (*Hub, error) {
 		users:      make(map[string]bool),
 		sessions:   make(map[string]*Client),
 		guard:      newGuard(guardConfigFromEnv()),
-		turn:       turnSettingsFromEnv(),
+		livekit:    livekitSettingsFromEnv(),
 	}
-	switch {
-	case !hub.turn.configured():
-		slog.Default().Info("TURN_HOST/TURN_SECRET unset: no STUN/TURN, voice chat only between players who can reach each other directly (same LAN)")
-	case hub.turn.secret == "":
-		slog.Default().Info("TURN_SECRET unset: voice chat offers STUN only, no relay", "host", hub.turn.host)
+	if !hub.livekit.configured() {
+		slog.Default().Info("LIVEKIT_API_KEY/LIVEKIT_API_SECRET unset: voice chat is disabled until a LiveKit server is configured")
 	}
 	return hub, nil
 }

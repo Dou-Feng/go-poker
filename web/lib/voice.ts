@@ -1,26 +1,36 @@
-// In-room voice chat: a WebRTC audio mesh between the browsers of one room.
+// In-room voice chat on LiveKit (livekit-client): every browser sends and
+// receives audio through one self-hosted LiveKit SFU instead of a mesh of
+// direct peer connections. WebRTC signalling, NAT traversal and TURN relaying
+// all live inside the LiveKit server; the game server only mints the
+// short-lived access token (`get-livekit-token`, see
+// backend/server/livekit.go) that admits each account (identity = account
+// UUID) to the room `gopoker-<tablename>`.
 //
-// The Go server only relays signalling (`voice-signal`, see
-// backend/server/voice.go); media flows peer to peer. Peers are keyed by
-// account UUID. A client is "in voice" while either its mic or its speaker is
-// on; it then announces `join`, every peer already in voice opens a
-// connection to it, and negotiation follows the "perfect negotiation" pattern
-// so two peers announcing at once cannot deadlock. Both toggles default to
-// off: nobody is recorded or hears anything until they opt in.
+// A client is "in voice" while either its mic or its speaker is on; the first
+// activation fetches a token and connects. Both toggles default to off:
+// nobody is recorded or hears anything until they opt in.
 //
 // Audio routing:
 //   mic → getUserMedia → GainNode (mic input volume) → MediaStreamDestination
-//       → one RTCRtpSender per peer
-//   peer track → <audio> element (others' volume, per-peer local mute)
+//       → published to LiveKit as a microphone LocalAudioTrack
+//   remote track → <audio> element (others' volume, per-peer local mute)
 //
 // Mic/speaker state lives only for the session; volumes and the per-peer mute
 // list persist in localStorage.
 
 import {
-  getIceServers,
-  sendVoiceSignal,
-  VoiceSignalKind,
-} from "../actions/actions";
+  ConnectionState,
+  LocalAudioTrack,
+  Room,
+  RoomEvent,
+  Track,
+  type Participant,
+  type RemoteAudioTrack,
+  type RemoteParticipant,
+  type RemoteTrack,
+  type RemoteTrackPublication,
+} from "livekit-client";
+import { getLiveKitToken } from "../actions/actions";
 import { TranslationKey } from "./translations";
 import { resumeAudioContext, setVoiceAudioState } from "./sfx";
 
@@ -48,35 +58,24 @@ export type VoiceState = {
    * mic. Off by default; the user's explicit choice persists.
    */
   echoCancellation: boolean;
+  /**
+   * Whether the AI (Krisp) noise filter processes the outgoing mic instead
+   * of the browser's built-in noise suppression. Off by default: the model
+   * is a ~6 MB download, fetched only once the player opts in.
+   */
+  noiseCancellation: boolean;
   peers: Record<string, VoicePeer>;
   /** Pending user-facing error (a translation key); cleared with clearError. */
   error: TranslationKey | null;
 };
 
-type Signal = {
-  from?: string;
-  to?: string;
-  kind: VoiceSignalKind;
-  payload?: unknown;
-};
-
-type Peer = {
-  id: string;
-  pc: RTCPeerConnection;
-  transceiver: RTCRtpTransceiver;
-  /** Perfect negotiation: the polite side rolls back on offer collision. */
-  polite: boolean;
-  makingOffer: boolean;
-  ignoreOffer: boolean;
-  audio: HTMLAudioElement | null;
-  pendingIce: RTCIceCandidateInit[];
-  iceTimer: ReturnType<typeof setTimeout> | null;
-  mic: boolean;
-  connected: boolean;
-};
-
 const SETTINGS_KEY = "gopoker-voice";
-const ICE_BATCH_MS = 150;
+/** Reconnect backoff after an unexpected LiveKit disconnect. */
+const RECONNECT_DELAY_MS = 1000;
+/** Ask for a fresh token when the current one has less than this left. */
+const TOKEN_REFRESH_MARGIN_MS = 10 * 60 * 1000;
+/** Minimum spacing between token requests (the reply is asynchronous). */
+const TOKEN_REQUEST_SPACING_MS = 5000;
 
 type StoredSettings = {
   micVolume: number;
@@ -84,6 +83,8 @@ type StoredSettings = {
   mutedPeers: string[];
   /** Browser acoustic echo cancellation on the mic (default off). */
   echoCancellation: boolean;
+  /** AI (Krisp) noise filter on the outgoing mic (default off). */
+  noiseCancellation: boolean;
 };
 
 const DEFAULT_SETTINGS: StoredSettings = {
@@ -91,6 +92,7 @@ const DEFAULT_SETTINGS: StoredSettings = {
   outputVolume: 1,
   mutedPeers: [],
   echoCancellation: false,
+  noiseCancellation: false,
 };
 
 export const MAX_MIC_VOLUME = 3;
@@ -120,15 +122,24 @@ function loadSettings(): StoredSettings {
         ? parsed.mutedPeers.filter((p) => typeof p === "string")
         : [],
       echoCancellation: parsed.echoCancellation === true,
+      noiseCancellation: parsed.noiseCancellation === true,
     };
   } catch {
     return DEFAULT_SETTINGS;
   }
 }
 
-// Build-time override of the ICE server list (a JSON array of RTCIceServer
-// objects). Normally unset: the Go server hands out the bundled coturn's
-// STUN/TURN URLs with fresh credentials over the socket (get-ice-servers).
+// Build-time override of the LiveKit server address (normally unset: the Go
+// server hands out the address together with the token). The value must be
+// reachable from the browser, e.g. wss://voice.example.com.
+function livekitUrlOverride(): string | null {
+  const raw = process.env.NEXT_PUBLIC_LIVEKIT_URL;
+  return raw ? raw : null;
+}
+
+// Build-time override of the ICE server list handed to the LiveKit SDK (a
+// JSON array of RTCIceServer objects). Rarely needed — the LiveKit server
+// distributes its own ICE configuration — but kept for exotic deployments.
 function iceServersOverride(): RTCIceServer[] | null {
   const raw = process.env.NEXT_PUBLIC_ICE_SERVERS;
   if (!raw) {
@@ -142,12 +153,8 @@ function iceServersOverride(): RTCIceServer[] | null {
   }
 }
 
-function pageHost(): string {
-  return typeof window === "undefined" ? "" : window.location.hostname;
-}
-
-// Peer connections work on any origin, so listening is always possible when
-// the browser has WebRTC at all.
+// LiveKit, like the raw mesh before it, is WebRTC: without RTCPeerConnection
+// there is nothing to listen with.
 function webrtcSupported(): boolean {
   return (
     typeof window !== "undefined" && typeof RTCPeerConnection !== "undefined"
@@ -169,31 +176,63 @@ function isSecureContext(): boolean {
   return typeof window !== "undefined" && window.isSecureContext === true;
 }
 
+// The AI noise filter (LiveKit's Krisp plugin) ships as a ~6 MB bundle with
+// the model inlined, so it is loaded on demand — only a player who turns the
+// setting on ever downloads it. The promise is cached so repeated toggles
+// reuse one module instance; a failed load is dropped so a flaky network can
+// be retried.
+type KrispModule = typeof import("@livekit/krisp-noise-filter");
+let krispModule: Promise<KrispModule> | null = null;
+
+function loadKrisp(): Promise<KrispModule> {
+  if (!krispModule) {
+    krispModule = import("@livekit/krisp-noise-filter").catch((err) => {
+      krispModule = null;
+      throw err;
+    });
+  }
+  return krispModule;
+}
+
+/** Live bookkeeping for one remote participant (keyed by account UUID). */
+type LivePeer = {
+  mic: boolean;
+};
+
 class VoiceManager {
   private socket: WebSocket | null = null;
   private myId: string | null = null;
   private room: string | null = null;
-  private peers = new Map<string, Peer>();
   private listeners = new Set<() => void>();
   private state: VoiceState;
+
+  // The LiveKit room connection, and the token that admits us.
+  private lk: Room | null = null;
+  private connectGen = 0;
+  private token: string | null = null;
+  private tokenUrl = "";
+  private tokenExpiresAt = 0;
+  private tokenRequestedAt = 0;
+
+  // Remote participants and their playback elements, keyed by account UUID.
+  private livePeers = new Map<string, LivePeer>();
+  private audioElements = new Map<string, HTMLAudioElement>();
+  private audioHost: HTMLElement | null = null;
+
+  // The published mic track, if any (wraps this.micTrack).
+  private published: LocalAudioTrack | null = null;
 
   private rawStream: MediaStream | null = null;
   private micTrack: MediaStreamTrack | null = null;
   private micCtx: AudioContext | null = null;
   private micGain: GainNode | null = null;
-  private audioHost: HTMLElement | null = null;
   private micRequest = 0;
   private micRequested = false;
   private micEchoCancellation = false;
-  private echoRevision = 0;
-  private echoChange: Promise<void> = Promise.resolve();
-
-  // ICE servers (STUN/TURN + credentials) issued by the game server, and
-  // when they stop being valid. Requested on room entry and refreshed before
-  // new peer connections once they near expiry.
-  private serverIce: RTCIceServer[] | null = null;
-  private serverIceExpiresAt = 0;
-  private iceRequestedAt = 0;
+  // Serializes changes to the capture track (echo cancellation, AI noise
+  // filter) so rapid toggles cannot apply older settings after the latest.
+  private captureRevision = 0;
+  private captureChange: Promise<void> = Promise.resolve();
 
   constructor() {
     const settings = loadSettings();
@@ -206,6 +245,7 @@ class VoiceManager {
       outputVolume: settings.outputVolume,
       mutedPeers: settings.mutedPeers,
       echoCancellation: settings.echoCancellation,
+      noiseCancellation: settings.noiseCancellation,
       peers: {},
       error: null,
     };
@@ -226,8 +266,8 @@ class VoiceManager {
 
   private emit(patch: Partial<VoiceState> = {}) {
     const peers: Record<string, VoicePeer> = {};
-    this.peers.forEach((p, id) => {
-      peers[id] = { id, mic: p.mic, connected: p.connected };
+    this.livePeers.forEach((p, id) => {
+      peers[id] = { id, mic: p.mic, connected: true };
     });
     this.state = { ...this.state, ...patch, peers };
     this.listeners.forEach((l) => l());
@@ -255,16 +295,13 @@ class VoiceManager {
   }
 
   /**
-   * Called whenever the socket (re)connects. Peers were told we left when
-   * our old connection dropped, so the mesh is rebuilt from scratch.
+   * Called whenever the game socket (re)connects. The LiveKit media
+   * connection is independent of it, so nothing is torn down; if voice is
+   * active but the room is gone (server restart), reconnect now.
    */
   onSocketConnected() {
-    this.teardownPeers();
-    if (this.room) {
-      this.requestIceServers(true);
-    }
-    if (this.active && this.room) {
-      this.announce("join");
+    if (this.active) {
+      void this.ensureConnected();
     }
   }
 
@@ -273,73 +310,317 @@ class VoiceManager {
     if (this.room === room && this.myId === myId) {
       return;
     }
-    this.teardownPeers();
+    this.teardownRoom();
     this.room = room;
     this.myId = myId;
-    // Fetch STUN/TURN details up front so the first peer connection does not
-    // have to wait for them.
-    this.requestIceServers(true);
+    // Fetch a token up front so the first activation does not have to wait.
+    this.requestToken();
     if (this.active) {
-      this.announce("join");
+      void this.ensureConnected();
     }
-  }
-
-  /** ice-servers reply from the game server (see backend/server/turn.go). */
-  setIceServers(servers: RTCIceServer[], ttlSeconds: number) {
-    this.serverIce = Array.isArray(servers) ? servers : [];
-    const ttl = Number.isFinite(ttlSeconds) && ttlSeconds > 0 ? ttlSeconds : 0;
-    this.serverIceExpiresAt = ttl ? Date.now() + ttl * 1000 : 0;
   }
 
   /**
-   * Ask the server for ICE servers. Unless forced, this is a no-op while the
-   * current credentials are still comfortably valid or a request is in
-   * flight (the reply is asynchronous; peers created before it arrives use
-   * the fallback STUN URL).
+   * `livekit-token` reply from the game server (see
+   * backend/server/livekit.go). An empty token means this server has no
+   * LiveKit credentials: voice chat is unavailable here.
    */
-  private requestIceServers(force = false) {
-    if (!this.socket) {
+  setLiveKitToken(url: string, token: string, ttlSeconds: number) {
+    if (!token) {
+      if (this.active) {
+        this.emit({ error: "voiceUnavailable" });
+      }
+      return;
+    }
+    this.tokenUrl = url;
+    this.token = token;
+    const ttl = Number.isFinite(ttlSeconds) && ttlSeconds > 0 ? ttlSeconds : 0;
+    this.tokenExpiresAt = ttl ? Date.now() + ttl * 1000 : 0;
+    if (this.active) {
+      void this.ensureConnected();
+    }
+  }
+
+  /**
+   * Ask the server for a LiveKit token. Unless forced, this is a no-op while
+   * the current token is still comfortably valid or a request is in flight.
+   */
+  private requestToken(force = false) {
+    if (!this.socket || !this.room) {
       return;
     }
     const now = Date.now();
-    const soon = 10 * 60 * 1000;
-    const fresh = this.serverIce && this.serverIceExpiresAt - now > soon;
-    const inFlight = now - this.iceRequestedAt < 5000;
+    const fresh =
+      this.token &&
+      (!this.tokenExpiresAt ||
+        this.tokenExpiresAt - now > TOKEN_REFRESH_MARGIN_MS);
+    const inFlight = now - this.tokenRequestedAt < TOKEN_REQUEST_SPACING_MS;
     if (!force && (fresh || inFlight)) {
       return;
     }
-    this.iceRequestedAt = now;
-    getIceServers(this.socket, pageHost());
+    this.tokenRequestedAt = now;
+    getLiveKitToken(this.socket);
   }
 
-  private currentIceServers(): RTCIceServer[] {
-    const override = iceServersOverride();
-    if (override) {
-      return override;
-    }
-    if (this.serverIce && this.serverIce.length > 0) {
-      // Expired TURN credentials would be rejected by coturn; better to
-      // connect directly than to stall on the relay.
-      if (!this.serverIceExpiresAt || this.serverIceExpiresAt > Date.now()) {
-        return this.serverIce;
-      }
-    }
-    // No STUN/TURN (the server has not answered yet, or no coturn is
-    // deployed): browsers exchange host candidates only, which connects
-    // peers on the same LAN. Never guess an address the browser would wait
-    // on.
-    return [];
-  }
-
-  /** Leaving the room turns voice off; the server announces our departure. */
+  /** Leaving the room turns voice off and disconnects from LiveKit. */
   leaveRoom() {
     this.micRequested = false;
     this.micRequest++;
-    this.teardownPeers();
-    this.stopMic();
+    this.unpublishMic();
+    this.releaseMic();
     this.room = null;
+    this.token = null;
+    this.tokenExpiresAt = 0;
+    this.teardownRoom();
     this.emit({ micOn: false, speakerOn: false });
     this.syncAudioSession();
+  }
+
+  // ---- LiveKit connection ----------------------------------------------
+
+  /** Connect to the LiveKit room when voice is active and we have a token. */
+  private async ensureConnected() {
+    if (!this.room || !this.active) {
+      return;
+    }
+    const st = this.lk?.state;
+    if (
+      st === ConnectionState.Connected ||
+      st === ConnectionState.Connecting ||
+      st === ConnectionState.Reconnecting
+    ) {
+      return;
+    }
+    if (!this.token || this.tokenExpiresAt - Date.now() < 60 * 1000) {
+      // No (or nearly expired) token: ask and retry when the reply arrives.
+      this.requestToken();
+      return;
+    }
+    await this.connectRoom();
+  }
+
+  private async connectRoom() {
+    const token = this.token;
+    const url = livekitUrlOverride() ?? this.tokenUrl;
+    if (!token || !url) {
+      return;
+    }
+    if (!this.lk) {
+      this.lk = this.createRoom();
+    }
+    const room = this.lk;
+    const gen = ++this.connectGen;
+    try {
+      await room.connect(url, token);
+    } catch (err) {
+      if (gen !== this.connectGen) {
+        return;
+      }
+      console.warn("voice: connect", err);
+      // The token may be stale or the room gone: drop it so the next
+      // activation asks for a fresh one instead of looping on a bad one.
+      this.token = null;
+      return;
+    }
+    if (gen !== this.connectGen) {
+      return;
+    }
+    // Someone turned the mic on while we were connecting.
+    await this.publishMic();
+    // Participants already in the room do not fire ParticipantConnected.
+    room.remoteParticipants.forEach((p) => this.notePeer(p));
+    this.emit();
+  }
+
+  private createRoom(): Room {
+    const rtcConfig = iceServersOverride();
+    const room = new Room({
+      adaptiveStream: false,
+      dynacast: false,
+      ...(rtcConfig ? { rtcConfig: { iceServers: rtcConfig } } : {}),
+    });
+    // Every handler first ignores events from a room we already left: the
+    // Disconnected event of a torn-down room arrives asynchronously.
+    room.on(RoomEvent.ParticipantConnected, (p: RemoteParticipant) => {
+      if (this.lk !== room) {
+        return;
+      }
+      this.notePeer(p);
+      this.emit();
+    });
+    room.on(RoomEvent.ParticipantDisconnected, (p: RemoteParticipant) => {
+      if (this.lk !== room) {
+        return;
+      }
+      this.livePeers.delete(p.identity);
+      this.detachAudio(p.identity);
+      this.emit();
+    });
+    room.on(
+      RoomEvent.TrackSubscribed,
+      (
+        track: RemoteTrack,
+        _pub: RemoteTrackPublication,
+        p: RemoteParticipant
+      ) => {
+        if (this.lk !== room) {
+          return;
+        }
+        if (track.kind === Track.Kind.Audio) {
+          this.attachAudio(p.identity, track as RemoteAudioTrack);
+        }
+        this.notePeer(p);
+        this.emit();
+      }
+    );
+    room.on(RoomEvent.TrackUnsubscribed, (track, _pub, p) => {
+      if (this.lk !== room) {
+        return;
+      }
+      if (track.kind === Track.Kind.Audio) {
+        this.detachAudio(p.identity, track as RemoteAudioTrack);
+      }
+      this.emit();
+    });
+    room.on(RoomEvent.TrackMuted, (_pub, p) => {
+      if (this.lk !== room) {
+        return;
+      }
+      this.notePeer(p);
+      this.emit();
+    });
+    room.on(RoomEvent.TrackUnmuted, (_pub, p) => {
+      if (this.lk !== room) {
+        return;
+      }
+      this.notePeer(p);
+      this.emit();
+    });
+    room.on(RoomEvent.Disconnected, () => {
+      if (this.lk !== room) {
+        return;
+      }
+      // Unexpected loss (leaveRoom disconnects via teardownRoom, which
+      // clears this.lk first): drop everything and try again shortly. The
+      // published track dies with the room, and leaving the reference behind
+      // would make the next publishMic() a no-op — the mic would look on
+      // while nobody could hear it.
+      this.lk = null;
+      this.connectGen++;
+      this.published = null;
+      this.dropAudioElements();
+      this.livePeers.clear();
+      this.emit();
+      if (this.active && this.room) {
+        this.requestToken(true);
+        setTimeout(() => {
+          if (this.active) {
+            void this.ensureConnected();
+          }
+        }, RECONNECT_DELAY_MS);
+      }
+    });
+    return room;
+  }
+
+  private teardownRoom() {
+    this.connectGen++;
+    this.published = null;
+    this.dropAudioElements();
+    this.livePeers.clear();
+    const room = this.lk;
+    this.lk = null;
+    if (room) {
+      try {
+        room.disconnect();
+      } catch {
+        // already disconnected
+      }
+    }
+    this.emit();
+  }
+
+  private dropAudioElements() {
+    this.audioElements.forEach((el) => {
+      el.pause();
+      el.srcObject = null;
+      el.remove();
+    });
+    this.audioElements.clear();
+    this.audioHost?.remove();
+    this.audioHost = null;
+  }
+
+  // ---- remote participants ---------------------------------------------
+
+  /** (Re)record a participant's mic state from their microphone track. */
+  private notePeer(p: Participant) {
+    // Mute events deliver the base Participant type; only remote
+    // participants carry track publications.
+    const remote = p as RemoteParticipant;
+    const pub = remote.getTrackPublication
+      ? remote.getTrackPublication(Track.Source.Microphone)
+      : undefined;
+    this.livePeers.set(p.identity, { mic: pub ? !pub.isMuted : false });
+  }
+
+  private attachAudio(id: string, track: RemoteAudioTrack) {
+    if (typeof document === "undefined") {
+      return;
+    }
+    if (!this.audioHost) {
+      this.audioHost = document.createElement("div");
+      this.audioHost.setAttribute("data-voice-audio", "");
+      this.audioHost.style.display = "none";
+      document.body.appendChild(this.audioHost);
+    }
+    let audio = this.audioElements.get(id);
+    if (!audio) {
+      audio = document.createElement("audio");
+      audio.setAttribute("playsinline", "");
+      this.audioHost.appendChild(audio);
+      this.audioElements.set(id, audio);
+    }
+    try {
+      track.attach(audio);
+    } catch (err) {
+      console.warn("voice: attach track", err);
+    }
+    this.applyOutput(id);
+  }
+
+  private detachAudio(id: string, track?: RemoteAudioTrack) {
+    const audio = this.audioElements.get(id);
+    if (!audio) {
+      return;
+    }
+    if (track) {
+      try {
+        track.detach(audio);
+      } catch {
+        // element is gone either way
+      }
+    }
+    audio.pause();
+    audio.srcObject = null;
+    audio.remove();
+    this.audioElements.delete(id);
+  }
+
+  private applyOutput(id: string) {
+    const audio = this.audioElements.get(id);
+    if (!audio) {
+      return;
+    }
+    audio.muted = !this.state.speakerOn || this.isPeerMuted(id);
+    audio.volume = this.state.outputVolume;
+    if (audio.muted) {
+      audio.pause();
+    } else {
+      void audio.play().catch(() => {
+        // The next speaker toggle retries if autoplay was blocked.
+      });
+    }
   }
 
   // ---- user controls ---------------------------------------------------
@@ -375,12 +656,14 @@ class VoiceManager {
         return;
       }
     } else {
-      this.stopMic();
+      this.unpublishMic();
+      this.releaseMic();
     }
     const wasActive = this.active;
     this.state = { ...this.state, micOn: on };
-    this.peers.forEach((p) => this.applyMicToPeer(p));
-    this.syncPresence(wasActive);
+    if (this.active && !wasActive) {
+      void this.ensureConnected();
+    }
     this.syncAudioSession();
     this.emit();
   }
@@ -397,9 +680,11 @@ class VoiceManager {
     this.state = { ...this.state, speakerOn: on };
     if (on) {
       this.syncAudioSession();
+      if (!wasActive) {
+        void this.ensureConnected();
+      }
     }
-    this.peers.forEach((p) => this.applyOutputToPeer(p));
-    this.syncPresence(wasActive);
+    this.audioElements.forEach((_el, id) => this.applyOutput(id));
     this.syncAudioSession();
     this.emit();
   }
@@ -416,7 +701,7 @@ class VoiceManager {
   setOutputVolume(v: number): void {
     const vol = clamp01(v);
     this.state = { ...this.state, outputVolume: vol };
-    this.peers.forEach((p) => this.applyOutputToPeer(p));
+    this.audioElements.forEach((_el, id) => this.applyOutput(id));
     this.emit();
     this.persist();
   }
@@ -427,50 +712,41 @@ class VoiceManager {
       ? this.state.mutedPeers.filter((p) => p !== id)
       : this.state.mutedPeers.concat(id);
     this.state = { ...this.state, mutedPeers: muted };
-    const peer = this.peers.get(id);
-    if (peer) {
-      this.applyOutputToPeer(peer);
-    }
+    this.applyOutput(id);
     this.emit();
     this.persist();
   }
 
   /**
    * Update the live capture track without stopping the hardware, WebAudio
-   * graph or WebRTC sender. Serialize changes so rapid toggles cannot apply
-   * older settings after the latest choice.
+   * graph or the published track. Serialize changes so rapid toggles cannot
+   * apply older settings after the latest choice.
    */
   async setEchoCancellation(on: boolean): Promise<void> {
     if (on === this.state.echoCancellation) {
       return;
     }
-    const revision = ++this.echoRevision;
+    const revision = ++this.captureRevision;
     this.emit({ echoCancellation: on });
     this.persist();
     if (!this.state.micOn) {
       return; // startMic picks up changes made while permission is pending.
     }
     const request = this.micRequest;
-    const track = this.rawStream?.getAudioTracks()[0];
-    this.echoChange = this.echoChange.then(async () => {
-      if (
-        !track ||
-        request !== this.micRequest ||
-        revision !== this.echoRevision
-      ) {
+    this.captureChange = this.captureChange.then(async () => {
+      if (request !== this.micRequest || revision !== this.captureRevision) {
         return;
       }
       try {
-        await track.applyConstraints({
-          ...this.micConstraints(on),
-          echoCancellation: { exact: on },
-        });
+        await this.applyCaptureConstraints();
         if (request !== this.micRequest) {
           return;
         }
         this.micEchoCancellation = on;
       } catch {
-        if (request === this.micRequest && revision === this.echoRevision) {
+        // `{exact: on}` is the part browsers may refuse; keep the previous
+        // setting rather than guessing what was applied.
+        if (request === this.micRequest && revision === this.captureRevision) {
           this.emit({
             echoCancellation: this.micEchoCancellation,
             error: "voiceSettingsFailed",
@@ -483,16 +759,147 @@ class VoiceManager {
         void resumeAudioContext(this.micCtx);
       }
     });
-    await this.echoChange;
+    await this.captureChange;
   }
 
-  private micConstraints(echoCancellation: boolean): MediaTrackConstraints {
+  /**
+   * Switch the outgoing mic between the browser's built-in noise suppression
+   * and the AI (Krisp) filter. Turning it on downloads the model on first
+   * use; if that is impossible the browser keeps doing the job and the
+   * setting reverts, so the player never ends up with no noise handling at
+   * all (or with two stages fighting each other).
+   */
+  async setNoiseCancellation(on: boolean): Promise<void> {
+    if (on === this.state.noiseCancellation) {
+      return;
+    }
+    const revision = ++this.captureRevision;
+    this.emit({ noiseCancellation: on });
+    this.persist();
+    // With the mic off there is nothing to process yet: publishMic attaches
+    // the filter when the capture starts.
+    if (!this.state.micOn) {
+      return;
+    }
+    const request = this.micRequest;
+    this.captureChange = this.captureChange.then(async () => {
+      if (request !== this.micRequest || revision !== this.captureRevision) {
+        return;
+      }
+      let failed = false;
+      if (on) {
+        // Nothing published yet (still connecting): publishMic attaches it.
+        failed = this.published
+          ? !(await this.attachKrisp(this.published))
+          : false;
+      } else {
+        await this.detachKrisp();
+      }
+      if (request !== this.micRequest || revision !== this.captureRevision) {
+        return;
+      }
+      if (failed) {
+        this.emit({
+          noiseCancellation: false,
+          error: "noiseCancellationFailed",
+        });
+        this.persist();
+      }
+      // Whatever ended up active decides how the hardware is constrained:
+      // browser suppression is requested only while the AI filter is idle.
+      try {
+        await this.applyCaptureConstraints();
+      } catch {
+        // Echo cancellation is the setting that may be refused; it already
+        // reported on its own path if so.
+      }
+    });
+    await this.captureChange;
+  }
+
+  /**
+   * Constraints for the hardware capture track. Exactly one noise reducer is
+   * asked for: while the player wants the AI filter, the browser's own
+   * suppression stays off (cascading two of them smears speech). If the
+   * model turns out to be unusable, the setting reverts and this flips back
+   * to browser suppression.
+   */
+  private micConstraints(): MediaTrackConstraints {
     return {
-      echoCancellation,
-      // Keep gain control and noise suppression independent of echo removal.
+      echoCancellation: this.state.echoCancellation,
+      // Gain control stays independent of both echo and noise handling.
       autoGainControl: true,
-      noiseSuppression: true,
+      noiseSuppression: !this.state.noiseCancellation,
     };
+  }
+
+  /**
+   * Apply the capture constraints to the live hardware track. Echo
+   * cancellation is pinned with `exact` so the browser either honours the
+   * choice or reports failure (handled by the caller) instead of silently
+   * overriding it.
+   */
+  private async applyCaptureConstraints(): Promise<boolean> {
+    const track = this.rawStream?.getAudioTracks()[0];
+    if (!track) {
+      return true; // nothing captured yet: startMic uses the current state
+    }
+    await track.applyConstraints({
+      ...this.micConstraints(),
+      echoCancellation: { exact: this.state.echoCancellation },
+    });
+    return true;
+  }
+
+  /**
+   * Attach the AI noise filter to a published track. Returns false when the
+   * filter is unavailable (unsupported browser, load failure) or could not
+   * be set up, in which case the caller keeps browser noise suppression.
+   */
+  private async attachKrisp(track: LocalAudioTrack): Promise<boolean> {
+    // Processors need an AudioContext on the track (livekit-client throws
+    // otherwise). We always publish a track built from our WebAudio graph,
+    // so ours is the same context the graph runs on — sample rates match and
+    // no second context is spun up.
+    if (!this.micCtx) {
+      return false;
+    }
+    try {
+      const mod = await loadKrisp();
+      if (!mod.isKrispNoiseFilterSupported()) {
+        return false;
+      }
+      const processor = mod.KrispNoiseFilter();
+      await track.setProcessor(processor);
+      // LiveKit only auto-enables a processor through its onPublish hook,
+      // which fires when the track is published *with* the processor already
+      // attached. Attaching one to an already-published track (the player
+      // flipping the switch mid-hand) skips that, so enable it explicitly —
+      // setEnabled is a no-op when the state already matches.
+      try {
+        await processor.setEnabled(true);
+      } catch (err) {
+        // Half-installed filter: leave the chain as we found it.
+        await track.stopProcessor().catch(() => {});
+        throw err;
+      }
+      return true;
+    } catch (err) {
+      console.warn("voice: AI noise filter", err);
+      return false;
+    }
+  }
+
+  private async detachKrisp() {
+    const track = this.published;
+    if (!track) {
+      return;
+    }
+    try {
+      await track.stopProcessor();
+    } catch (err) {
+      console.warn("voice: stop AI noise filter", err);
+    }
   }
 
   private syncAudioSession() {
@@ -508,6 +915,7 @@ class VoiceManager {
       outputVolume: this.state.outputVolume,
       mutedPeers: this.state.mutedPeers,
       echoCancellation: this.state.echoCancellation,
+      noiseCancellation: this.state.noiseCancellation,
     };
     try {
       window.localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
@@ -516,313 +924,70 @@ class VoiceManager {
     }
   }
 
-  /** Announce join/leave/state after a toggle changed our presence. */
-  private syncPresence(wasActive: boolean) {
-    if (!this.room) {
-      return;
-    }
-    if (this.active && !wasActive) {
-      this.requestIceServers();
-      this.announce("join");
-    } else if (!this.active && wasActive) {
-      this.announce("leave");
-      this.teardownPeers();
-    } else if (this.active) {
-      this.announce("state");
-    }
-  }
-
-  private announce(kind: "join" | "leave" | "state") {
-    if (!this.socket) {
-      return;
-    }
-    const payload = kind === "leave" ? undefined : { mic: this.state.micOn };
-    sendVoiceSignal(this.socket, null, kind, payload);
-  }
-
-  private send(to: string, kind: VoiceSignalKind, payload?: unknown) {
-    if (!this.socket) {
-      return;
-    }
-    sendVoiceSignal(this.socket, to, kind, payload);
-  }
-
-  // ---- inbound signalling ---------------------------------------------
-
-  handleSignal(sig: Signal): void {
-    const from = sig.from;
-    if (!from || from === this.myId || !this.room) {
-      return;
-    }
-    switch (sig.kind) {
-      case "join": {
-        if (!this.active) {
-          return;
-        }
-        // Creating the peer adds a transceiver, which fires
-        // negotiationneeded and sends our offer to the newcomer.
-        const peer = this.ensurePeer(from);
-        peer.mic = this.payloadMic(sig.payload);
-        // Tell the newcomer our mic state (they missed our join).
-        this.send(from, "state", { mic: this.state.micOn });
-        this.emit();
-        return;
-      }
-      case "leave":
-        this.removePeer(from);
-        this.emit();
-        return;
-      case "state": {
-        if (!this.active) {
-          return;
-        }
-        // Only peers in voice send state. A newcomer receives the existing
-        // peers' state before their offers arrive, so create the connection
-        // here too; a resulting offer collision is resolved by perfect
-        // negotiation.
-        const peer = this.ensurePeer(from);
-        peer.mic = this.payloadMic(sig.payload);
-        this.emit();
-        return;
-      }
-      case "offer":
-      case "answer": {
-        if (!this.active) {
-          return;
-        }
-        const peer = this.ensurePeer(from);
-        void this.handleDescription(
-          peer,
-          sig.payload as RTCSessionDescriptionInit
-        );
-        return;
-      }
-      case "ice": {
-        const peer = this.peers.get(from);
-        if (!peer) {
-          return;
-        }
-        const list = (sig.payload as { candidates?: RTCIceCandidateInit[] })
-          ?.candidates;
-        if (!Array.isArray(list)) {
-          return;
-        }
-        list.forEach((candidate) => {
-          void peer.pc.addIceCandidate(candidate).catch((err) => {
-            // Candidates for an offer we ignored (collision) are expected
-            // to fail; anything else is worth a log line.
-            if (!peer.ignoreOffer) {
-              console.warn("voice: addIceCandidate", err);
-            }
-          });
-        });
-        return;
-      }
-    }
-  }
-
-  private payloadMic(payload: unknown): boolean {
-    return !!(payload as { mic?: boolean } | undefined)?.mic;
-  }
-
-  // ---- peer connections -----------------------------------------------
-
-  private ensurePeer(id: string): Peer {
-    const existing = this.peers.get(id);
-    if (existing) {
-      return existing;
-    }
-    this.requestIceServers();
-    const pc = new RTCPeerConnection({ iceServers: this.currentIceServers() });
-    const transceiver = pc.addTransceiver("audio", {
-      direction: this.micTrack ? "sendrecv" : "recvonly",
-    });
-    const peer: Peer = {
-      id,
-      pc,
-      transceiver,
-      // Deterministic and opposite on the two ends.
-      polite: (this.myId ?? "") > id,
-      makingOffer: false,
-      ignoreOffer: false,
-      audio: null,
-      pendingIce: [],
-      iceTimer: null,
-      mic: false,
-      connected: false,
-    };
-    this.peers.set(id, peer);
-
-    if (this.micTrack) {
-      void transceiver.sender.replaceTrack(this.micTrack).catch(() => {});
-    }
-
-    pc.onnegotiationneeded = () => {
-      void this.makeOffer(peer);
-    };
-    pc.onicecandidate = (e) => {
-      if (e.candidate) {
-        peer.pendingIce.push(e.candidate.toJSON());
-        if (!peer.iceTimer) {
-          peer.iceTimer = setTimeout(() => this.flushIce(peer), ICE_BATCH_MS);
-        }
-      } else {
-        this.flushIce(peer);
-      }
-    };
-    pc.ontrack = (e) => {
-      const stream = e.streams[0] ?? new MediaStream([e.track]);
-      this.attachAudio(peer, stream);
-    };
-    pc.onconnectionstatechange = () => {
-      peer.connected = pc.connectionState === "connected";
-      if (pc.connectionState === "failed") {
-        // Try an ICE restart before giving up (e.g. a network change).
-        if (typeof pc.restartIce === "function") {
-          pc.restartIce();
-        }
-      }
-      this.emit();
-    };
-    return peer;
-  }
-
-  private async makeOffer(peer: Peer) {
-    const pc = peer.pc;
-    try {
-      peer.makingOffer = true;
-      const offer = await pc.createOffer();
-      // A remote offer may have arrived while we were creating ours; the
-      // collision is then resolved by handleDescription, not here.
-      if (pc.signalingState !== "stable") {
-        return;
-      }
-      await pc.setLocalDescription(offer);
-      if (pc.localDescription) {
-        this.send(peer.id, "offer", pc.localDescription.toJSON());
-      }
-    } catch (err) {
-      console.warn("voice: offer", err);
-    } finally {
-      peer.makingOffer = false;
-    }
-  }
-
-  private async handleDescription(peer: Peer, desc: RTCSessionDescriptionInit) {
-    const pc = peer.pc;
-    if (!desc || (desc.type !== "offer" && desc.type !== "answer")) {
-      return;
-    }
-    const collision =
-      desc.type === "offer" &&
-      (peer.makingOffer || pc.signalingState !== "stable");
-    peer.ignoreOffer = !peer.polite && collision;
-    if (peer.ignoreOffer) {
-      // The impolite side keeps its own offer; the polite side will roll
-      // back and answer ours.
-      return;
-    }
-    try {
-      if (collision) {
-        // Polite side: drop our pending offer, then accept theirs.
-        await pc.setLocalDescription({ type: "rollback" });
-      }
-      await pc.setRemoteDescription(desc);
-      if (desc.type === "offer") {
-        const answer = await pc.createAnswer();
-        await pc.setLocalDescription(answer);
-        if (pc.localDescription) {
-          this.send(peer.id, "answer", pc.localDescription.toJSON());
-        }
-      }
-    } catch (err) {
-      console.warn("voice: description", err);
-    }
-  }
-
-  private flushIce(peer: Peer) {
-    if (peer.iceTimer) {
-      clearTimeout(peer.iceTimer);
-      peer.iceTimer = null;
-    }
-    if (peer.pendingIce.length === 0) {
-      return;
-    }
-    const candidates = peer.pendingIce;
-    peer.pendingIce = [];
-    this.send(peer.id, "ice", { candidates });
-  }
-
-  private removePeer(id: string) {
-    const peer = this.peers.get(id);
-    if (!peer) {
-      return;
-    }
-    this.peers.delete(id);
-    if (peer.iceTimer) {
-      clearTimeout(peer.iceTimer);
-    }
-    peer.pc.onnegotiationneeded = null;
-    peer.pc.onicecandidate = null;
-    peer.pc.ontrack = null;
-    peer.pc.onconnectionstatechange = null;
-    try {
-      peer.pc.close();
-    } catch {
-      // already closed
-    }
-    if (peer.audio) {
-      peer.audio.pause();
-      peer.audio.srcObject = null;
-      peer.audio.remove();
-      peer.audio = null;
-    }
-  }
-
-  private teardownPeers() {
-    Array.from(this.peers.keys()).forEach((id) => this.removePeer(id));
-    this.audioHost?.remove();
-    this.audioHost = null;
-  }
-
-  // ---- playback -------------------------------------------------------
-
-  private attachAudio(peer: Peer, stream: MediaStream) {
-    if (typeof document === "undefined") {
-      return;
-    }
-    if (!this.audioHost) {
-      this.audioHost = document.createElement("div");
-      this.audioHost.setAttribute("data-voice-audio", "");
-      this.audioHost.style.display = "none";
-      document.body.appendChild(this.audioHost);
-    }
-    if (!peer.audio) {
-      const audio = document.createElement("audio");
-      audio.setAttribute("playsinline", "");
-      this.audioHost.appendChild(audio);
-      peer.audio = audio;
-    }
-    peer.audio.srcObject = stream;
-    this.applyOutputToPeer(peer);
-  }
-
-  private applyOutputToPeer(peer: Peer) {
-    if (!peer.audio) {
-      return;
-    }
-    peer.audio.muted = !this.state.speakerOn || this.isPeerMuted(peer.id);
-    peer.audio.volume = this.state.outputVolume;
-    if (peer.audio.muted) {
-      peer.audio.pause();
-    } else {
-      void peer.audio.play().catch(() => {
-        // The next speaker toggle retries if autoplay was blocked.
-      });
-    }
-  }
-
   // ---- microphone -----------------------------------------------------
+
+  /** Publish the processed mic track to LiveKit (no-op while disconnected). */
+  private async publishMic() {
+    const room = this.lk;
+    if (
+      !this.micTrack ||
+      this.published ||
+      !room ||
+      room.state !== ConnectionState.Connected
+    ) {
+      return;
+    }
+    // We own the track (custom WebAudio chain): LiveKit must not manage it.
+    // The graph's AudioContext travels with it because livekit-client refuses
+    // to set up a processor on a track that has none.
+    const local = new LocalAudioTrack(
+      this.micTrack,
+      undefined,
+      true,
+      this.micCtx ?? undefined
+    );
+    this.published = local;
+    // Attach the AI filter before the track goes out — LiveKit then creates
+    // the sender from processedTrack, so the first audio is already cleaned.
+    if (this.state.noiseCancellation) {
+      const attached = await this.attachKrisp(local);
+      // Browser suppression was left off at capture time in anticipation of
+      // the model; re-apply the constraints either way so the hardware track
+      // matches whatever is actually in the chain.
+      void this.applyCaptureConstraints().catch(() => {});
+      if (!attached) {
+        this.emit({
+          noiseCancellation: false,
+          error: "noiseCancellationFailed",
+        });
+        this.persist();
+      }
+    }
+    try {
+      await room.localParticipant.publishTrack(local, {
+        source: Track.Source.Microphone,
+      });
+    } catch (err) {
+      if (this.published === local) {
+        this.published = null;
+      }
+      console.warn("voice: publish mic", err);
+    }
+  }
+
+  /** Stop publishing (and stop sending) our mic. */
+  private unpublishMic() {
+    const room = this.lk;
+    const track = this.published;
+    this.published = null;
+    if (room && track) {
+      try {
+        room.localParticipant.unpublishTrack(track, true);
+      } catch {
+        // room already gone
+      }
+    }
+  }
 
   private async startMic(request: number): Promise<boolean> {
     if (this.micTrack) {
@@ -839,9 +1004,10 @@ class VoiceManager {
     try {
       // Echo cancellation, noise suppression and automatic gain are the
       // browser's own WebRTC audio processing (Chrome: AEC3); we only ask
-      // for them. Echo cancellation is user-toggleable (Settings).
+      // for them. Echo cancellation is user-toggleable (Settings), and noise
+      // suppression steps aside when the AI filter is doing the job.
       raw = await navigator.mediaDevices.getUserMedia({
-        audio: this.micConstraints(echoCancellation),
+        audio: this.micConstraints(),
         video: false,
       });
     } catch {
@@ -860,7 +1026,7 @@ class VoiceManager {
     this.rawStream = raw;
     const rawTrack = raw.getAudioTracks()[0];
     if (!rawTrack) {
-      this.stopMic();
+      this.releaseMic();
       this.emit({ error: "micDenied" });
       return false;
     }
@@ -921,7 +1087,7 @@ class VoiceManager {
       while (echoCancellation !== this.state.echoCancellation) {
         echoCancellation = this.state.echoCancellation;
         await rawTrack.applyConstraints({
-          ...this.micConstraints(echoCancellation),
+          ...this.micConstraints(),
           echoCancellation: { exact: echoCancellation },
         });
         if (request !== this.micRequest) {
@@ -930,19 +1096,22 @@ class VoiceManager {
       }
     } catch {
       if (request === this.micRequest) {
-        this.stopMic();
+        this.releaseMic();
         this.emit({ error: "voiceSettingsFailed" });
       }
       return false;
     }
     this.micEchoCancellation = echoCancellation;
     void resumeAudioContext(this.micCtx);
+    // LiveKit publish happens after connectRoom too, in case the room was
+    // not up yet; here it covers the mic-first, connect-later order.
+    void this.publishMic();
     return true;
   }
 
   /** Release the microphone hardware and the processing graph. */
   private releaseMic() {
-    this.echoChange = Promise.resolve();
+    this.captureChange = Promise.resolve();
     if (this.rawStream) {
       this.rawStream.getTracks().forEach((t) => t.stop());
       this.rawStream = null;
@@ -959,24 +1128,6 @@ class VoiceManager {
       this.micCtx = null;
     }
     this.micGain = null;
-  }
-
-  /** Release the mic and stop sending to every peer (direction → recvonly). */
-  private stopMic() {
-    this.releaseMic();
-    this.peers.forEach((p) => this.applyMicToPeer(p));
-  }
-
-  private applyMicToPeer(peer: Peer) {
-    const tr = peer.transceiver;
-    void tr.sender.replaceTrack(this.micTrack).catch(() => {});
-    // Changing the direction renegotiates (onnegotiationneeded → offer).
-    const direction: RTCRtpTransceiverDirection = this.micTrack
-      ? "sendrecv"
-      : "recvonly";
-    if (tr.direction !== direction) {
-      tr.direction = direction;
-    }
   }
 }
 

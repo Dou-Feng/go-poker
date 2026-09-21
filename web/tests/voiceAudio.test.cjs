@@ -37,6 +37,8 @@ function harness(options = {}) {
   const contexts = [],
     tracks = [],
     elements = [],
+    rooms = [],
+    localTracks = [],
     peers = [],
     timers = [],
     captures = [],
@@ -126,15 +128,93 @@ function harness(options = {}) {
       return { stream: stream() };
     }
   }
+  // Minimal livekit-client stub: a fake Room that records what voice.ts
+  // publishes and lets tests drive participants/tracks by emitting events.
+  class FakeRoom {
+    constructor(opts) {
+      this.opts = opts;
+      this.state = "disconnected";
+      this.handlers = new Map();
+      this.remoteParticipants = new Map();
+      this.localParticipant = {
+        published: [],
+        unpublished: [],
+        publishTrack(track, pubOpts) {
+          this.published.push({ track, opts: pubOpts });
+          return Promise.resolve();
+        },
+        unpublishTrack(track, stop) {
+          this.unpublished.push({ track, stop });
+        },
+      };
+      rooms.push(this);
+    }
+    on(ev, fn) {
+      if (!this.handlers.has(ev)) this.handlers.set(ev, []);
+      this.handlers.get(ev).push(fn);
+      return this;
+    }
+    emit(ev, ...args) {
+      for (const fn of this.handlers.get(ev) ?? []) fn(...args);
+    }
+    async connect(url, token) {
+      this.state = "connecting";
+      await Promise.resolve();
+      this.url = url;
+      this.token = token;
+      this.state = "connected";
+    }
+    disconnect() {
+      this.state = "disconnected";
+      this.emit("disconnected");
+    }
+  }
+  const livekit = {
+    Room: FakeRoom,
+    LocalAudioTrack: class LocalAudioTrack {
+      constructor(mediaTrack, constraints, userProvided, audioContext) {
+        this.mediaTrack = mediaTrack;
+        this.constraints = constraints;
+        this.userProvided = userProvided;
+        this.audioContext = audioContext;
+        this.processor = null;
+        this.stoppedProcessor = false;
+        localTracks.push(this);
+      }
+      async setProcessor(processor) {
+        if (options.processor === false) throw new Error("processor failed");
+        this.processor = processor;
+      }
+      async stopProcessor() {
+        this.processor = null;
+        this.stoppedProcessor = true;
+      }
+    },
+    RoomEvent: {
+      ParticipantConnected: "participantConnected",
+      ParticipantDisconnected: "participantDisconnected",
+      TrackSubscribed: "trackSubscribed",
+      TrackUnsubscribed: "trackUnsubscribed",
+      TrackMuted: "trackMuted",
+      TrackUnmuted: "trackUnmuted",
+      Disconnected: "disconnected",
+    },
+    Track: {
+      Kind: { Audio: "audio", Video: "video" },
+      Source: { Microphone: "microphone" },
+    },
+    ConnectionState: {
+      Disconnected: "disconnected",
+      Connecting: "connecting",
+      Connected: "connected",
+      Reconnecting: "reconnecting",
+    },
+  };
+  // voice.ts only checks that the constructor exists to decide WebRTC
+  // support; the fake Room plays the part of the real transport.
   class RTCPeerConnection {
     constructor() {
       peers.push(this);
-    }
-    addTransceiver() {
-      return {
-        direction: "recvonly",
-        sender: { replaceTrack: async () => {} },
-      };
     }
     close() {
       this.closed = true;
@@ -203,7 +283,12 @@ function harness(options = {}) {
       RTCPeerConnection,
       process: { env: {} },
       console,
-      setTimeout,
+      // Timers are recorded AND scheduled: tests can fire a pending retry
+      // immediately without waiting out the real delay.
+      setTimeout: (fn, ms) => {
+        timers.push(fn);
+        return setTimeout(fn, ms);
+      },
       clearTimeout,
       fetch: () =>
         options.fetch?.promise ??
@@ -214,7 +299,31 @@ function harness(options = {}) {
       require: (id) =>
         id === "./sfx"
           ? modules.sfx
-          : { getIceServers() {}, sendVoiceSignal() {} },
+          : id === "livekit-client"
+          ? livekit
+          : id === "@livekit/krisp-noise-filter"
+          ? {
+              isKrispNoiseFilterSupported: () =>
+                options.krispSupported !== false,
+              // Mirrors the real plugin: the filter only actually runs once
+              // setEnabled(true) is called (the SDK does that from its
+              // onPublish hook, which voice.ts cannot rely on when the
+              // processor is attached after publishing).
+              KrispNoiseFilter: () => ({
+                name: "livekit-noise-filter",
+                enabled: false,
+                isEnabled() {
+                  return this.enabled;
+                },
+                async setEnabled(on) {
+                  if (options.krispEnableFails) {
+                    throw new Error("krisp enable failed");
+                  }
+                  this.enabled = on;
+                },
+              }),
+            }
+          : { getLiveKitToken() {} },
     });
     modules[name] = exports;
   }
@@ -226,6 +335,8 @@ function harness(options = {}) {
     contexts,
     tracks,
     elements,
+    rooms,
+    localTracks,
     peers,
     timers,
     storage,
@@ -268,14 +379,38 @@ test("turning off the mic restores normal audio while game sounds keep playing",
   assert.equal(h.storage.get("gopoker-bgm-volume"), "0.07");
 });
 
-test("turning off listening pauses remote audio, and leaving detaches media and closes peers", async () => {
+test("speaker toggles pause remote audio, and leaving detaches media and disconnects the room", async () => {
   const h = harness();
+  h.voice.setLiveKitToken("ws://lk", "tok", 3600);
   await h.voice.setMic(true);
   h.voice.setSpeaker(true);
-  h.voice.handleSignal({ from: "other", kind: "join", payload: { mic: true } });
-  h.peers[0].ontrack({ streams: [h.stream()] });
+  await flush();
+  const room = h.rooms[0];
+  assert.equal(room.state, "connected");
+  assert.equal(room.localParticipant.published.length, 1);
+  assert.equal(room.localParticipant.published[0].opts.source, "microphone");
+  const participant = {
+    identity: "other",
+    getTrackPublication: () => ({ isMuted: false }),
+  };
+  room.emit("participantConnected", participant);
+  room.emit(
+    "trackSubscribed",
+    {
+      kind: "audio",
+      attach: (el) => {
+        el.srcObject = { remote: true };
+      },
+      detach: (el) => {
+        el.srcObject = null;
+      },
+    },
+    { kind: "audio" },
+    participant
+  );
   const audio = h.elements.find((e) => e.tag === "audio");
   assert.equal(audio.paused, false);
+  assert.equal(h.voice.getState().peers.other.mic, true);
   h.voice.setSpeaker(false);
   assert.equal(audio.paused, true);
   assert.equal(h.session.type, "play-and-record");
@@ -286,7 +421,9 @@ test("turning off listening pauses remote audio, and leaving detaches media and 
   assert.equal(audio.paused, true);
   assert.equal(audio.srcObject, null);
   assert.equal(audio.removed, true);
-  assert.ok(h.peers.every((p) => p.closed));
+  assert.equal(room.state, "disconnected");
+  assert.ok(room.localParticipant.unpublished.length >= 1);
+  assert.ok(h.tracks.every((t) => t.stopped));
   assert.equal(h.session.type, "ambient");
 });
 
@@ -530,4 +667,114 @@ test("mic boost can exceed unity, persists across reload, and never amplifies ga
   assert.equal(mic.gains[0].gain.value, 3);
   h.voice.setMicVolume(0);
   assert.equal(mic.gains[0].gain.value, 0);
+});
+
+test("AI noise cancellation replaces browser noise suppression on the published track", async () => {
+  const h = harness();
+  h.voice.setLiveKitToken("ws://lk", "tok", 3600);
+  await h.voice.setMic(true);
+  await flush();
+
+  // Off by default: the browser's own suppression does the work.
+  assert.equal(h.voice.getState().noiseCancellation, false);
+  assert.equal(h.captures[0].audio.noiseSuppression, true);
+  const track = h.localTracks[0];
+  assert.equal(track.processor, null);
+
+  await h.voice.setNoiseCancellation(true);
+  await flush();
+
+  // The model is attached to the published track and the hardware track
+  // stops suppressing (two stages at once would smear speech).
+  assert.equal(h.voice.getState().noiseCancellation, true);
+  assert.equal(track.processor.name, "livekit-noise-filter");
+  assert.equal(track.processor.isEnabled(), true);
+  assert.equal(h.constraints.at(-1).noiseSuppression, false);
+  assert.equal(h.constraints.at(-1).autoGainControl, true);
+  assert.equal(
+    JSON.parse(h.storage.get("gopoker-voice")).noiseCancellation,
+    true
+  );
+
+  await h.voice.setNoiseCancellation(false);
+  await flush();
+  assert.equal(track.processor, null);
+  assert.equal(track.stoppedProcessor, true);
+  assert.equal(h.constraints.at(-1).noiseSuppression, true);
+  assert.equal(
+    JSON.parse(h.storage.get("gopoker-voice")).noiseCancellation,
+    false
+  );
+});
+
+test("AI noise cancellation applied at capture time skips browser suppression", async () => {
+  const h = harness({ settings: { noiseCancellation: true } });
+  h.voice.setLiveKitToken("ws://lk", "tok", 3600);
+  assert.equal(h.voice.getState().noiseCancellation, true);
+  await h.voice.setMic(true);
+  await flush();
+
+  // No second, browser-side suppression while the model is in the chain.
+  assert.equal(h.captures[0].audio.noiseSuppression, false);
+  assert.equal(h.captures[0].audio.echoCancellation, false);
+  assert.equal(h.captures[0].audio.autoGainControl, true);
+  assert.equal(h.localTracks[0].processor.name, "livekit-noise-filter");
+  assert.equal(h.localTracks[0].processor.isEnabled(), true);
+});
+
+test("unsupported or failing AI noise cancellation reverts and keeps the mic usable", async () => {
+  for (const options of [
+    { krispSupported: false },
+    { processor: false },
+    { krispEnableFails: true },
+  ]) {
+    const h = harness(options);
+    h.voice.setLiveKitToken("ws://lk", "tok", 3600);
+    await h.voice.setMic(true);
+    await flush();
+    await h.voice.setNoiseCancellation(true);
+    await flush();
+
+    assert.equal(h.voice.getState().noiseCancellation, false);
+    assert.equal(h.voice.getState().error, "noiseCancellationFailed");
+    assert.equal(h.voice.getState().micOn, true);
+    // Browser suppression is back on, so the mic is never left unhandled.
+    assert.equal(h.constraints.at(-1).noiseSuppression, true);
+    assert.equal(
+      JSON.parse(h.storage.get("gopoker-voice")).noiseCancellation,
+      false
+    );
+    if (options.krispEnableFails) {
+      // A processor that could not be enabled is removed again instead of
+      // sitting half-installed in the chain.
+      assert.equal(h.localTracks.at(-1).processor, null);
+    }
+  }
+});
+
+test("a microphone re-published after an unexpected disconnect is published again", async () => {
+  const h = harness();
+  h.voice.setLiveKitToken("ws://lk", "tok", 3600);
+  await h.voice.setMic(true);
+  await flush();
+  const room = h.rooms[0];
+  assert.equal(room.localParticipant.published.length, 1);
+
+  // The LiveKit connection dies (network blip, server restart, duplicate
+  // identity from another tab); the room object is discarded and a fresh one
+  // is created on the retry.
+  room.emit("disconnected", room);
+  assert.equal(h.voice.getState().micOn, true);
+  h.timers.forEach((fn) => fn());
+  await flush();
+  await flush();
+
+  const revived = h.rooms.at(-1);
+  assert.notEqual(revived, room);
+  assert.equal(revived.state, "connected");
+  assert.equal(
+    revived.localParticipant.published.length,
+    1,
+    "the mic must be published on the new connection"
+  );
 });

@@ -381,10 +381,6 @@ func (t *table) unregisterClient(client *Client) {
 		go t.broadcastGame()
 	}
 
-	if wasMember {
-		t.announceVoiceLeave(client)
-	}
-
 	if empty && t.emptyTimer == nil {
 		t.emptyTimer = time.AfterFunc(emptyTableTTL, func() {
 			if t.hub != nil {

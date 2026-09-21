@@ -18,8 +18,8 @@ const (
 	writeWait  = 10 * time.Second
 	pongWait   = 60 * time.Second
 	pingPeriod = (pongWait * 9) / 10
-	// maxMessageSize bounds one inbound frame. Game messages are a few hundred
-	// bytes; a WebRTC SDP offer/answer relayed for voice chat is 2–8 KiB.
+	// maxMessageSize bounds one inbound frame. Game and chat messages are a
+	// few hundred bytes; the bound also absorbs rapid-fire UI actions.
 	maxMessageSize = 16 * 1024
 )
 
@@ -583,21 +583,13 @@ func (c *Client) processEvents(rawMessage []byte) error {
 		c.send <- createPong()
 		return nil
 
-	case actionVoiceSignal:
-		var sig voiceSignal
-		err := json.Unmarshal(rawMessage, &sig)
-		if err != nil {
-			return err
-		}
-		return handleVoiceSignal(c, sig)
-
-	case actionGetIceServers:
-		var req getIceServers
+	case actionGetLiveKitToken:
+		var req getLiveKitToken
 		err := json.Unmarshal(rawMessage, &req)
 		if err != nil {
 			return err
 		}
-		handleGetIceServers(c, req.Host)
+		handleGetLiveKitToken(c)
 		return nil
 
 	case actionGetSession:
@@ -651,7 +643,7 @@ func actionNeedsTable(action string) bool {
 		actionVoteSettle, actionShowHand, actionSpectate, actionTakeSeat,
 		actionStartGame, actionResetGame, actionDealGame, actionPlayerCall,
 		actionPlayerCheck, actionPlayerRaise, actionPlayerFold, actionAddBot,
-		actionRemoveBot, actionVoiceSignal:
+		actionRemoveBot, actionGetLiveKitToken:
 		return true
 	default:
 		return false

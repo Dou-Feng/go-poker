@@ -253,6 +253,11 @@ export const translations = {
     echoCancellation: "Echo cancellation",
     echoCancellationHint:
       "Browser acoustic echo cancellation. Keep on with speakers; try off with a headset if your voice sounds clipped.",
+    noiseCancellation: "AI noise cancellation",
+    noiseCancellationHint:
+      "Filters keyboard, fans and background chatter with a local speech model (downloaded on first use, runs on this device). Replaces the browser's own noise suppression.",
+    noiseCancellationFailed:
+      "Could not start AI noise cancellation — browser noise suppression is still on",
     on: "On",
     off: "Off",
     more: "More",
@@ -287,6 +292,7 @@ export const translations = {
     micNeedsHttps:
       "microphone needs a secure page — open the site over https (listening still works)",
     voiceUnsupported: "voice chat is not supported in this browser",
+    voiceUnavailable: "voice chat is unavailable on this server",
     isFriend: "friends",
   },
   zh: {
@@ -537,6 +543,10 @@ export const translations = {
     echoCancellation: "回声消除",
     echoCancellationHint:
       "浏览器自带的声学回声消除。用外放请保持开启；戴耳机时若声音被削可尝试关闭。",
+    noiseCancellation: "AI 降噪",
+    noiseCancellationHint:
+      "本地语音模型过滤键盘声、风扇与背景人声（首次开启时下载，在本机运行）。会取代浏览器自带的降噪。",
+    noiseCancellationFailed: "AI 降噪启动失败，已继续使用浏览器降噪",
     on: "开",
     off: "关",
     more: "更多",
@@ -569,6 +579,7 @@ export const translations = {
     micNeedsHttps:
       "麦克风需要 https 页面 — 请用 https 打开本站（收听不受影响）",
     voiceUnsupported: "当前浏览器不支持语音",
+    voiceUnavailable: "此服务器未开启语音功能",
     isFriend: "已是好友",
   },
 } as const;

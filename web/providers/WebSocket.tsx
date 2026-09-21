@@ -392,13 +392,14 @@ export function SocketProvider(props: SocketProviderProps) {
               payload: (event.session ?? null) as SessionRecord | null,
             });
             return;
-          case "voice-signal":
-            // Peer-to-peer voice chat signalling relayed by the server; it
-            // never touches the app store.
-            voice.handleSignal(event);
-            return;
-          case "ice-servers":
-            voice.setIceServers(event.servers ?? [], event.ttl ?? 0);
+          case "livekit-token":
+            // LiveKit access token for in-room voice chat; it never touches
+            // the app store (see lib/voice.ts and backend/server/livekit.go).
+            voice.setLiveKitToken(
+              event.url ?? "",
+              event.token ?? "",
+              event.ttl ?? 0
+            );
             return;
           case "settlement":
             dispatch({

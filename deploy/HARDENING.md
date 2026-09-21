@@ -118,40 +118,62 @@ Aliyun Anti-DDoS, ...). They terminate TLS and proxy WebSockets; then run the
 app with TLS off, `TRUST_PROXY=true`, and restrict the origin firewall to the
 provider's IP ranges so attackers cannot bypass the CDN.
 
-## 5. Voice chat ports (coturn)
+## 5. Voice chat ports (LiveKit)
 
-In-room voice is WebRTC between browsers. Without any STUN/TURN it only works
-between players who can reach each other directly (same LAN). For players on
-different networks, enable the bundled coturn (`COMPOSE_PROFILES=voice` and
-`TURN_SECRET` in `.env`); it runs with `network_mode: host` so no third-party
-service is involved. It needs, in addition to 80/443:
+In-room voice runs on a self-hosted LiveKit SFU: every browser sends and
+receives audio through it instead of peer-to-peer. Enable the bundled service
+(`COMPOSE_PROFILES=voice` plus `LIVEKIT_API_KEY`/`LIVEKIT_API_SECRET` in
+`.env`); it runs with `network_mode: host` so no third-party service is
+involved. It needs, in addition to 80/443:
 
 | Port | Protocol | Purpose |
 |---|---|---|
-| `TURN_PORT` (3478) | UDP + TCP | STUN binding requests and TURN control |
-| `TURN_MIN_PORT`–`TURN_MAX_PORT` (49160–49200) | UDP | Relayed media |
+| 7880 | TCP | WebSocket signalling — this is the `LIVEKIT_URL` browsers connect to |
+| 7881 | TCP | ICE/TCP fallback for networks that block UDP |
+| `LIVEKIT_UDP_MIN_PORT`–`LIVEKIT_UDP_MAX_PORT` (50000–50100) | UDP | Media (audio) relay |
 
-Only authenticated players can allocate a relay: the game server mints
-credentials from `TURN_SECRET` (coturn `--use-auth-secret`) with a 24 h expiry
-(`TURN_TTL_HOURS`) bound to the account, and coturn is started with quotas and
-`--denied-peer-ip` for every private range, so the relay cannot be used as a
-pivot into the docker network or the LAN. coturn refuses to start without a
-`TURN_SECRET`. With nftables add:
+Only token holders may join: the game server mints short-lived access tokens
+from the API key pair (`LIVEKIT_TOKEN_TTL_HOURS`, 6 h default) bound to the
+account and the poker room (`gopoker-<tablename>`), restricted to microphone
+publish/subscribe — no data channels, no anonymous use. livekit-server refuses
+to start without the key pair, and enforces a secret of at least 32
+characters.
+
+**TLS is not optional when the game page is https.** Browsers block `ws://`
+from a secure page (mixed content), and livekit-server cannot terminate TLS
+itself — its config parser rejects a `tls:` block (verified against v1.13.7).
+Two ways to get `wss://`:
+
+1. The bundled Caddy proxy: add `voice-tls` to `COMPOSE_PROFILES`, set
+   `TLS_CERT_FILE`/`TLS_KEY_FILE` (the app's own certificate is reused; `./certs`
+   is mounted into the proxy at the same path), open `LIVEKIT_PROXY_PORT`
+   (7443 by default) and set `LIVEKIT_URL=wss://<domain>:7443`.
+2. A reverse proxy the host already runs (nginx, Caddy, Cloudflare Tunnel):
+   proxy the SFU there with a plain WebSocket passthrough — see the snippet in
+   `.env.example`. If your stack is behind such a proxy, do this instead of
+   publishing another port.
+
+TLS covers signalling only: the browser still sends audio to the UDP range
+above, so those ports must stay open even with `wss://`.
+
+With nftables add:
 
 ```nft
-    udp dport 3478 accept
-    tcp dport 3478 ct state new limit rate 30/second burst 60 packets accept
-    udp dport 49160-49200 accept
+    tcp dport 7880 ct state new limit rate 30/second burst 60 packets accept
+    tcp dport 7881 accept
+    tcp dport 7443 ct state new limit rate 30/second burst 60 packets accept
+    udp dport 50000-50100 accept
 ```
 
-If the host is a cloud VM behind 1:1 NAT, set `TURN_EXTERNAL_IP=public/private`
-so relay candidates carry the public address.
+For a cloud VM behind 1:1 NAT keep `LIVEKIT_USE_EXTERNAL_IP=true` (the default
+for a hostname `LIVEKIT_URL`; `deploy/livekit-entrypoint.sh` derives it) so ICE
+candidates carry the public address.
 
 ## 6. Checklist for a public host
 
 1. `.env`: `TLS_DOMAINS` or cert files; `ALLOWED_ORIGINS=https://your.domain`.
 2. Strong `REDIS_PASSWORD`; Redis is not published to the host (compose keeps
-   it on the internal network only). Strong `TURN_SECRET` if voice relay is on.
+   it on the internal network only). Strong `LIVEKIT_API_SECRET` if voice is on.
 3. `deploy/sysctl-hardening.conf` installed; firewall allows only 80/443 (+22)
    plus, with the `voice` profile, the ports in section 5.
 4. Keep the image updated (`./deploy.sh` or `docker compose pull && up -d`).

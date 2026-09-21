@@ -12,6 +12,16 @@ services:
     environment:
       PORT: "3000"
       REDIS_URL: ${REDIS_URL}
+      # Passed through as real environment variables, not read from the
+      # mounted .env: a bind-mounted *file* is pinned to the inode it had when
+      # the container started, so editing .env on the host (editors save via
+      # rename) leaves the container reading a deleted inode — "I/O error",
+      # and every setting added afterwards is invisible until the container is
+      # recreated. godotenv does not override these.
+      LIVEKIT_API_KEY: ${LIVEKIT_API_KEY:-}
+      LIVEKIT_API_SECRET: ${LIVEKIT_API_SECRET:-}
+      LIVEKIT_URL: ${LIVEKIT_URL:-}
+      LIVEKIT_TOKEN_TTL_HOURS: ${LIVEKIT_TOKEN_TTL_HOURS:-6}
     volumes:
       - ./backend:/app
       - ./.env:/app/.env
@@ -30,58 +40,86 @@ services:
       # 头像上传/读取接口直连后端 3000（Next dev 不会代理 /api/*）
       NEXT_PUBLIC_API_BASE: ${NEXT_PUBLIC_API_BASE:-http://localhost:3000}
       WATCHPACK_POLLING: "true"
+      # npm_config_* 前缀的环境变量会被 npm 自己读取，因此这里配一次即可覆盖
+      # 本容器的所有 npm 调用（npm install / npm run）。注意：宿主 ~/.npmrc 里的
+      # 镜像不会进容器，容器默认走 registry.npmjs.org，国内装依赖会明显变慢。
+      npm_config_registry: ${NPM_REGISTRY:-https://registry.npmjs.org}
+      npm_config_audit: "false"
+      npm_config_fund: "false"
     ports:
       - "8080:8080"
     volumes:
       - ./web:/app
       - web_node_modules:/app/node_modules
+      # npm 的下载缓存：容器重建（compose up）后依然保留，避免重新下载全部依赖。
+      - npmcache:/root/.npm
     depends_on:
       - go-poker
 
-  # STUN/TURN for in-room voice chat (WebRTC) — OPT-IN. Enable it with
-  # COMPOSE_PROFILES=voice in .env (or `docker compose --profile voice up`).
-  # Without it voice still works between players who can reach each other
-  # directly (same LAN / Wi-Fi); players behind different NATs need this:
-  # STUN lets browsers learn their public address, TURN relays audio when a
-  # direct path is impossible. Authentication is coturn's shared-secret
-  # scheme: the Go server knows TURN_SECRET too and mints per-player,
-  # time-limited credentials (backend/server/turn.go), so the relay is never
-  # open to anonymous use.
-  coturn:
-    image: coturn/coturn:4.6-alpine
-    container_name: go-poker-coturn-hot
+  # LiveKit SFU for in-room voice chat — OPT-IN, replaces the former coturn
+  # STUN/TURN relay. Enable it with COMPOSE_PROFILES=voice in .env (or
+  # `docker compose --profile voice up`). All voice audio flows through this
+  # server instead of browser-to-browser peer connections; the Go server only
+  # mints the short-lived access tokens (get-livekit-token,
+  # backend/server/livekit.go) from the shared LIVEKIT_API_KEY/SECRET pair.
+  # Host networking means the SFU shares the host's ports: 7880 (websocket
+  # signalling, this is what browsers' LIVEKIT_URL points at), 7881/tcp
+  # fallback and the UDP media range from .env.
+  livekit:
+    image: livekit/livekit-server:latest
+    container_name: go-poker-livekit-hot
     restart: unless-stopped
     profiles: ["voice"]
-    # Host networking (Linux only): the relay hands out a UDP port range and
-    # must advertise the host's real address; publishing the range through
-    # the docker bridge is slow and would expose the container's private IP.
-    network_mode: host
+    ports:
+      - "${LIVEKIT_PORT:-7880}:7880"       # websocket signalling (LIVEKIT_URL)
+      - "${LIVEKIT_TCP_PORT:-7881}:7881"   # ICE/TCP fallback where UDP is blocked
+      - "${LIVEKIT_UDP_MIN_PORT:-50000}-${LIVEKIT_UDP_MAX_PORT:-50100}:${LIVEKIT_UDP_MIN_PORT:-50000}-${LIVEKIT_UDP_MAX_PORT:-50100}/udp"
     environment:
-      TURN_SECRET: ${TURN_SECRET:-}
-      TURN_PORT: ${TURN_PORT:-3478}
-      TURN_MIN_PORT: ${TURN_MIN_PORT:-49160}
-      TURN_MAX_PORT: ${TURN_MAX_PORT:-49200}
-      TURN_REALM: ${TURN_REALM:-gopoker}
-      TURN_EXTERNAL_IP: ${TURN_EXTERNAL_IP:-}
-    # Refuses to start without a secret: an unauthenticated relay would be an
-    # open proxy. "$$" escapes compose interpolation so the shell inside the
-    # container expands the variables. --denied-peer-ip blocks every private
-    # range so the relay cannot be used as a pivot into the docker network or
-    # the LAN.
-    entrypoint: >
-      sh -c 'test -n "$$TURN_SECRET" || { echo "coturn: TURN_SECRET is not set in .env" >&2; exit 1; };
-      exec turnserver -n --log-file=stdout --no-cli --no-tls --no-dtls --fingerprint
-      --listening-port="$$TURN_PORT" --min-port="$$TURN_MIN_PORT" --max-port="$$TURN_MAX_PORT"
-      --realm="$$TURN_REALM" --use-auth-secret --static-auth-secret="$$TURN_SECRET"
-      --user-quota=12 --total-quota=300 --stale-nonce=600 --no-multicast-peers
-      --denied-peer-ip=0.0.0.0-0.255.255.255
-      --denied-peer-ip=10.0.0.0-10.255.255.255
-      --denied-peer-ip=100.64.0.0-100.127.255.255
-      --denied-peer-ip=127.0.0.0-127.255.255.255
-      --denied-peer-ip=169.254.0.0-169.254.255.255
-      --denied-peer-ip=172.16.0.0-172.31.255.255
-      --denied-peer-ip=192.168.0.0-192.168.255.255
-      $${TURN_EXTERNAL_IP:+--external-ip=$$TURN_EXTERNAL_IP}'
+      LIVEKIT_API_KEY: ${LIVEKIT_API_KEY:-}
+      LIVEKIT_API_SECRET: ${LIVEKIT_API_SECRET:-}
+      LIVEKIT_URL: ${LIVEKIT_URL:-}
+      LIVEKIT_PORT: ${LIVEKIT_PORT:-7880}
+      LIVEKIT_TCP_PORT: ${LIVEKIT_TCP_PORT:-7881}
+      LIVEKIT_UDP_MIN_PORT: ${LIVEKIT_UDP_MIN_PORT:-50000}
+      LIVEKIT_UDP_MAX_PORT: ${LIVEKIT_UDP_MAX_PORT:-50100}
+      # auto (default) derives the advertised address from LIVEKIT_URL;
+      # set LIVEKIT_USE_EXTERNAL_IP/LIVEKIT_NODE_IP to override.
+      LIVEKIT_USE_EXTERNAL_IP: ${LIVEKIT_USE_EXTERNAL_IP:-auto}
+      LIVEKIT_NODE_IP: ${LIVEKIT_NODE_IP:-}
+    entrypoint: ["/bin/sh", "/etc/livekit-entrypoint.sh"]
+    volumes:
+      - ./deploy/livekit-entrypoint.sh:/etc/livekit-entrypoint.sh:ro
+
+  # TLS endpoint for the SFU — OPT-IN, profile voice-tls (use
+  # COMPOSE_PROFILES=voice,voice-tls). Needed whenever the game page is served
+  # over https: the browser blocks ws:// from a secure page, and
+  # livekit-server cannot terminate TLS itself, so the SFU must sit behind a
+  # proxy. This one reuses ./certs at the same path the Go app uses, so
+  # TLS_CERT_FILE/TLS_KEY_FILE apply unchanged. Set the game server's
+  # LIVEKIT_URL to wss://<domain>:<LIVEKIT_PROXY_PORT>.
+  # If the host already runs a reverse proxy (nginx/Caddy/Cloudflare in front
+  # of the stack), add the equivalent WebSocket location there instead of
+  # enabling this service.
+  livekit-proxy:
+    image: caddy:2-alpine
+    container_name: go-poker-livekit-proxy-hot
+    restart: unless-stopped
+    profiles: ["voice-tls"]
+    ports:
+      - "${LIVEKIT_PROXY_PORT:-7443}:${LIVEKIT_PROXY_PORT:-7443}"
+    environment:
+      LIVEKIT_PROXY_PORT: ${LIVEKIT_PROXY_PORT:-7443}
+      # Defaults to the certificate the app serves; override for autocert
+      # (TLS_DOMAINS), whose certificate is cached under TLS_CACHE_DIR.
+      LIVEKIT_TLS_CERT_FILE: ${LIVEKIT_TLS_CERT_FILE:-${TLS_CERT_FILE:-}}
+      LIVEKIT_TLS_KEY_FILE: ${LIVEKIT_TLS_KEY_FILE:-${TLS_KEY_FILE:-}}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      # Same mount point as the app: TLS_CERT_FILE/TLS_KEY_FILE are reused
+      # verbatim instead of being repeated in a second variable.
+      - ./certs:/app/certs:ro
+    depends_on:
+      - livekit
 
   redis:
     image: redis:latest
@@ -102,4 +140,5 @@ services:
 volumes:
   gomodcache:
   web_node_modules:
+  npmcache:
   redis-hot:

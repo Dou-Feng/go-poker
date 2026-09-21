@@ -23,7 +23,7 @@ make start     # run backend and frontend together
 
 - Go tests: `cd backend && go test ./...` — only the `poker` package has tests (white-box, same package).
 - Frontend type-check: `cd web && npm run type-check`; format with Prettier.
-- Note: `go.mod` declares `go 1.24` but `backend/Dockerfile` uses `golang:1.18.2-alpine` — don't rely on the Docker image matching local builds.
+- Note: `go.mod` declares `go 1.26` (toolchain choice, matches the root `Dockerfile`'s `golang:1.26-alpine` + `GOTOOLCHAIN=local`); `backend/Dockerfile` still uses `golang:1.18.2-alpine` — don't rely on that legacy image matching local builds. LiveKit tokens are minted with plain `golang-jwt/jwt/v5` — do NOT add the `livekit/protocol` module back: it drags in protobuf/psrpc/otel (~300 packages) for a ~40-line JWT.
 
 ## Conventions
 

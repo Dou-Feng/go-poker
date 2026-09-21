@@ -1,0 +1,33 @@
+# Reverse proxy that gives livekit-server a TLS (wss://) endpoint.
+#
+# Why this exists: browsers refuse to open a ws:// connection from an https://
+# page (mixed content), and livekit-server cannot terminate TLS itself — its
+# config parser rejects a `tls:` block ("field tls not found in type
+# config.Config", verified against v1.13.7). A deployment whose game page is
+# served over https therefore needs something in front of the SFU. This is the
+# smallest option that stays inside the repo.
+#
+# The certificate is the one the Go app already serves: ./certs is mounted at
+# /app/certs (the same path the app uses) so TLS_CERT_FILE/TLS_KEY_FILE can be
+# reused verbatim — no second certificate flow to keep in sync.
+#
+# The site is a catch-all (`:{port}` with no hostname) so the deployment does
+# not have to repeat its domain inside the container; Caddy presents the
+# configured certificate for whatever hostname the browser asks for.
+#
+# Enable it with COMPOSE_PROFILES=voice,voice-tls (the proxy is useless without
+# the SFU it fronts), then point the game server at it:
+#   LIVEKIT_URL=wss://<domain>:<LIVEKIT_PROXY_PORT>
+
+:{$LIVEKIT_PROXY_PORT:7443} {
+	tls {$LIVEKIT_TLS_CERT_FILE} {$LIVEKIT_TLS_KEY_FILE}
+
+	# reverse_proxy handles the WebSocket upgrade itself; no extra headers.
+	reverse_proxy livekit:7880
+
+	log {
+		output stdout
+		# WebSocket connections live for as long as the room does, so the
+		# access log stays small without extra filtering.
+	}
+}
