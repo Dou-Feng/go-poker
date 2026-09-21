@@ -1415,6 +1415,12 @@ func createUserInfo(rdb *redis.Client, u *UserRecord, self bool) []byte {
 			})
 		}
 	}
+	// Preferences belong to the account owner: another player's profile must
+	// not leak them (they can reveal who someone has muted).
+	settings := json.RawMessage(nil)
+	if self {
+		settings = u.Settings
+	}
 	resp := userInfo{
 		base{actionUserInfo},
 		u.UUID,
@@ -1425,6 +1431,7 @@ func createUserInfo(rdb *redis.Client, u *UserRecord, self bool) []byte {
 		friends,
 		u.Stats,
 		self,
+		settings,
 	}
 	bytes, err := json.Marshal(resp)
 	if err != nil {

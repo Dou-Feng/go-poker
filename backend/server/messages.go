@@ -1,6 +1,8 @@
 package server
 
 import (
+	"encoding/json"
+
 	"github.com/evanofslack/go-poker/poker"
 )
 
@@ -48,6 +50,9 @@ const (
 	// actionGetSession fetches the shared scoreboard of a past room session
 	// (referenced by sessionId in the caller's history entries).
 	actionGetSession string = "get-session"
+	// actionSetSettings stores the caller's preference blob on their account
+	// so it follows them to other devices (see settings.go).
+	actionSetSettings string = "set-settings"
 )
 
 type getSession struct {
@@ -67,6 +72,14 @@ type removeBot struct {
 
 type getLiveKitToken struct {
 	base // actionGetLiveKitToken
+}
+
+// setSettings carries the player's preference blob. Settings is opaque to the
+// server: it is stored verbatim (bounded by maxSettingsBytes) and handed back
+// in user-info, so the browser owns the shape.
+type setSettings struct {
+	base                     // actionSetSettings
+	Settings json.RawMessage `json:"settings"`
 }
 
 type base struct {
@@ -270,12 +283,21 @@ const (
 	actionSessionExpired       string = "session-expired"
 	actionLiveKitToken         string = "livekit-token"
 	actionSession              string = "session"
+	actionSettingsResult       string = "settings-result"
 )
 
 // sessionMessage answers actionGetSession.
 type sessionMessage struct {
 	base                  // actionSession
 	Session SessionRecord `json:"session"`
+}
+
+// settingsResult acknowledges actionSetSettings. Failures arrive as an
+// `error` message instead, so a well-formed reply is always ok.
+type settingsResult struct {
+	base           // actionSettingsResult
+	OK      bool   `json:"ok"`
+	Message string `json:"message,omitempty"`
 }
 
 // liveKitToken answers actionGetLiveKitToken. OK is false when the server
@@ -403,6 +425,9 @@ type userInfo struct {
 	Friends     []friendInfo      `json:"friends"`
 	Stats       poker.PlayerStats `json:"stats"`
 	Self        bool              `json:"self"`
+	// Settings is only ever sent to the account itself (nil for other
+	// players' profiles).
+	Settings json.RawMessage `json:"settings,omitempty"`
 }
 
 type historyList struct {

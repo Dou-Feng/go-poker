@@ -33,6 +33,11 @@ type UserRecord struct {
 	AvatarImage  bool              `json:"avatarImage"`
 	Friends      []string          `json:"friends"` // account UUIDs
 	Stats        poker.PlayerStats `json:"stats"`
+	// Settings is the player's preference blob (audio volumes, voice toggles,
+	// language, muted peers, ...), stored and returned verbatim: the layout is
+	// owned by the browser, so adding a setting does not need a server change.
+	// Empty for accounts that never synced (older ones, or before first save).
+	Settings json.RawMessage `json:"settings,omitempty"`
 }
 
 // newSessionToken returns a bearer token for browser reconnects and stores

@@ -2,6 +2,8 @@
 // voice announcements via the browser's SpeechSynthesis API (so male/female
 // voices work without any external assets or APIs).
 
+import { settingsChanged } from "./settings";
+
 export type SoundSettings = {
   sfxVolume: number;
   bgmVolume: number;
@@ -35,6 +37,10 @@ export function saveSoundSettings(settings: SoundSettings) {
   if (typeof window !== "undefined") {
     window.localStorage.setItem(KEY, JSON.stringify(settings));
   }
+  // Sound settings are read on demand (loadSoundSettings), so nothing has to
+  // be reloaded when the account's copy arrives; the push keeps the account
+  // in step. See lib/settings.ts.
+  settingsChanged();
 }
 
 let audioCtx: AudioContext | null = null;

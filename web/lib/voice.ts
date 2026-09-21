@@ -31,6 +31,7 @@ import {
   type RemoteTrackPublication,
 } from "livekit-client";
 import { getLiveKitToken } from "../actions/actions";
+import { settingsChanged, onSettingsApplied } from "./settings";
 import { TranslationKey } from "./translations";
 import { resumeAudioContext, setVoiceAudioState } from "./sfx";
 
@@ -926,6 +927,34 @@ class VoiceManager {
     } catch {
       // storage unavailable: settings simply do not persist
     }
+    // Also keep the account's copy up to date (debounced).
+    settingsChanged();
+  }
+
+  /**
+   * Re-read the stored preferences. Used when the account's copy arrives on
+   * sign-in: volumes/mutes/toggles change under the live session, so the gain
+   * node, playback elements and capture constraints are refreshed too.
+   */
+  reloadSettings() {
+    const stored = loadSettings();
+    this.state = {
+      ...this.state,
+      micVolume: stored.micVolume,
+      outputVolume: stored.outputVolume,
+      mutedPeers: stored.mutedPeers,
+      echoCancellation: stored.echoCancellation,
+      noiseCancellation: stored.noiseCancellation,
+    };
+    if (this.micGain) {
+      this.micGain.gain.value = stored.micVolume;
+    }
+    this.audioElements.forEach((_el, id) => this.applyOutput(id));
+    this.emit();
+    // Echo cancellation and noise handling are hardware constraints: apply
+    // them to a live capture track (no-op when the mic is off, startMic then
+    // picks up the new state).
+    void this.applyCaptureConstraints().catch(() => {});
   }
 
   // ---- microphone -----------------------------------------------------
@@ -1137,3 +1166,7 @@ class VoiceManager {
 
 // One manager per browser tab, shared by the socket provider and the UI.
 export const voice = new VoiceManager();
+
+// Preferences arriving from the account (sign-in on another device) are
+// written to local storage first, then pushed into the live session.
+onSettingsApplied(() => voice.reloadSettings());

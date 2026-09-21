@@ -303,6 +303,13 @@ function harness(options = {}) {
       require: (id) =>
         id === "./sfx"
           ? modules.sfx
+          : id === "./settings"
+          ? {
+              // The account mirroring is covered by tests/settings.test.cjs;
+              // here it only has to stay out of the way.
+              settingsChanged() {},
+              onSettingsApplied() {},
+            }
           : id === "livekit-client"
           ? livekit
           : id === "@livekit/krisp-noise-filter"

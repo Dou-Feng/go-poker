@@ -30,6 +30,13 @@ import {
 } from "../lib/session";
 import { emitFx } from "../lib/fxBus";
 import { voice } from "../lib/voice";
+import {
+  applyAccountSettings,
+  hasStoredSettings,
+  pushSettingsNow,
+  setSettingsAccount,
+  setSettingsSocket,
+} from "../lib/settings";
 
 /*  
 WebSocket context creates a single connection to the server per client. 
@@ -100,6 +107,9 @@ export function SocketProvider(props: SocketProviderProps) {
         // peer mesh (peers were told we left when the old socket dropped).
         voice.setSocket(ws);
         voice.onSocketConnected();
+        // Preference pushes ride on it too, and anything changed while
+        // offline is sent as soon as it is back.
+        setSettingsSocket(ws);
       };
       ws.onclose = () => {
         // StrictMode's first-pass socket is closed intentionally by the
@@ -112,6 +122,7 @@ export function SocketProvider(props: SocketProviderProps) {
         console.log("websocket disconnected");
         setSocket(null);
         voice.setSocket(null);
+        setSettingsSocket(null);
         scheduleReconnect();
       };
       ws.onerror = (error) => {
@@ -311,6 +322,25 @@ export function SocketProvider(props: SocketProviderProps) {
             if (event.self) {
               saveUser(event.uuid);
               dispatch({ type: "setUuid", payload: event.uuid ?? null });
+              // Preferences stored on the account follow the player across
+              // devices. The account wins once it has any; an account that
+              // has never synced (new player, or from before this feature)
+              // adopts what this browser already had, so nobody loses their
+              // setup. See lib/settings.ts.
+              const stored = hasStoredSettings(event.settings);
+              if (stored) {
+                const lang = applyAccountSettings(event.settings);
+                if (lang) {
+                  dispatch({ type: "setLanguage", payload: lang });
+                }
+              }
+              // Preferences may only be pushed for a signed-in account, and
+              // an account that has never synced adopts this browser's setup
+              // so nobody loses what they had. See lib/settings.ts.
+              setSettingsAccount(event.uuid ?? null);
+              if (!stored) {
+                pushSettingsNow();
+              }
               // The server's record is authoritative for the display name:
               // after a refresh the client only has the cached username (or
               // nothing) until this reply arrives.
@@ -359,6 +389,8 @@ export function SocketProvider(props: SocketProviderProps) {
               clearUser();
               clearSession();
               clearTabAuth();
+              // Signed out: stop mirroring preferences to the account.
+              setSettingsAccount(null);
               dispatch({ type: "resetGame" });
               dispatch({
                 type: "setAuthError",
@@ -400,6 +432,10 @@ export function SocketProvider(props: SocketProviderProps) {
               event.token ?? "",
               event.ttl ?? 0
             );
+            return;
+          case "settings-result":
+            // Ack for a preference push; nothing to do unless it failed, and
+            // failures arrive separately as an `error` message.
             return;
           case "settlement":
             dispatch({

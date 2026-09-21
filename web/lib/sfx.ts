@@ -3,6 +3,8 @@
 // Interface Sounds. Volume is persisted in localStorage; 0 disables playback
 // entirely.
 
+import { onSettingsApplied, settingsChanged } from "./settings";
+
 const SFX_BASE = "/sfx";
 
 export type SfxName =
@@ -119,6 +121,7 @@ export function setSfxVolume(volume: number) {
   if (typeof window !== "undefined") {
     window.localStorage.setItem(VOLUME_KEY, String(v));
   }
+  settingsChanged();
 }
 
 function getCtx(): AudioContext | null {
@@ -314,6 +317,7 @@ export function setBgmVolume(volume: number) {
   if (bgmGain && audioCtx) {
     bgmGain.gain.value = v;
   }
+  settingsChanged();
 }
 
 function unlockAudioOnGesture() {
@@ -397,3 +401,15 @@ export function stopBgm() {
     // ignore: music is best-effort
   }
 }
+
+// Preferences arriving from the account (sign-in on another device) were
+// written to local storage already; drop the caches so the values are read
+// again, and let a looping track pick up its new level.
+onSettingsApplied(() => {
+  cachedVolume = null;
+  cachedBgmVolume = null;
+  const bgm = getBgmVolume();
+  if (bgmGain && audioCtx) {
+    bgmGain.gain.value = bgm;
+  }
+});

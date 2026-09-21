@@ -592,6 +592,15 @@ func (c *Client) processEvents(rawMessage []byte) error {
 		handleGetLiveKitToken(c)
 		return nil
 
+	case actionSetSettings:
+		var req setSettings
+		err := json.Unmarshal(rawMessage, &req)
+		if err != nil {
+			return err
+		}
+		handleSetSettings(c, req.Settings)
+		return nil
+
 	case actionGetSession:
 		var req getSession
 		if err := json.Unmarshal(rawMessage, &req); err != nil {
