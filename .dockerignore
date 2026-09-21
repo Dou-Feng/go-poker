@@ -1,0 +1,48 @@
+# Keep the build context down to what the Dockerfile actually reads.
+#
+# The Dockerfile only ever COPYs `web/` and `backend/`, and both are thrown away
+# again after their builder stage, so nothing else has to reach the daemon.
+# Without this file the context is the whole repo (~955 MB, dominated by
+# node_modules/.next/.git); BuildKit hashes and uploads all of it whenever its
+# cache is cold — a fresh clone, a CI runner, or a different machine.
+#
+# The rule for adding entries: exclude anything the build does not read. If you
+# later add a COPY/ADD for one of these paths, delete the entry.
+
+# --- secrets and runtime-only state ------------------------------------------
+# These are bind-mounted at runtime by docker-compose.yaml (./.env:/app/.env,
+# ./certs:/app/certs), never baked into the image. Keeping them out of the
+# context means the Redis password and the TLS/LiveKit keys are not shipped to
+# the daemon on every build.
+.env
+.env.*
+certs
+
+# --- generated output, rebuilt inside the image ------------------------------
+# frontend-builder runs `npm ci && npm run build` from source, so the host's
+# node_modules (591 MB), .next (201 MB) and out (21 MB) are all stale copies.
+web/node_modules
+web/.next
+web/out
+**/node_modules
+**/.next
+
+# TypeScript incremental-build state, produced by `npm run type-check`; it is
+# gitignored, and `npm run build` inside the image writes its own.
+web/tsconfig.tsbuildinfo
+
+# --- large source assets not needed to build ---------------------------------
+# web/assets-src holds the original artwork plus the commands that regenerate
+# public/bg-*.webp; the build consumes the WebP files, not the sources.
+web/assets-src
+
+# --- scratch / local-only ----------------------------------------------------
+.git
+tmp
+backend/tmp
+.claude
+.vscode
+
+# --- editor and OS noise -----------------------------------------------------
+*.log
+**/.DS_Store
