@@ -293,6 +293,8 @@ export const translations = {
       "microphone needs a secure page — open the site over https (listening still works)",
     voiceUnsupported: "voice chat is not supported in this browser",
     voiceUnavailable: "voice chat is unavailable on this server",
+    voiceConnectFailed:
+      "could not reach the voice server — check that it is running and its port is open",
     isFriend: "friends",
   },
   zh: {
@@ -580,6 +582,7 @@ export const translations = {
       "麦克风需要 https 页面 — 请用 https 打开本站（收听不受影响）",
     voiceUnsupported: "当前浏览器不支持语音",
     voiceUnavailable: "此服务器未开启语音功能",
+    voiceConnectFailed: "无法连接语音服务器，请确认它已启动且端口已放行",
     isFriend: "已是好友",
   },
 } as const;

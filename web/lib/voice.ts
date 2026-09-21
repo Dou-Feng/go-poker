@@ -420,6 +420,10 @@ class VoiceManager {
       // The token may be stale or the room gone: drop it so the next
       // activation asks for a fresh one instead of looping on a bad one.
       this.token = null;
+      // Say so in the UI. Failing silently left players with toggles that
+      // looked "on", no audio at all, and nothing to act on — the browser
+      // console was the only trace.
+      this.emit({ error: "voiceConnectFailed" });
       return;
     }
     if (gen !== this.connectGen) {

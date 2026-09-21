@@ -158,6 +158,10 @@ function harness(options = {}) {
       for (const fn of this.handlers.get(ev) ?? []) fn(...args);
     }
     async connect(url, token) {
+      if (options.connectFails) {
+        this.state = "disconnected";
+        throw new Error("connect failed");
+      }
       this.state = "connecting";
       await Promise.resolve();
       this.url = url;
@@ -777,4 +781,16 @@ test("a microphone re-published after an unexpected disconnect is published agai
     1,
     "the mic must be published on the new connection"
   );
+});
+
+test("a voice server that cannot be reached surfaces a visible error", async () => {
+  const h = harness({ connectFails: true });
+  h.voice.setLiveKitToken("wss://voice.example.com", "tok", 3600);
+  await h.voice.setSpeaker(true);
+  await flush();
+  // The toggles look on, so without an error the player has nothing to act on.
+  assert.equal(h.voice.getState().speakerOn, true);
+  assert.equal(h.voice.getState().error, "voiceConnectFailed");
+  h.voice.clearError();
+  assert.equal(h.voice.getState().error, null);
 });
