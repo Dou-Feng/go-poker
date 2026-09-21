@@ -9,7 +9,7 @@ import {
   playSfx,
 } from "../lib/sfx";
 import { useVoice } from "../hooks/useVoice";
-import { voice } from "../lib/voice";
+import { MAX_MIC_VOLUME, voice } from "../lib/voice";
 import MicIcon from "./MicIcon";
 import SpeakerIcon from "./SpeakerIcon";
 import Portal from "./Portal";
@@ -169,7 +169,7 @@ export default function Settings({ buttonClassName }: SettingsProps) {
                     <input
                       type="range"
                       min={0}
-                      max={100}
+                      max={MAX_MIC_VOLUME * 100}
                       step={5}
                       aria-label={t("micVolume")}
                       value={micPct}
@@ -178,6 +178,7 @@ export default function Settings({ buttonClassName }: SettingsProps) {
                       }
                       className={sliderClass}
                     />
+                    <p className="type-caption">{t("micVolumeHint")}</p>
                   </div>
                   <div className="flex flex-col gap-1.5">
                     <div className="flex flex-row items-center justify-between">

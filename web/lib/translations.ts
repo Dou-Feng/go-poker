@@ -189,7 +189,8 @@ export const translations = {
     gameAlreadyRunning: "game already running",
     alreadyInRoom: "Leave your current room before joining another",
     couldNotRefundPlayers: "Some refunds failed. Please retry the room reset",
-    settlementPending: "Settlement is waiting for storage. Retrying automatically",
+    settlementPending:
+      "Settlement is waiting for storage. Retrying automatically",
     gameNotRunning: "game not running",
     tableIsFull: "table is full",
     tapSeatToJoinNext: "Tap an empty seat to join the next hand",
@@ -244,6 +245,10 @@ export const translations = {
     speakerOn: "Voice on — tap to stop listening",
     speakerOff: "Voice off — tap to listen",
     micVolume: "Mic input volume",
+    micVolumeHint:
+      "100% keeps the original level; raise it if your voice is too quiet.",
+    voiceSettingsFailed:
+      "Could not change microphone settings. The previous setting was kept.",
     othersVolume: "Others' voice volume",
     echoCancellation: "Echo cancellation",
     echoCancellationHint:
@@ -526,6 +531,8 @@ export const translations = {
     speakerOn: "语音已开 — 点击停止收听",
     speakerOff: "语音已关 — 点击收听他人",
     micVolume: "麦克风输入音量",
+    micVolumeHint: "100% 为原始音量；对方听不清时可调高。",
+    voiceSettingsFailed: "无法修改麦克风设置，已保留原设置。",
     othersVolume: "他人语音音量",
     echoCancellation: "回声消除",
     echoCancellationHint:

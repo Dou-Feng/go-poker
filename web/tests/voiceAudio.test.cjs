@@ -38,17 +38,26 @@ function harness(options = {}) {
     tracks = [],
     elements = [],
     peers = [],
-    timers = [];
+    timers = [],
+    captures = [],
+    constraints = [],
+    listeners = new Map();
   const storage = new Map([
     ["gopoker-sfx-volume", "0.3"],
     ["gopoker-bgm-volume", "0.07"],
   ]);
+  if (options.settings)
+    storage.set("gopoker-voice", JSON.stringify(options.settings));
   const session = { type: "auto" };
   function stream() {
     const track = {
       stopped: false,
       stop() {
         this.stopped = true;
+      },
+      async applyConstraints(value) {
+        constraints.push(value);
+        if (options.apply) await options.apply(value);
       },
     };
     tracks.push(track);
@@ -59,10 +68,13 @@ function harness(options = {}) {
       this.state = options.resume ? "suspended" : "running";
       this.sources = [];
       this.gains = [];
+      this.compressors = [];
+      this.resumeCalls = 0;
       this.destination = {};
       contexts.push(this);
     }
     resume() {
+      this.resumeCalls++;
       this.state = "running";
       return options.resume?.promise ?? Promise.resolve();
     }
@@ -98,6 +110,18 @@ function harness(options = {}) {
       if (options.graphFailure) throw new Error("graph failed");
       return { connect() {} };
     }
+    createDynamicsCompressor() {
+      const compressor = {
+        threshold: { value: 0 },
+        knee: { value: 0 },
+        ratio: { value: 0 },
+        attack: { value: 0 },
+        release: { value: 0 },
+        connect() {},
+      };
+      this.compressors.push(compressor);
+      return compressor;
+    }
     createMediaStreamDestination() {
       return { stream: stream() };
     }
@@ -118,7 +142,9 @@ function harness(options = {}) {
   }
   const document = {
     body: { appendChild() {} },
-    addEventListener() {},
+    addEventListener(name, fn) {
+      listeners.set(name, fn);
+    },
     createElement(tag) {
       const element = {
         tag,
@@ -147,7 +173,10 @@ function harness(options = {}) {
     platform: options.desktop ? "Linux" : "iPhone",
     maxTouchPoints: 5,
     mediaDevices: {
-      getUserMedia: () => options.capture?.promise ?? Promise.resolve(stream()),
+      getUserMedia: (value) => {
+        captures.push(value);
+        return options.capture?.promise ?? Promise.resolve(stream());
+      },
     },
   };
   if (!options.noSession) navigator.audioSession = session;
@@ -202,6 +231,9 @@ function harness(options = {}) {
     storage,
     session,
     stream,
+    captures,
+    constraints,
+    listeners,
   };
 }
 
@@ -316,15 +348,17 @@ test("late cleanup from the previous mic cannot reset a newly opened mic's sessi
   assert.ok(h.tracks.every((t) => t.stopped));
 });
 
-test("leaving during echo-cancellation restart cannot reopen the microphone", async () => {
+test("leaving during a live echo-cancellation change cannot reopen the microphone", async () => {
   const options = {};
   const h = harness(options);
   await h.voice.setMic(true);
-  options.capture = deferred();
-  const reopening = h.voice.setEchoCancellation(false);
+  const apply = deferred();
+  options.apply = () => apply.promise;
+  const changing = h.voice.setEchoCancellation(true);
+  await flush();
   h.voice.leaveRoom();
-  options.capture.resolve(h.stream());
-  await reopening;
+  apply.resolve();
+  await changing;
   assert.equal(h.voice.getState().micOn, false);
   assert.equal(h.session.type, "ambient");
   assert.ok(h.tracks.every((t) => t.stopped));
@@ -363,4 +397,137 @@ test("unsupported Audio Session API still cleans up and keeps game sounds", asyn
     await flush();
     assert.ok(h.tracks.every((t) => t.stopped));
   }
+});
+
+test("echo cancellation defaults off, including older settings without the field", async () => {
+  for (const settings of [
+    undefined,
+    { micVolume: 0.7 },
+    { echoCancellation: false },
+  ]) {
+    const h = harness({ settings });
+    assert.equal(h.voice.getState().echoCancellation, false);
+    await h.voice.setMic(true);
+    assert.equal(h.captures[0].audio.echoCancellation, false);
+    assert.equal(h.captures[0].audio.autoGainControl, true);
+  }
+  const h = harness({ settings: { echoCancellation: true } });
+  assert.equal(h.voice.getState().echoCancellation, true);
+  await h.voice.setMic(true);
+  assert.equal(h.captures[0].audio.echoCancellation, true);
+});
+
+test("live echo changes preserve capture, game audio, mic gain and processing context", async () => {
+  const h = harness({ settings: { echoCancellation: true, micVolume: 2 } });
+  h.sfx.startBgm("room");
+  await flush();
+  await h.voice.setMic(true);
+  const [game, mic] = h.contexts;
+  game.state = "interrupted";
+  mic.state = "interrupted";
+  await h.voice.setEchoCancellation(false);
+  assert.equal(h.constraints[0].echoCancellation.exact, false);
+  assert.equal(h.constraints[0].autoGainControl, true);
+  assert.equal(h.constraints[0].noiseSuppression, true);
+  assert.equal(h.captures.length, 1);
+  assert.equal(h.contexts.length, 2);
+  assert.ok(h.tracks.every((t) => !t.stopped));
+  assert.equal(game.state, "running");
+  assert.equal(mic.state, "running");
+  assert.equal(mic.gains[0].gain.value, 2);
+  assert.equal(game.sources[0].stopped, false);
+  h.sfx.playSfx("fold");
+  await flush();
+  assert.equal(game.sources.length, 2);
+  assert.equal(h.session.type, "play-and-record");
+});
+
+test("failed constraint changes retain a working mic and restore the previous setting", async () => {
+  const h = harness({ apply: () => Promise.reject(new Error("unsupported")) });
+  await h.voice.setMic(true);
+  await h.voice.setEchoCancellation(true);
+  assert.equal(h.voice.getState().echoCancellation, false);
+  assert.equal(h.voice.getState().micOn, true);
+  assert.equal(h.voice.getState().error, "voiceSettingsFailed");
+  assert.equal(
+    JSON.parse(h.storage.get("gopoker-voice")).echoCancellation,
+    false
+  );
+  assert.equal(h.captures.length, 1);
+  assert.ok(h.tracks.every((t) => !t.stopped));
+});
+
+test("rapid echo toggles are applied in order without reopening capture", async () => {
+  const applying = deferred();
+  const h = harness({ apply: () => applying.promise });
+  await h.voice.setMic(true);
+  const on = h.voice.setEchoCancellation(true);
+  await flush();
+  const off = h.voice.setEchoCancellation(false);
+  assert.equal(h.constraints.length, 1);
+  applying.resolve();
+  await Promise.all([on, off]);
+  assert.deepEqual(
+    h.constraints.map((c) => c.echoCancellation.exact),
+    [true, false]
+  );
+  assert.equal(h.voice.getState().echoCancellation, false);
+  assert.equal(h.captures.length, 1);
+});
+
+for (const during of ["permission", "context resume"]) {
+  test(`echo preference changed during ${during} is applied before sending`, async () => {
+    const pending = deferred();
+    const h = harness(
+      during === "permission" ? { capture: pending } : { resume: pending }
+    );
+    const opening = h.voice.setMic(true);
+    await flush();
+    await h.voice.setEchoCancellation(true);
+    pending.resolve(during === "permission" ? h.stream() : undefined);
+    await opening;
+    assert.equal(h.constraints.at(-1).echoCancellation.exact, true);
+    assert.equal(h.voice.getState().micOn, true);
+    assert.equal(h.voice.getState().echoCancellation, true);
+  });
+}
+
+test("Safari interruptions resume game audio even after the first gesture", async () => {
+  const h = harness();
+  h.sfx.startBgm("room");
+  await flush();
+  const game = h.contexts[0];
+  game.state = "interrupted";
+  game.onstatechange();
+  await flush();
+  assert.equal(game.state, "running");
+  for (let i = 0; i < 2; i++) {
+    game.state = "interrupted";
+    h.listeners.get("pointerdown")();
+    await flush();
+    assert.equal(game.state, "running");
+  }
+  assert.equal(game.sources.length, 1);
+});
+
+test("mic boost can exceed unity, persists across reload, and never amplifies game audio", async () => {
+  const h = harness();
+  h.sfx.startBgm("room");
+  await flush();
+  await h.voice.setMic(true);
+  const [game, mic] = h.contexts;
+  h.voice.setMicVolume(2.5);
+  assert.equal(mic.gains[0].gain.value, 2.5);
+  assert.equal(mic.compressors.length, 1);
+  assert.equal(mic.compressors[0].threshold.value, -1);
+  assert.equal(game.gains[0].gain.value, 0.07);
+  const restored = harness({
+    settings: JSON.parse(h.storage.get("gopoker-voice")),
+  });
+  await restored.voice.setMic(true);
+  assert.equal(restored.contexts[0].gains[0].gain.value, 2.5);
+  h.voice.setMicVolume(10);
+  assert.equal(mic.gains[0].gain.value, 3);
+  h.voice.setMicVolume(0);
+  assert.equal(mic.gains[0].gain.value, 0);
 });

@@ -79,6 +79,20 @@ export function setVoiceAudioState(mic: boolean, speaker: boolean) {
   voiceMic = mic;
   voiceSpeaker = speaker;
   updateAudioSession();
+  void resumeAudioContext(audioCtx);
+}
+
+// Safari may interrupt an existing context when capture settings change.
+// Older TypeScript DOM declarations omit this state; it still needs resume.
+export async function resumeAudioContext(ctx: AudioContext | null) {
+  if (!ctx || !["suspended", "interrupted"].includes(ctx.state as string)) {
+    return;
+  }
+  try {
+    await ctx.resume();
+  } catch {
+    // A later user gesture can retry if the browser blocks automatic resume.
+  }
 }
 
 export function getSfxVolume(): number {
@@ -121,11 +135,15 @@ function getCtx(): AudioContext | null {
       return null;
     }
     audioCtx = new Ctor();
+    const ctx = audioCtx;
+    ctx.onstatechange = () => {
+      if ((ctx.state as string) === "interrupted") {
+        void resumeAudioContext(ctx);
+      }
+    };
   }
   // Browsers start the context suspended until a user gesture.
-  if (audioCtx.state === "suspended") {
-    void audioCtx.resume();
-  }
+  void resumeAudioContext(audioCtx);
   return audioCtx;
 }
 
@@ -304,13 +322,10 @@ function unlockAudioOnGesture() {
   }
   audioUnlocked = true;
   const resume = () => {
-    const ctx = getCtx();
-    if (ctx && ctx.state === "suspended") {
-      void ctx.resume();
-    }
+    void resumeAudioContext(audioCtx);
   };
-  document.addEventListener("pointerdown", resume, { once: true });
-  document.addEventListener("keydown", resume, { once: true });
+  document.addEventListener("pointerdown", resume);
+  document.addEventListener("keydown", resume);
 }
 
 // Start looping music for a screen. Starting the same track again is a no-op;
@@ -327,9 +342,6 @@ export function startBgm(track: BgmTrack) {
       return;
     }
     unlockAudioOnGesture();
-    if (ctx.state === "suspended") {
-      void ctx.resume();
-    }
     const key = "bgm:" + track;
     void (async () => {
       try {

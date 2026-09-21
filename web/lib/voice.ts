@@ -22,7 +22,7 @@ import {
   VoiceSignalKind,
 } from "../actions/actions";
 import { TranslationKey } from "./translations";
-import { setVoiceAudioState } from "./sfx";
+import { resumeAudioContext, setVoiceAudioState } from "./sfx";
 
 export type VoicePeer = {
   id: string;
@@ -37,7 +37,7 @@ export type VoiceState = {
   micAvailable: boolean;
   micOn: boolean;
   speakerOn: boolean;
-  /** 0..1, gain applied to the outgoing mic signal. */
+  /** 0..3, gain applied to the outgoing mic signal; 1 is the original level. */
   micVolume: number;
   /** 0..1, playback volume for every remote peer. */
   outputVolume: number;
@@ -45,8 +45,7 @@ export type VoiceState = {
   mutedPeers: string[];
   /**
    * Whether the browser's acoustic echo cancellation is requested on the
-   * mic. On by default; turning it off can help with a headset when the
-   * canceller clips speech, and hurts badly on speakers.
+   * mic. Off by default; the user's explicit choice persists.
    */
   echoCancellation: boolean;
   peers: Record<string, VoicePeer>;
@@ -83,7 +82,7 @@ type StoredSettings = {
   micVolume: number;
   outputVolume: number;
   mutedPeers: string[];
-  /** Browser acoustic echo cancellation on the mic (default on). */
+  /** Browser acoustic echo cancellation on the mic (default off). */
   echoCancellation: boolean;
 };
 
@@ -91,8 +90,14 @@ const DEFAULT_SETTINGS: StoredSettings = {
   micVolume: 1,
   outputVolume: 1,
   mutedPeers: [],
-  echoCancellation: true,
+  echoCancellation: false,
 };
+
+export const MAX_MIC_VOLUME = 3;
+
+function clampMicVolume(v: number): number {
+  return Math.min(MAX_MIC_VOLUME, Math.max(0, Number.isFinite(v) ? v : 0));
+}
 
 function clamp01(v: number): number {
   return Math.min(1, Math.max(0, Number.isFinite(v) ? v : 0));
@@ -109,12 +114,12 @@ function loadSettings(): StoredSettings {
     }
     const parsed = JSON.parse(raw) as Partial<StoredSettings>;
     return {
-      micVolume: clamp01(parsed.micVolume ?? 1),
+      micVolume: clampMicVolume(parsed.micVolume ?? 1),
       outputVolume: clamp01(parsed.outputVolume ?? 1),
       mutedPeers: Array.isArray(parsed.mutedPeers)
         ? parsed.mutedPeers.filter((p) => typeof p === "string")
         : [],
-      echoCancellation: parsed.echoCancellation !== false,
+      echoCancellation: parsed.echoCancellation === true,
     };
   } catch {
     return DEFAULT_SETTINGS;
@@ -179,6 +184,9 @@ class VoiceManager {
   private audioHost: HTMLElement | null = null;
   private micRequest = 0;
   private micRequested = false;
+  private micEchoCancellation = false;
+  private echoRevision = 0;
+  private echoChange: Promise<void> = Promise.resolve();
 
   // ICE servers (STUN/TURN + credentials) issued by the game server, and
   // when they stop being valid. Requested on room entry and refreshed before
@@ -397,7 +405,7 @@ class VoiceManager {
   }
 
   setMicVolume(v: number): void {
-    const vol = clamp01(v);
+    const vol = clampMicVolume(v);
     if (this.micGain) {
       this.micGain.gain.value = vol;
     }
@@ -428,37 +436,63 @@ class VoiceManager {
   }
 
   /**
-   * Toggle the browser's echo cancellation. The constraint is fixed when the
-   * mic is opened, so a live mic is reopened with the new setting and the
-   * fresh track swapped into every sender (no renegotiation: the transceiver
-   * direction does not change).
+   * Update the live capture track without stopping the hardware, WebAudio
+   * graph or WebRTC sender. Serialize changes so rapid toggles cannot apply
+   * older settings after the latest choice.
    */
   async setEchoCancellation(on: boolean): Promise<void> {
     if (on === this.state.echoCancellation) {
       return;
     }
-    this.state = { ...this.state, echoCancellation: on };
+    const revision = ++this.echoRevision;
+    this.emit({ echoCancellation: on });
     this.persist();
-    if (this.state.micOn) {
-      const request = ++this.micRequest;
-      this.releaseMic();
-      const started = await this.startMic(request);
-      if (request !== this.micRequest) {
+    if (!this.state.micOn) {
+      return; // startMic picks up changes made while permission is pending.
+    }
+    const request = this.micRequest;
+    const track = this.rawStream?.getAudioTracks()[0];
+    this.echoChange = this.echoChange.then(async () => {
+      if (
+        !track ||
+        request !== this.micRequest ||
+        revision !== this.echoRevision
+      ) {
         return;
       }
-      if (!started) {
-        this.micRequested = false;
-        // Reopening failed (permission revoked meanwhile): drop the mic
-        // state so the button reflects reality.
-        this.state = { ...this.state, micOn: false };
-        this.peers.forEach((p) => this.applyMicToPeer(p));
-        this.syncPresence(true);
-      } else {
-        this.peers.forEach((p) => this.applyMicToPeer(p));
+      try {
+        await track.applyConstraints({
+          ...this.micConstraints(on),
+          echoCancellation: { exact: on },
+        });
+        if (request !== this.micRequest) {
+          return;
+        }
+        this.micEchoCancellation = on;
+      } catch {
+        if (request === this.micRequest && revision === this.echoRevision) {
+          this.emit({
+            echoCancellation: this.micEchoCancellation,
+            error: "voiceSettingsFailed",
+          });
+          this.persist();
+        }
       }
-    }
-    this.syncAudioSession();
-    this.emit();
+      if (request === this.micRequest) {
+        this.syncAudioSession();
+        void resumeAudioContext(this.micCtx);
+      }
+    });
+    await this.echoChange;
+  }
+
+  private micConstraints(echoCancellation: boolean): MediaTrackConstraints {
+    return {
+      echoCancellation,
+      // Keep gain control and noise suppression independent of echo removal.
+      autoGainControl: true,
+      noiseSuppression: true,
+    };
   }
 
   private syncAudioSession() {
@@ -801,16 +835,13 @@ class VoiceManager {
       return false;
     }
     let raw: MediaStream;
+    let echoCancellation = this.state.echoCancellation;
     try {
       // Echo cancellation, noise suppression and automatic gain are the
       // browser's own WebRTC audio processing (Chrome: AEC3); we only ask
       // for them. Echo cancellation is user-toggleable (Settings).
       raw = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          echoCancellation: this.state.echoCancellation,
-          noiseSuppression: true,
-          autoGainControl: true,
-        },
+        audio: this.micConstraints(echoCancellation),
         video: false,
       });
     } catch {
@@ -845,9 +876,12 @@ class VoiceManager {
       }
       const ctx = new AC();
       this.micCtx = ctx;
-      if (ctx.state === "suspended") {
-        await ctx.resume();
-      }
+      ctx.onstatechange = () => {
+        if (this.micCtx === ctx && (ctx.state as string) === "interrupted") {
+          void resumeAudioContext(ctx);
+        }
+      };
+      await resumeAudioContext(ctx);
       if (request !== this.micRequest) {
         return false;
       }
@@ -855,8 +889,17 @@ class VoiceManager {
       const gain = ctx.createGain();
       gain.gain.value = this.state.micVolume;
       const dest = ctx.createMediaStreamDestination();
+      // Let quiet microphones be amplified above 100%, while compressing
+      // loud peaks before encoding instead of clipping the outgoing signal.
+      const limiter = ctx.createDynamicsCompressor();
+      limiter.threshold.value = -1;
+      limiter.knee.value = 0;
+      limiter.ratio.value = 20;
+      limiter.attack.value = 0.003;
+      limiter.release.value = 0.1;
       source.connect(gain);
-      gain.connect(dest);
+      gain.connect(limiter);
+      limiter.connect(dest);
       const processed = dest.stream.getAudioTracks()[0];
       if (!processed) {
         throw new Error("no processed track");
@@ -874,11 +917,32 @@ class VoiceManager {
       }
       this.micTrack = rawTrack;
     }
+    try {
+      while (echoCancellation !== this.state.echoCancellation) {
+        echoCancellation = this.state.echoCancellation;
+        await rawTrack.applyConstraints({
+          ...this.micConstraints(echoCancellation),
+          echoCancellation: { exact: echoCancellation },
+        });
+        if (request !== this.micRequest) {
+          return false;
+        }
+      }
+    } catch {
+      if (request === this.micRequest) {
+        this.stopMic();
+        this.emit({ error: "voiceSettingsFailed" });
+      }
+      return false;
+    }
+    this.micEchoCancellation = echoCancellation;
+    void resumeAudioContext(this.micCtx);
     return true;
   }
 
   /** Release the microphone hardware and the processing graph. */
   private releaseMic() {
+    this.echoChange = Promise.resolve();
     if (this.rawStream) {
       this.rawStream.getTracks().forEach((t) => t.stop());
       this.rawStream = null;
