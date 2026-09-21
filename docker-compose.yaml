@@ -1,6 +1,6 @@
 services:
   go-poker:
-    image: evanofslack/go-poker:latest
+    image: walkerfeng2/go-poker:latest
     build:
       context: .
       # npm registry used to install the frontend deps inside the image. Empty
