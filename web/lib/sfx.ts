@@ -45,6 +45,41 @@ const VOLUME_KEY = "gopoker-sfx-volume";
 let cachedVolume: number | null = null;
 let audioCtx: AudioContext | null = null;
 const buffers = new Map<string, AudioBuffer>();
+let voiceMic = false;
+let voiceSpeaker = false;
+
+type AudioSessionType = "ambient" | "playback" | "play-and-record";
+
+function updateAudioSession() {
+  if (typeof navigator === "undefined") {
+    return;
+  }
+  // The session is shared by game audio and voice. Older browsers may not
+  // expose this API; track/context cleanup still runs independently.
+  try {
+    const session = (
+      navigator as Navigator & { audioSession?: { type: AudioSessionType } }
+    ).audioSession;
+    if (session) {
+      session.type = voiceMic
+        ? "play-and-record"
+        : voiceSpeaker
+        ? "playback"
+        : "ambient";
+    }
+  } catch {
+    // The browser still owns the final routing decision.
+  }
+}
+
+// Only microphone capture needs the call session. Listening alone uses
+// normal playback; with voice off, game audio respects iOS silent mode.
+// Game music/effects continue and their saved volumes are never changed.
+export function setVoiceAudioState(mic: boolean, speaker: boolean) {
+  voiceMic = mic;
+  voiceSpeaker = speaker;
+  updateAudioSession();
+}
 
 export function getSfxVolume(): number {
   if (cachedVolume !== null) {
@@ -77,6 +112,7 @@ function getCtx(): AudioContext | null {
     return null;
   }
   if (!audioCtx) {
+    updateAudioSession();
     const Ctor =
       window.AudioContext ||
       (window as unknown as { webkitAudioContext?: typeof AudioContext })

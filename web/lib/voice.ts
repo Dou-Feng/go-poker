@@ -22,6 +22,7 @@ import {
   VoiceSignalKind,
 } from "../actions/actions";
 import { TranslationKey } from "./translations";
+import { setVoiceAudioState } from "./sfx";
 
 export type VoicePeer = {
   id: string;
@@ -176,6 +177,8 @@ class VoiceManager {
   private micCtx: AudioContext | null = null;
   private micGain: GainNode | null = null;
   private audioHost: HTMLElement | null = null;
+  private micRequest = 0;
+  private micRequested = false;
 
   // ICE servers (STUN/TURN + credentials) issued by the game server, and
   // when they stop being valid. Requested on room entry and refreshed before
@@ -322,10 +325,13 @@ class VoiceManager {
 
   /** Leaving the room turns voice off; the server announces our departure. */
   leaveRoom() {
+    this.micRequested = false;
+    this.micRequest++;
     this.teardownPeers();
     this.stopMic();
     this.room = null;
     this.emit({ micOn: false, speakerOn: false });
+    this.syncAudioSession();
   }
 
   // ---- user controls ---------------------------------------------------
@@ -344,20 +350,30 @@ class VoiceManager {
       });
       return;
     }
-    if (on === this.state.micOn) {
+    if (on === this.micRequested) {
       return;
     }
-    const wasActive = this.active;
+    this.micRequested = on;
+    const request = ++this.micRequest;
     if (on) {
-      if (!(await this.startMic())) {
+      this.syncAudioSession();
+      const started = await this.startMic(request);
+      if (request !== this.micRequest) {
+        return;
+      }
+      if (!started) {
+        this.micRequested = false;
+        this.syncAudioSession();
         return;
       }
     } else {
       this.stopMic();
     }
+    const wasActive = this.active;
     this.state = { ...this.state, micOn: on };
     this.peers.forEach((p) => this.applyMicToPeer(p));
     this.syncPresence(wasActive);
+    this.syncAudioSession();
     this.emit();
   }
 
@@ -371,8 +387,12 @@ class VoiceManager {
     }
     const wasActive = this.active;
     this.state = { ...this.state, speakerOn: on };
+    if (on) {
+      this.syncAudioSession();
+    }
     this.peers.forEach((p) => this.applyOutputToPeer(p));
     this.syncPresence(wasActive);
+    this.syncAudioSession();
     this.emit();
   }
 
@@ -420,8 +440,14 @@ class VoiceManager {
     this.state = { ...this.state, echoCancellation: on };
     this.persist();
     if (this.state.micOn) {
+      const request = ++this.micRequest;
       this.releaseMic();
-      if (!(await this.startMic())) {
+      const started = await this.startMic(request);
+      if (request !== this.micRequest) {
+        return;
+      }
+      if (!started) {
+        this.micRequested = false;
         // Reopening failed (permission revoked meanwhile): drop the mic
         // state so the button reflects reality.
         this.state = { ...this.state, micOn: false };
@@ -431,7 +457,12 @@ class VoiceManager {
         this.peers.forEach((p) => this.applyMicToPeer(p));
       }
     }
+    this.syncAudioSession();
     this.emit();
+  }
+
+  private syncAudioSession() {
+    setVoiceAudioState(this.micRequested, this.state.speakerOn);
   }
 
   private persist() {
@@ -716,6 +747,8 @@ class VoiceManager {
 
   private teardownPeers() {
     Array.from(this.peers.keys()).forEach((id) => this.removePeer(id));
+    this.audioHost?.remove();
+    this.audioHost = null;
   }
 
   // ---- playback -------------------------------------------------------
@@ -732,17 +765,12 @@ class VoiceManager {
     }
     if (!peer.audio) {
       const audio = document.createElement("audio");
-      audio.autoplay = true;
       audio.setAttribute("playsinline", "");
       this.audioHost.appendChild(audio);
       peer.audio = audio;
     }
     peer.audio.srcObject = stream;
     this.applyOutputToPeer(peer);
-    void peer.audio.play().catch(() => {
-      // Autoplay policies: the user gesture that turned voice on normally
-      // unlocks playback; if not, the next toggle retries.
-    });
   }
 
   private applyOutputToPeer(peer: Peer) {
@@ -751,11 +779,18 @@ class VoiceManager {
     }
     peer.audio.muted = !this.state.speakerOn || this.isPeerMuted(peer.id);
     peer.audio.volume = this.state.outputVolume;
+    if (peer.audio.muted) {
+      peer.audio.pause();
+    } else {
+      void peer.audio.play().catch(() => {
+        // The next speaker toggle retries if autoplay was blocked.
+      });
+    }
   }
 
   // ---- microphone -----------------------------------------------------
 
-  private async startMic(): Promise<boolean> {
+  private async startMic(request: number): Promise<boolean> {
     if (this.micTrack) {
       return true;
     }
@@ -779,7 +814,16 @@ class VoiceManager {
         video: false,
       });
     } catch {
-      this.emit({ error: "micDenied" });
+      if (request === this.micRequest) {
+        this.emit({ error: "micDenied" });
+      }
+      return false;
+    }
+    // Permission can resolve after turning the mic off or leaving the room.
+    // Never attach a late stream or resurrect the recording session.
+    if (request !== this.micRequest) {
+      raw.getTracks().forEach((t) => t.stop());
+      this.syncAudioSession();
       return false;
     }
     this.rawStream = raw;
@@ -800,8 +844,12 @@ class VoiceManager {
         throw new Error("no AudioContext");
       }
       const ctx = new AC();
+      this.micCtx = ctx;
       if (ctx.state === "suspended") {
         await ctx.resume();
+      }
+      if (request !== this.micRequest) {
+        return false;
       }
       const source = ctx.createMediaStreamSource(raw);
       const gain = ctx.createGain();
@@ -817,6 +865,13 @@ class VoiceManager {
       this.micGain = gain;
       this.micTrack = processed;
     } catch {
+      if (request !== this.micRequest) {
+        return false;
+      }
+      if (this.micCtx) {
+        void this.micCtx.close().catch(() => {});
+        this.micCtx = null;
+      }
       this.micTrack = rawTrack;
     }
     return true;
@@ -833,7 +888,10 @@ class VoiceManager {
       this.micTrack = null;
     }
     if (this.micCtx) {
-      void this.micCtx.close().catch(() => {});
+      void this.micCtx
+        .close()
+        .catch(() => {})
+        .then(() => this.syncAudioSession());
       this.micCtx = null;
     }
     this.micGain = null;

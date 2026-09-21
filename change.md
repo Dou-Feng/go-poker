@@ -8,6 +8,8 @@
 
 ## 补丁
 
+- [x] 修复 iPhone 关闭麦克风后仍停留在通话音频模式：通过 Audio Session API 在开麦时使用 `play-and-record`，关麦但仍收听时恢复 `playback`，语音全关时恢复 `ambient`；游戏音乐和音效继续按原音量播放。关闭收听时暂停远端音频，离房时释放媒体元素；补齐授权/音频初始化/回声消除重启期间关闭语音的异步取消，以及处理节点初始化失败时的 AudioContext 清理。前端回归测试：`web/tests/voiceAudio.test.cjs`；实际 iPhone 输出路由仍需真机验证。
+
 - [x] 限制局中主动亮牌：本人已 all-in，且本手中仍有筹码可操作的玩家最多只剩 1 人时才显示亮牌按钮，后端同步校验；包括四人局中三人 all-in，以及全部 all-in 的情况。保留正常多人摊牌与手牌结束后赢家秀牌，补充引擎及 WebSocket 消息回归测试。
 
 - [x] 修复局中预约入座、手牌结束后老玩家无法取消准备：收尾时同步玩家状态与 `In` 标记，保留自动续局所需的准备状态。回归测试覆盖弃牌结束、正常摊牌，以及新玩家入座后老玩家取消准备、重新准备再开局：`backend/poker/action_boundary_test.go`、`backend/server/reserve_test.go`。
