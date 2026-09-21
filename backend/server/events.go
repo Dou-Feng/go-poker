@@ -1281,7 +1281,7 @@ func handleVoteSettle(c *Client) {
 	c.table.voteSettle(c)
 }
 
-// handleShowHand reveals a player's hole cards at showdown.
+// handleShowHand requests a voluntary reveal; the engine checks eligibility.
 func handleShowHand(c *Client) {
 	if c.table == nil {
 		c.send <- createError("not in a room")

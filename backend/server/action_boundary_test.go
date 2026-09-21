@@ -8,6 +8,52 @@ import (
 	"github.com/evanofslack/go-poker/poker"
 )
 
+func TestWireShowHandRequiresAtMostOnePlayerAbleToAct(t *testing.T) {
+	for _, count := range []int{2, 3, 4} {
+		t.Run(map[int]string{2: "heads-up", 3: "two-can-act", 4: "three-all-in"}[count], func(t *testing.T) {
+			tbl, _ := newTestTable(t)
+			drainBroadcasts(t, tbl)
+			seat(t, tbl, "a", 1, true)
+			seat(t, tbl, "b", 2, true)
+			if count >= 3 {
+				seat(t, tbl, "c", 3, true)
+			}
+			if count == 4 {
+				seat(t, tbl, "d", 4, true)
+			}
+			if !autoStartIfReady(tbl) {
+				t.Fatal("start failed")
+			}
+			c := actionClient(t, tbl)
+			v := tbl.game.GenerateOmniView()
+			pn := v.ActionNum
+			if err := poker.Bet(tbl.game, pn, v.Players[pn].Stack); err != nil {
+				t.Fatal(err)
+			}
+			if count == 4 {
+				for i := 0; i < 2; i++ {
+					v = tbl.game.GenerateOmniView()
+					if err := poker.Bet(tbl.game, v.ActionNum, v.Players[v.ActionNum].Stack); err != nil {
+						t.Fatal(err)
+					}
+				}
+			}
+			before := tbl.game.GenerateOmniView()
+			if err := c.processEvents([]byte(`{"action":"show-hand"}`)); err != nil {
+				t.Fatal(err)
+			}
+			after := tbl.game.GenerateOmniView()
+			if count == 3 {
+				if !reflect.DeepEqual(before, after) {
+					t.Fatal("wire request allowed reveal while two opponents could act")
+				}
+			} else if !after.Players[pn].Revealed {
+				t.Fatal("all-in player could not reveal with only one opponent able to act")
+			}
+		})
+	}
+}
+
 func TestWireActionsCannotReplayFoldOrOverbet(t *testing.T) {
 	for _, action := range []string{"fold", "raise"} {
 		t.Run(action, func(t *testing.T) {

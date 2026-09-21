@@ -178,24 +178,9 @@ func TestSidePotShowdownAwards(t *testing.T) {
 // ShowHand must propagate the revealed flag into the serialized view so other
 // clients can render the player's hole cards.
 func TestShowHandRevealsInView(t *testing.T) {
-	g := NewGame()
-	Configure(g, 1, 2, 100, 100, 6, 0)
-
-	a := g.AddPlayer()
-	b := g.AddPlayer()
-	c := g.AddPlayer()
-
-	for _, pn := range []uint{a, b, c} {
-		if err := BuyIn(g, pn, 100); err != nil {
-			t.Fatalf("buyin: %v", err)
-		}
-		if err := ToggleReady(g, pn, 0); err != nil {
-			t.Fatalf("ready: %v", err)
-		}
-	}
-	if err := Deal(g, a, 0); err != nil {
-		t.Fatalf("deal: %v", err)
-	}
+	g := sitDown(t, 100, 100)
+	a := g.actionNum
+	shove(t, g, a)
 
 	if err := ShowHand(g, a, 0); err != nil {
 		t.Fatalf("show hand: %v", err)

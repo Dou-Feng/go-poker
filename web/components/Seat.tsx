@@ -192,7 +192,12 @@ export default function Seat({
       (game.pots ?? []).some((pot) =>
         (pot.winningPlayerNums ?? []).includes(player.position)
       );
-    const canShow = isMine && inHand && player.stack === 0 && !player.revealed;
+    const canShow =
+      isMine &&
+      allIn &&
+      !left &&
+      !player.revealed &&
+      game.players.filter((p) => p.in && p.stack > 0).length <= 1;
     // Table position as a badge on the avatar (independent of the seat
     // state, so BB + TURN or D + ALL-IN simply stack).
     const role: "dealer" | "sb" | "bb" | null = !running

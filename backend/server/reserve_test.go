@@ -93,7 +93,8 @@ func foldOut(t *testing.T, tbl *table, clients map[string]*Client) {
 
 // The core scenario: a spectator taps seat 3 mid-hand, is seated there when
 // the hand ends, NOT ready, so the table waits in the not-ready phase instead
-// of dealing again. Readying up starts the three-handed hand.
+// of dealing again. Existing players can cancel ready, and the three-handed
+// hand starts once everyone readies up again.
 func TestReservedSeatIsFilledNotReadyAtHandEnd(t *testing.T) {
 	tbl, store, a, b, c := reserveRoom(t)
 	if !autoStartIfReady(tbl) {
@@ -150,10 +151,30 @@ func TestReservedSeatIsFilledNotReadyAtHandEnd(t *testing.T) {
 		}
 	}
 
+	// Both the folder and the winner can cancel readiness while waiting
+	// for the reserved seat. Exercise the same messages the UI sends.
+	for _, client := range []*Client{a, b} {
+		if err := client.processEvents([]byte(`{"action":"toggle-ready"}`)); err != nil {
+			t.Fatal(err)
+		}
+		view = tbl.game.GenerateOmniView()
+		i, _ := findPlayer(view, client.uuid)
+		if view.Running || view.Players[i].Ready || view.Players[i].In {
+			t.Fatalf("existing player could not cancel ready: %+v", view.Players[i])
+		}
+	}
 	handleToggleReady(c)
+	if tbl.game.GenerateOmniView().Running {
+		t.Fatal("newcomer readying must wait for existing players to ready again")
+	}
+	handleToggleReady(a)
+	if tbl.game.GenerateOmniView().Running {
+		t.Fatal("must wait until every player is ready")
+	}
+	handleToggleReady(b)
 	view = tbl.game.GenerateOmniView()
 	if !view.Running || len(view.Players) != 3 {
-		t.Fatalf("readying the newcomer must start the hand, running=%v players=%d", view.Running, len(view.Players))
+		t.Fatalf("everyone ready must start the hand, running=%v players=%d", view.Running, len(view.Players))
 	}
 }
 

@@ -221,12 +221,31 @@ func setUsername(g *Game, pn uint, data string) error {
 	return nil
 }
 
-// ShowHand marks a player's hole cards as voluntarily revealed (e.g. an
-// all-in player choosing to show). data is ignored.
+// ShowHand allows an all-in player to reveal once at most one player in the
+// hand still has chips to act. At showdown, a player may show an uncontested
+// winning hand. data is ignored.
 func ShowHand(g *Game, pn uint, data uint) error {
 	g.mtx.Lock()
 	defer g.mtx.Unlock()
-	g.getPlayer(pn).Revealed = true
+	if pn >= uint(len(g.players)) {
+		return ErrOutOfBounds
+	}
+	p := g.getPlayer(pn)
+	if !g.getRunning() || !p.In || p.Left {
+		return ErrIllegalAction
+	}
+	if g.getStage() != Showdown {
+		canAct := 0
+		for _, opponent := range g.players {
+			if opponent.In && opponent.Stack > 0 {
+				canAct++
+			}
+		}
+		if !p.allIn() || canAct > 1 {
+			return ErrIllegalAction
+		}
+	}
+	p.Revealed = true
 	return nil
 }
 

@@ -407,8 +407,13 @@ func (g *Game) resetForNextHand() {
 		g.players[i].Bet = 0
 		g.players[i].TotalBet = 0
 
-		if g.players[i].Stack == 0 {
-			g.players[i].Ready = false
+		// The showdown has ended: nobody remains in the previous hand.
+		// Preserve readiness so automatic dealing can continue, while also
+		// allowing players to cancel ready if a newcomer makes the table wait.
+		if g.players[i].Ready && g.players[i].Stack > 0 {
+			g.players[i].setState(PlayerReady)
+		} else {
+			g.players[i].setState(PlayerNotReady)
 		}
 
 	}

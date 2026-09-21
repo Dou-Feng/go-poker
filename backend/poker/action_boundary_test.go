@@ -74,3 +74,44 @@ func TestFoldedPlayerCannotUnreadyOrMoveDuringHand(t *testing.T) {
 		t.Fatal("hand changed after rejected requests")
 	}
 }
+
+func TestSettledPlayersCanCancelReady(t *testing.T) {
+	for _, ending := range []string{"fold", "showdown"} {
+		t.Run(ending, func(t *testing.T) {
+			g := sitDown(t, 200, 200)
+			if ending == "fold" {
+				if err := Fold(g, g.actionNum, 0); err != nil {
+					t.Fatal(err)
+				}
+			} else {
+				for steps := 0; g.getStage() != Showdown && steps < 20; steps++ {
+					if g.getBetting() {
+						call(t, g, g.actionNum)
+					} else if err := Deal(g, g.dealerNum, 0); err != nil {
+						t.Fatal(err)
+					}
+				}
+			}
+			if err := SettleShowdown(g); err != nil {
+				t.Fatal(err)
+			}
+			for pn, p := range g.GenerateOmniView().Players {
+				if p.In || !p.Ready || p.State != PlayerReady {
+					t.Fatalf("player %d did not return to ready: %+v", pn, p)
+				}
+				if err := ToggleReady(g, uint(pn), 0); err != nil {
+					t.Fatalf("player %d cannot cancel ready: %v", pn, err)
+				}
+				if p := g.GenerateOmniView().Players[pn]; p.Ready || p.In || p.State != PlayerNotReady {
+					t.Fatalf("player %d did not cancel ready: %+v", pn, p)
+				}
+				if err := ToggleReady(g, uint(pn), 0); err != nil {
+					t.Fatalf("player %d cannot ready again: %v", pn, err)
+				}
+			}
+			if err := g.Start(); err != nil {
+				t.Fatalf("cannot start next hand: %v", err)
+			}
+		})
+	}
+}
