@@ -1,5 +1,15 @@
-import { useState } from "react";
-import { FiSettings, FiX } from "react-icons/fi";
+import { CSSProperties, ReactNode, useEffect, useRef, useState } from "react";
+import {
+  FiActivity,
+  FiCheck,
+  FiGlobe,
+  FiMusic,
+  FiSettings,
+  FiUsers,
+  FiX,
+  FiZap,
+} from "react-icons/fi";
+import { GiSpades } from "react-icons/gi";
 import { useTranslation } from "../hooks/useTranslation";
 import {
   getSfxVolume,
@@ -13,229 +23,344 @@ import { MAX_MIC_VOLUME, voice } from "../lib/voice";
 import MicIcon from "./MicIcon";
 import SpeakerIcon from "./SpeakerIcon";
 import Portal from "./Portal";
-import ui from "../styles/Dialog.module.css";
+import s from "../styles/Settings.module.css";
 
-const sliderClass =
-  "h-1.5 w-full cursor-pointer appearance-none rounded-full bg-cardhi accent-cyan-700";
+type SettingsProps = { buttonClassName?: string };
 
-type SettingsProps = {
-  buttonClassName?: string;
+type VolumeControlProps = {
+  label: string;
+  icon: ReactNode;
+  value: number;
+  max?: number;
+  hint?: string;
+  secondary?: boolean;
+  onChange: (value: number) => void;
+  onToggleMute?: () => void;
+  onPreview?: () => void;
 };
 
-export default function Settings({ buttonClassName }: SettingsProps) {
+function VolumeControl({
+  label,
+  icon,
+  value,
+  max = 100,
+  hint,
+  secondary,
+  onChange,
+  onToggleMute,
+  onPreview,
+}: VolumeControlProps) {
+  const { t } = useTranslation();
+  return (
+    <div className={`${s.row} ${secondary ? s.secondaryRow : ""}`}>
+      <span className={s.rowIcon} aria-hidden="true">
+        {icon}
+      </span>
+      <div className={s.label}>
+        <span>{label}</span>
+        {hint && <span className={s.hint}>{hint}</span>}
+      </div>
+      <div className={s.volumeControl}>
+        {onToggleMute ? (
+          <button
+            type="button"
+            className={s.volumeButton}
+            onClick={onToggleMute}
+            aria-label={`${
+              value === 0 ? t("unmuteAudio") : t("muteAudio")
+            }: ${label}`}
+            aria-pressed={value === 0}
+            title={value === 0 ? t("unmuteAudio") : t("muteAudio")}
+          >
+            <SpeakerIcon off />
+          </button>
+        ) : (
+          <span className={s.volumeEnd} aria-hidden="true">
+            {icon}
+          </span>
+        )}
+        <div className={s.rangeWrap}>
+          <output className={s.volumeValue} aria-hidden="true">
+            {value}
+            <span>%</span>
+          </output>
+          <input
+            type="range"
+            min={0}
+            max={max}
+            step={5}
+            value={value}
+            aria-label={label}
+            aria-valuetext={`${value}%`}
+            onChange={(e) => onChange(Number(e.target.value))}
+            onPointerUp={onPreview}
+            onKeyUp={onPreview}
+            className={s.range}
+            style={
+              { "--range-fill": `${(value / max) * 100}%` } as CSSProperties
+            }
+          />
+        </div>
+        <span className={s.volumeEnd} aria-hidden="true">
+          <SpeakerIcon />
+        </span>
+      </div>
+    </div>
+  );
+}
+
+type SettingSwitchProps = {
+  label: string;
+  hint: string;
+  icon: ReactNode;
+  checked: boolean;
+  onChange: () => void;
+};
+
+function SettingSwitch({
+  label,
+  hint,
+  icon,
+  checked,
+  onChange,
+}: SettingSwitchProps) {
+  const { t } = useTranslation();
+  return (
+    <div className={`${s.row} ${s.switchRow}`}>
+      <span className={s.rowIcon} aria-hidden="true">
+        {icon}
+      </span>
+      <div className={s.label}>
+        <span>{label}</span>
+        <span className={s.hint}>{hint}</span>
+      </div>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={checked}
+        aria-label={label}
+        onClick={onChange}
+        className={s.switch}
+        data-checked={checked}
+        title={checked ? t("on") : t("off")}
+      >
+        <span className={s.switchMark} aria-hidden="true">
+          {checked ? <FiCheck /> : <FiX />}
+        </span>
+        <span className={s.switchThumb} aria-hidden="true" />
+      </button>
+    </div>
+  );
+}
+
+function SettingsDialog({ onClose }: { onClose: () => void }) {
   const { language, setLanguage, t } = useTranslation();
-  const [open, setOpen] = useState(false);
   const [volume, setVolume] = useState(() => Math.round(getSfxVolume() * 100));
   const [bgmVolume, setBgmVolumeState] = useState(() =>
     Math.round(getBgmVolume() * 100)
   );
   const v = useVoice();
-  const micPct = Math.round(v.micVolume * 100);
-  const outPct = Math.round(v.outputVolume * 100);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const closeRef = useRef<HTMLButtonElement>(null);
 
-  const optionButton = (active: boolean) =>
-    `rounded-sm px-3 py-1 text-sm ${
-      active ? "bg-cyan-900 text-ink" : "bg-floor text-ink hover:bg-cardhi"
-    }`;
+  useEffect(() => {
+    const previousFocus = document.activeElement as HTMLElement | null;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    closeRef.current?.focus({ preventScroll: true });
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      previousFocus?.focus({ preventScroll: true });
+    };
+  }, []);
 
-  const applyVolume = (v: number) => {
-    setVolume(v);
-    setSfxVolume(v / 100);
+  const applyVolume = (value: number) => {
+    setVolume(value);
+    setSfxVolume(value / 100);
   };
-
-  const applyBgm = (v: number) => {
-    setBgmVolumeState(v);
-    setBgmVolume(v / 100);
+  const applyBgm = (value: number) => {
+    setBgmVolumeState(value);
+    setBgmVolume(value / 100);
   };
 
   return (
-    <div className="relative">
+    <div
+      className={s.overlay}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div
+        className={s.dialog}
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="settings-title"
+        onKeyDown={(e) => {
+          if (e.key === "Escape") {
+            e.stopPropagation();
+            onClose();
+          }
+          if (e.key !== "Tab") return;
+          const controls = dialogRef.current?.querySelectorAll<HTMLElement>(
+            "button:not([disabled]), input:not([disabled])"
+          );
+          if (!controls?.length) return;
+          const first = controls[0],
+            last = controls[controls.length - 1];
+          if (e.shiftKey && document.activeElement === first) {
+            e.preventDefault();
+            last.focus();
+          } else if (!e.shiftKey && document.activeElement === last) {
+            e.preventDefault();
+            first.focus();
+          }
+        }}
+      >
+        <span className={s.crest} aria-hidden="true">
+          <GiSpades />
+        </span>
+        <div className={s.corners} aria-hidden="true">
+          <GiSpades />
+          <GiSpades />
+          <GiSpades />
+          <GiSpades />
+        </div>
+        <header className={s.header}>
+          <h2 id="settings-title">
+            <GiSpades aria-hidden="true" />
+            {t("settings")}
+          </h2>
+          <button
+            type="button"
+            ref={closeRef}
+            onClick={onClose}
+            data-sfx="back"
+            aria-label={t("close")}
+            className={s.close}
+          >
+            <FiX />
+          </button>
+        </header>
+        <div className={s.content}>
+          <div className={s.settingsBody}>
+            <div className={`${s.row} ${s.languageRow}`}>
+              <span className={s.rowIcon} aria-hidden="true">
+                <FiGlobe />
+              </span>
+              <span className={s.label}>{t("language")}</span>
+              <div
+                className={s.languages}
+                role="group"
+                aria-label={t("language")}
+              >
+                {(["en", "zh"] as const).map((lang) => (
+                  <button
+                    key={lang}
+                    type="button"
+                    lang={lang}
+                    onClick={() => setLanguage(lang)}
+                    aria-pressed={language === lang}
+                    className={s.language}
+                  >
+                    <FiCheck aria-hidden="true" />
+                    <span>{lang === "en" ? "English" : "中文"}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+            <VolumeControl
+              label={t("sfx")}
+              icon={<SpeakerIcon />}
+              value={volume}
+              onChange={applyVolume}
+              onToggleMute={() => applyVolume(volume === 0 ? 50 : 0)}
+              onPreview={() => playSfx("click")}
+            />
+            <VolumeControl
+              label={t("bgm")}
+              icon={<FiMusic />}
+              value={bgmVolume}
+              onChange={applyBgm}
+              onToggleMute={() => applyBgm(bgmVolume === 0 ? 5 : 0)}
+            />
+            {v.supported && (
+              <section
+                className={s.voiceSection}
+                aria-labelledby="settings-voice-title"
+              >
+                <h3 className={s.sectionTitle} id="settings-voice-title">
+                  <span className={s.rowIcon} aria-hidden="true">
+                    <MicIcon />
+                  </span>
+                  {t("voiceChat")}
+                </h3>
+                <VolumeControl
+                  label={t("micVolume")}
+                  icon={<MicIcon />}
+                  value={Math.round(v.micVolume * 100)}
+                  max={MAX_MIC_VOLUME * 100}
+                  hint={t("micVolumeHint")}
+                  secondary
+                  onChange={(value) => voice.setMicVolume(value / 100)}
+                />
+                <VolumeControl
+                  label={t("othersVolume")}
+                  icon={<FiUsers />}
+                  value={Math.round(v.outputVolume * 100)}
+                  secondary
+                  onChange={(value) => voice.setOutputVolume(value / 100)}
+                />
+                <SettingSwitch
+                  label={t("echoCancellation")}
+                  hint={t("micProcessingDescription")}
+                  icon={<FiActivity />}
+                  checked={v.echoCancellation}
+                  onChange={() =>
+                    void voice.setEchoCancellation(!v.echoCancellation)
+                  }
+                />
+                <SettingSwitch
+                  label={t("noiseCancellation")}
+                  hint={t("noiseCancellationDescription")}
+                  icon={<FiZap />}
+                  checked={v.noiseCancellation}
+                  onChange={() =>
+                    void voice.setNoiseCancellation(!v.noiseCancellation)
+                  }
+                />
+              </section>
+            )}
+          </div>
+        </div>
+        <footer className={s.footer} aria-hidden="true">
+          <span>GOOD CARDS, BETTER FRIENDS</span>
+        </footer>
+      </div>
+    </div>
+  );
+}
+
+export default function Settings({ buttonClassName }: SettingsProps) {
+  const { t } = useTranslation();
+  const [open, setOpen] = useState(false);
+  return (
+    <>
       <button
+        type="button"
         onClick={() => setOpen(true)}
         title={t("settings")}
         aria-label={t("settings")}
+        aria-haspopup="dialog"
         className={buttonClassName ?? "btn btn-icon"}
       >
         <FiSettings size="1rem" />
       </button>
-
       {open && (
         <Portal>
-          <div className={ui.overlay}>
-            <div className={ui.dialog}>
-              <div className={ui.dialogHeader}>
-                <h2>{t("settings")}</h2>
-                <button
-                  onClick={() => setOpen(false)}
-                  data-sfx="back"
-                  aria-label={t("close")}
-                  className={ui.iconButton}
-                >
-                  <FiX />
-                </button>
-              </div>
-
-              <div className="flex flex-col gap-2">
-                <p className="type-caption">{t("language")}</p>
-                <div className="flex flex-row gap-2">
-                  <button
-                    onClick={() => setLanguage("en")}
-                    aria-pressed={language === "en"}
-                    className={optionButton(language === "en")}
-                  >
-                    English
-                  </button>
-                  <button
-                    onClick={() => setLanguage("zh")}
-                    aria-pressed={language === "zh"}
-                    className={optionButton(language === "zh")}
-                  >
-                    中文
-                  </button>
-                </div>
-              </div>
-
-              <div className="mt-4 flex flex-col gap-2">
-                <div className="flex flex-row items-center justify-between">
-                  <p className="type-caption">{t("sfx")}</p>
-                  <p className="type-caption font-mono">{volume}%</p>
-                </div>
-                <div className="flex flex-row items-center gap-2">
-                  <input
-                    type="range"
-                    min={0}
-                    max={100}
-                    step={5}
-                    aria-label={t("sfx")}
-                    value={volume}
-                    onChange={(e) => applyVolume(Number(e.target.value))}
-                    onPointerUp={() => playSfx("click")}
-                    onKeyUp={() => playSfx("click")}
-                    className={sliderClass}
-                  />
-                  <button
-                    onClick={() => {
-                      applyVolume(volume === 0 ? 50 : 0);
-                    }}
-                    title={t("sfx")}
-                    aria-label={t("sfx")}
-                    aria-pressed={volume === 0}
-                    className="btn btn-icon"
-                  >
-                    <SpeakerIcon off={volume === 0} className="h-4 w-4" />
-                  </button>
-                </div>
-              </div>
-
-              <div className="mt-4 flex flex-col gap-2">
-                <div className="flex flex-row items-center justify-between">
-                  <p className="type-caption">{t("bgm")}</p>
-                  <p className="type-caption font-mono">{bgmVolume}%</p>
-                </div>
-                <div className="flex flex-row items-center gap-2">
-                  <input
-                    type="range"
-                    min={0}
-                    max={100}
-                    step={5}
-                    aria-label={t("bgm")}
-                    value={bgmVolume}
-                    onChange={(e) => applyBgm(Number(e.target.value))}
-                    className={sliderClass}
-                  />
-                  <button
-                    onClick={() => applyBgm(bgmVolume === 0 ? 5 : 0)}
-                    title={t("bgm")}
-                    aria-label={t("bgm")}
-                    aria-pressed={bgmVolume === 0}
-                    className="btn btn-icon"
-                  >
-                    <SpeakerIcon off={bgmVolume === 0} className="h-4 w-4" />
-                  </button>
-                </div>
-              </div>
-
-              {v.supported && (
-                <div className="mt-4 flex flex-col gap-3">
-                  <p className="type-caption">{t("voiceChat")}</p>
-                  <div className="flex flex-col gap-1.5">
-                    <div className="flex flex-row items-center justify-between">
-                      <p className="flex flex-row items-center gap-1.5 text-sm text-ink">
-                        <MicIcon className="h-4 w-4" />
-                        {t("micVolume")}
-                      </p>
-                      <p className="type-caption font-mono">{micPct}%</p>
-                    </div>
-                    <input
-                      type="range"
-                      min={0}
-                      max={MAX_MIC_VOLUME * 100}
-                      step={5}
-                      aria-label={t("micVolume")}
-                      value={micPct}
-                      onChange={(e) =>
-                        voice.setMicVolume(Number(e.target.value) / 100)
-                      }
-                      className={sliderClass}
-                    />
-                    <p className="type-caption">{t("micVolumeHint")}</p>
-                  </div>
-                  <div className="flex flex-col gap-1.5">
-                    <div className="flex flex-row items-center justify-between">
-                      <p className="flex flex-row items-center gap-1.5 text-sm text-ink">
-                        <SpeakerIcon className="h-4 w-4" />
-                        {t("othersVolume")}
-                      </p>
-                      <p className="type-caption font-mono">{outPct}%</p>
-                    </div>
-                    <input
-                      type="range"
-                      min={0}
-                      max={100}
-                      step={5}
-                      aria-label={t("othersVolume")}
-                      value={outPct}
-                      onChange={(e) =>
-                        voice.setOutputVolume(Number(e.target.value) / 100)
-                      }
-                      className={sliderClass}
-                    />
-                  </div>
-                  <div className="flex flex-row items-center justify-between">
-                    <p className="text-sm text-ink">{t("echoCancellation")}</p>
-                    <button
-                      onClick={() =>
-                        void voice.setEchoCancellation(!v.echoCancellation)
-                      }
-                      role="switch"
-                      aria-label={t("echoCancellation")}
-                      aria-checked={v.echoCancellation}
-                      className={optionButton(v.echoCancellation)}
-                    >
-                      {v.echoCancellation ? t("on") : t("off")}
-                    </button>
-                  </div>
-                  <div className="flex flex-row items-center justify-between">
-                    <p className="text-sm text-ink">{t("noiseCancellation")}</p>
-                    <button
-                      onClick={() =>
-                        void voice.setNoiseCancellation(!v.noiseCancellation)
-                      }
-                      role="switch"
-                      aria-label={t("noiseCancellation")}
-                      aria-checked={v.noiseCancellation}
-                      title={t("noiseCancellationHint")}
-                      className={optionButton(v.noiseCancellation)}
-                    >
-                      {v.noiseCancellation ? t("on") : t("off")}
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
+          <SettingsDialog onClose={() => setOpen(false)} />
         </Portal>
       )}
-    </div>
+    </>
   );
 }

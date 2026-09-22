@@ -34,6 +34,8 @@ import {
   FiX,
   FiArrowRight,
   FiCreditCard,
+  FiDatabase,
+  FiLayers,
 } from "react-icons/fi";
 import { GiSpades } from "react-icons/gi";
 
@@ -252,7 +254,7 @@ export default function Lobby() {
             onClick={() => setShowFriends(true)}
             title={t("friends")}
             aria-label={t("friends")}
-            className={ui.iconButton}
+            className={styles.toolButton}
           >
             <FiUsers />
           </button>
@@ -263,16 +265,16 @@ export default function Lobby() {
             }}
             title={t("history")}
             aria-label={t("history")}
-            className={ui.iconButton}
+            className={styles.toolButton}
           >
             <FiClock />
           </button>
-          <Settings buttonClassName={`${ui.iconButton} w-full`} />
+          <Settings buttonClassName={styles.toolButton} />
           <button
             onClick={logout}
             title={t("logout")}
             aria-label={t("logout")}
-            className={ui.iconButton}
+            className={styles.toolButton}
           >
             <FiLogOut />
           </button>
@@ -280,7 +282,8 @@ export default function Lobby() {
       </header>
       <section className={styles.content}>
         <header className={styles.lobbyIntro}>
-          <div>
+          <div className={styles.introTitle}>
+            <GiSpades className={styles.introSpade} aria-hidden="true" />
             <h1>{t("lobby")}</h1>
             <p>{t("lobbyTagline")}</p>
           </div>
@@ -308,147 +311,190 @@ export default function Lobby() {
               <span>{t("refresh")}</span>
             </button>
           </header>
-          {appState.tables.length === 0 && (
-            <div className={styles.empty}>
-              <GiSpades aria-hidden="true" className={styles.emptySpade} />
-              <h3>{t("lobbyEmptyTitle")}</h3>
-              <p>{t("lobbyEmptyHint")}</p>
-              <button
-                type="button"
-                onClick={() => setShowCreate(true)}
-                data-sfx="pong"
-                className={`${ui.primary} ${styles.emptyAction}`}
-              >
-                <FiPlus aria-hidden="true" />
-                {t("createFirstRoom")}
-              </button>
-            </div>
-          )}
-          <div className={styles.roomList}>
-            {appState.tables.map((room) => (
-              <article key={room.name} className={styles.room}>
-                <div className={styles.roomTopline}>
-                  <div className={styles.roomIdentity}>
-                    <span className={styles.roomMark} aria-hidden="true">
-                      <GiSpades />
-                    </span>
-                    <div className={styles.roomText}>
-                      <h3 title={room.name}>
-                        <span>{room.name}</span>
-                        {room.locked && (
-                          <FiLock
-                            aria-hidden="true"
-                            title={t("roomPassword")}
-                          />
-                        )}
-                      </h3>
-                      <div className={styles.roomBadges}>
-                        {room.tournament && (
-                          <span
-                            className={styles.badge}
-                            title={t("tournamentHint")}
-                          >
-                            {t("tournament")}
-                          </span>
-                        )}
-                        {room.botType === "ai" && (
-                          <span
-                            className={styles.badge}
-                            title={t("botTypeAIHint")}
-                          >
-                            {t("botTypeAI")}
-                          </span>
-                        )}
-                        {room.running && (
-                          <span className={styles.runningBadge}>
-                            {t("running")}
-                          </span>
-                        )}
+          <div
+            className={`${styles.roomViewport} ${
+              appState.tables.length === 0 ? styles.emptyViewport : ""
+            }`}
+            role="region"
+            aria-label={t("rooms")}
+            tabIndex={0}
+          >
+            {appState.tables.length === 0 && (
+              <div className={styles.empty}>
+                <GiSpades aria-hidden="true" className={styles.emptySpade} />
+                <h3>{t("lobbyEmptyTitle")}</h3>
+                <p>{t("lobbyEmptyHint")}</p>
+                <button
+                  type="button"
+                  onClick={() => setShowCreate(true)}
+                  data-sfx="pong"
+                  className={`${ui.primary} ${styles.emptyAction}`}
+                >
+                  <FiPlus aria-hidden="true" />
+                  {t("createFirstRoom")}
+                </button>
+              </div>
+            )}
+            <div className={styles.roomList}>
+              {appState.tables.map((room) => (
+                <article key={room.name} className={styles.room}>
+                  <span className={styles.roomCrest} aria-hidden="true">
+                    <GiSpades />
+                  </span>
+                  <div className={styles.roomCorners} aria-hidden="true">
+                    <GiSpades />
+                    <GiSpades />
+                    <GiSpades />
+                    <GiSpades />
+                  </div>
+                  <img
+                    className={styles.roomArt}
+                    src="/assets/ui/table/waiting-cards.webp"
+                    alt=""
+                    aria-hidden="true"
+                  />
+                  <div className={styles.roomTopline}>
+                    <div className={styles.roomIdentity}>
+                      <span className={styles.roomMark} aria-hidden="true">
+                        <GiSpades />
+                      </span>
+                      <div className={styles.roomText}>
+                        <h3 title={room.name}>
+                          <span>{room.name}</span>
+                          {room.locked && (
+                            <FiLock
+                              aria-hidden="true"
+                              title={t("roomPassword")}
+                            />
+                          )}
+                        </h3>
+                        <p className={styles.roomSubtitle}>
+                          {t("roomTagline")}
+                        </p>
+                        <div className={styles.roomBadges}>
+                          {room.tournament && (
+                            <span
+                              className={styles.badge}
+                              title={t("tournamentHint")}
+                            >
+                              {t("tournament")}
+                            </span>
+                          )}
+                          {room.botType === "ai" && (
+                            <span
+                              className={styles.badge}
+                              title={t("botTypeAIHint")}
+                            >
+                              {t("botTypeAI")}
+                            </span>
+                          )}
+                          {room.running && (
+                            <span className={styles.runningBadge}>
+                              {t("running")}
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </div>
+                    <div className={styles.roomCapacity}>
+                      <strong className={`${styles.occupancy} type-num`}>
+                        <FiUsers aria-hidden="true" />
+                        {room.players} / {room.maxPlayers}
+                      </strong>
+                      <span aria-hidden="true">TEXAS HOLD’EM</span>
+                    </div>
                   </div>
-                  <strong className={`${styles.occupancy} type-num`}>
-                    {room.players} / {room.maxPlayers}
-                  </strong>
-                </div>
 
-                <div className={styles.roomFacts}>
-                  <div>
-                    <span>{t("blinds")}</span>
-                    <strong className="type-num">
-                      {room.sb} / {room.bb}
-                    </strong>
+                  <div className={styles.roomFacts}>
+                    <div>
+                      <span>
+                        <FiLayers aria-hidden="true" />
+                        {t("blinds")}
+                      </span>
+                      <strong className="type-num">
+                        {room.sb} / {room.bb}
+                      </strong>
+                    </div>
+                    <div>
+                      <span>
+                        <FiDatabase aria-hidden="true" />
+                        {t("buyInLabel")}
+                      </span>
+                      <strong className="type-num">{room.buyIn}</strong>
+                    </div>
                   </div>
-                  <div>
-                    <span>{t("buyInLabel")}</span>
-                    <strong className="type-num">{room.buyIn}</strong>
-                  </div>
-                </div>
 
-                <div className={styles.roomFooter}>
-                  <p>
-                    <span>
-                      {room.handsLimit > 0
-                        ? `${room.handsLimit} ${t("hands")}`
-                        : t("unlimited")}
-                    </span>
-                    <span>·</span>
-                    <span>
-                      {room.actionTimeout > 0
-                        ? `${room.actionTimeout}s`
-                        : t("unlimited")}
-                    </span>
-                    {room.spectators > 0 && (
-                      <>
-                        <span>·</span>
-                        <span>
-                          {room.spectators} {t("watching")}
-                        </span>
-                      </>
-                    )}
-                  </p>
-                  <button
-                    onClick={() => onJoinClick(room)}
-                    className={`${ui.secondary} ${styles.joinButton}`}
-                  >
-                    {t("join")}
-                    <FiArrowRight aria-hidden="true" />
-                  </button>
-                </div>
-                {joinTarget === room.name && (
-                  <div className={styles.joinForm}>
-                    <input
-                      autoFocus
-                      className={ui.input}
-                      type="password"
-                      value={joinPassword}
-                      aria-label={t("roomPassword")}
-                      placeholder={t("roomPassword")}
-                      onChange={(e) => setJoinPassword(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                          join(room.name, joinPassword);
-                        }
-                      }}
-                    />
+                  <div className={styles.roomFooter}>
+                    <p>
+                      <FiClock aria-hidden="true" />
+                      <span>
+                        {room.handsLimit > 0
+                          ? `${room.handsLimit} ${t("hands")}`
+                          : t("unlimited")}
+                      </span>
+                      <span>·</span>
+                      <span>
+                        {room.actionTimeout > 0
+                          ? `${room.actionTimeout}s`
+                          : t("unlimited")}
+                      </span>
+                      {room.spectators > 0 && (
+                        <>
+                          <span>·</span>
+                          <span>
+                            {room.spectators} {t("watching")}
+                          </span>
+                        </>
+                      )}
+                    </p>
                     <button
-                      onClick={() => {
-                        setJoinTarget(null);
-                        setJoinPassword("");
-                      }}
-                      data-sfx="pong"
-                      className={ui.secondary}
+                      onClick={() => onJoinClick(room)}
+                      className={styles.joinButton}
                     >
-                      {t("cancel")}
+                      <GiSpades aria-hidden="true" />
+                      {t("join")}
+                      <FiArrowRight aria-hidden="true" />
                     </button>
                   </div>
-                )}
-              </article>
-            ))}
+                  {joinTarget === room.name && (
+                    <div className={styles.joinForm}>
+                      <input
+                        autoFocus
+                        className={ui.input}
+                        type="password"
+                        value={joinPassword}
+                        aria-label={t("roomPassword")}
+                        placeholder={t("roomPassword")}
+                        onChange={(e) => setJoinPassword(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            join(room.name, joinPassword);
+                          }
+                        }}
+                      />
+                      <button
+                        onClick={() => {
+                          setJoinTarget(null);
+                          setJoinPassword("");
+                        }}
+                        data-sfx="pong"
+                        className={ui.secondary}
+                      >
+                        {t("cancel")}
+                      </button>
+                    </div>
+                  )}
+                </article>
+              ))}
+            </div>
           </div>
         </section>
       </section>
-      <footer className={styles.footer}>GoPoker · PLAY · MEET · ENJOY</footer>
+      <footer className={styles.footer}>
+        <GiSpades aria-hidden="true" />
+        <span>GoPoker · PLAY · MEET · ENJOY</span>
+        <GiSpades aria-hidden="true" />
+      </footer>
       {showCreate && (
         <div className={ui.overlay}>
           <section

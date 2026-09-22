@@ -56,8 +56,8 @@ func handleJoinTable(c *Client, tablename string, password string, playerUUID st
 }
 
 // handleReconnectTable replays a saved browser session. It must never create
-// a room: when the room has been recycled (everyone offline for longer than
-// emptyTableTTL) or the player's seat was released by the offline timeout,
+// a room: when the room has been recycled after its last player left,
+// or the player's seat was released by the offline timeout,
 // the client is told the session expired so it returns to the lobby instead
 // of landing in an empty, un-joinable copy of the old room.
 func handleReconnectTable(c *Client, tablename string, password string, playerUUID string) {

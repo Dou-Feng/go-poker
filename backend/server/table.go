@@ -14,15 +14,9 @@ import (
 	"github.com/google/uuid"
 )
 
-// emptyTableTTL is how long a table lingers with no connected clients before
-// it is recycled (change.md: no online players for more than 2 minutes). It
-// doubles as the grace period for reconnects.
-const emptyTableTTL = 2 * time.Minute
-
-// offlineTimeout is how long a disconnected player is allowed to reconnect
-// before their hand is folded and they are removed from the room (change.md
-// 「离线状态」: 60 seconds). It is kept shorter than emptyTableTTL so players
-// are flushed (stack returned to wallet, stats recorded) before the room dies.
+// offlineTimeout preserves a disconnected player's seat for reconnects.
+// Once the last human leaves (or their seat expires), an empty room is
+// destroyed immediately; it has no additional retention timer.
 const offlineTimeout = 60 * time.Second
 
 // flushFunc persists one player's finished table session (see
@@ -49,7 +43,6 @@ type table struct {
 	createdAt     time.Time
 	stop          chan struct{}
 	stopOnce      sync.Once
-	emptyTimer    *time.Timer
 	offlineTimers map[string]*time.Timer
 	offlineMu     sync.Mutex
 	offlineAfter  time.Duration // grace period before an offline player is evicted
@@ -201,6 +194,14 @@ func (t *table) shutdown() {
 func (t *table) markPlayerOffline(playerUUID string) {
 	t.offlineMu.Lock()
 	defer t.offlineMu.Unlock()
+	select {
+	case <-t.stop:
+		return
+	default:
+	}
+	if playerUUID == "" {
+		return
+	}
 	if _, ok := t.offlineTimers[playerUUID]; ok {
 		return
 	}
@@ -257,6 +258,7 @@ func (t *table) timeoutPlayer(playerUUID string) {
 		t.broadcast <- createNewLog(fmt.Sprintf("%s timed out and left the table", username))
 	}
 	t.broadcastGame()
+	t.destroyIfEmpty()
 }
 
 // evictPlayer removes the seated player identified by their per-session uuid
@@ -352,12 +354,6 @@ func (t *table) registerClient(client *Client) {
 	t.clientsMu.Lock()
 	t.clients[client] = true
 	t.clientsMu.Unlock()
-
-	// Only a real connection keeps the room alive; bots do not.
-	if !client.isBot && t.emptyTimer != nil {
-		t.emptyTimer.Stop()
-		t.emptyTimer = nil
-	}
 }
 
 func (t *table) unregisterClient(client *Client) {
@@ -366,9 +362,6 @@ func (t *table) unregisterClient(client *Client) {
 	if wasMember {
 		delete(t.clients, client)
 	}
-	// A room holding only bots is empty: it is recycled like any other, and
-	// the bots go with it.
-	empty := t.humanCount() == 0
 	hostChanged := wasMember && client.accountUUID != "" && t.reassignHostIfGoneLocked()
 	t.clientsMu.Unlock()
 
@@ -381,13 +374,28 @@ func (t *table) unregisterClient(client *Client) {
 		go t.broadcastGame()
 	}
 
-	if empty && t.emptyTimer == nil {
-		t.emptyTimer = time.AfterFunc(emptyTableTTL, func() {
-			if t.hub != nil {
-				t.hub.destroyTable(t)
-			}
-		})
+	t.destroyIfEmpty()
+}
+
+// Bots do not keep a room alive. An offline human still owns their seat
+// until the reconnect grace expires; destroying it earlier would discard
+// their stack before timeoutPlayer can return it to the wallet.
+func (t *table) destroyIfEmpty() {
+	if t.hub == nil {
+		return
 	}
+	t.clientsMu.Lock()
+	empty := t.humanCount() == 0
+	t.clientsMu.Unlock()
+	if !empty || len(t.register) > 0 {
+		return
+	}
+	for _, p := range t.game.GenerateOmniView().Players {
+		if !p.Left && !isBotAccount(p.AccountUUID) {
+			return
+		}
+	}
+	t.hub.destroyTable(t)
 }
 
 // censoredGameFor builds the per-client copy of a broadcast update-game: the

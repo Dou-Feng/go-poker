@@ -91,18 +91,17 @@ func TestAddBotSeatsReadyBot(t *testing.T) {
 		t.Fatalf("bots must not be flushed to a wallet: %+v", rec.snapshot())
 	}
 
-	// Bots never keep the room alive: with the human gone the empty timer arms.
+	// Bots never keep the room alive: leaving the last human seat and
+	// connection recycles the room immediately, including its bot clients.
+	tbl.evictPlayer(human.uuid)
 	tbl.unregisterClient(human)
-	if tbl.emptyTimer == nil {
-		t.Fatalf("a room with only bots must be scheduled for recycling")
+	if hub.findTable(tbl.name) != nil {
+		t.Fatal("a room with only bots must be recycled immediately")
 	}
-	// And a bot registering does not disarm it.
-	if _, err := tbl.addBot(0); err != nil {
-		t.Fatalf("add bot: %v", err)
+	if len(tbl.botClients()) != 0 {
+		t.Fatal("destroyed room retained bot clients")
 	}
-	if tbl.emptyTimer == nil {
-		t.Fatalf("a bot must not cancel the empty timer")
-	}
+
 }
 
 // Bots cannot be added while a hand runs, nor beyond the seat cap.

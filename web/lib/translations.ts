@@ -13,6 +13,7 @@ export const translations = {
     lobbyEmptyTitle: "No rooms yet",
     lobbyEmptyHint: "Create a room and invite your friends to play",
     lobbyTagline: "Find a table and play together",
+    roomTagline: "Texas Hold’em · Play together",
     createFirstRoom: "Create the first room",
     moreSettings: "More settings",
     roomAutoName: "Leave blank for a random name",
@@ -245,6 +246,11 @@ export const translations = {
     speakerOn: "Voice on — tap to stop listening",
     speakerOff: "Voice off — tap to listen",
     micVolume: "Mic input volume",
+    muteAudio: "Mute",
+    unmuteAudio: "Unmute",
+    micProcessingDescription: "Reduce echo and keep your voice clear.",
+    noiseCancellationDescription:
+      "Filter background noise so your voice comes through.",
     micVolumeHint:
       "100% keeps the original level; raise it if your voice is too quiet.",
     voiceSettingsFailed:
@@ -307,6 +313,7 @@ export const translations = {
     lobbyEmptyTitle: "暂无房间",
     lobbyEmptyHint: "创建一个房间，邀请好友开始游戏",
     lobbyTagline: "找个房间，一起玩牌",
+    roomTagline: "德州扑克 · 欢乐对局",
     createFirstRoom: "创建第一个房间",
     moreSettings: "更多设置",
     roomAutoName: "留空自动生成",
@@ -537,6 +544,10 @@ export const translations = {
     speakerOn: "语音已开 — 点击停止收听",
     speakerOff: "语音已关 — 点击收听他人",
     micVolume: "麦克风输入音量",
+    muteAudio: "静音",
+    unmuteAudio: "取消静音",
+    micProcessingDescription: "减少回声，让语音更清晰。",
+    noiseCancellationDescription: "过滤环境杂音，让对方听清你的声音。",
     micVolumeHint: "100% 为原始音量；对方听不清时可调高。",
     voiceSettingsFailed: "无法修改麦克风设置，已保留原设置。",
     othersVolume: "他人语音音量",
