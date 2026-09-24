@@ -84,14 +84,14 @@ export default function RaiseInput({ onClose }: raiseProps) {
   const confirm = () => {
     if (socket) {
       playTickedAction(isAllIn ? "allin" : "heroBet");
-      sendLog(
-        socket,
-        isAllIn
-          ? appState.username + " is all in"
-          : maxBet > currentBet
-          ? appState.username + " raises to " + (currentBet + value)
-          : appState.username + " bets " + value
-      );
+      const user = appState.username ?? "";
+      if (isAllIn) {
+        sendLog(socket, "logAllIn", [user]);
+      } else if (maxBet > currentBet) {
+        sendLog(socket, "logRaisesTo", [user, String(currentBet + value)]);
+      } else {
+        sendLog(socket, "logBets", [user, String(value)]);
+      }
       playerRaise(socket, value);
     }
     onClose();

@@ -452,7 +452,7 @@ export default function Seat({
     }
     takeSeat(socket, appState.username, id, buyIn);
     if (!running) {
-      sendLog(socket, appState.username + " buys in for " + buyIn);
+      sendLog(socket, "logBuysIn", [appState.username, String(buyIn)]);
     }
   };
 

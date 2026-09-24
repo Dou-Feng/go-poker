@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	mrand "math/rand"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -513,19 +514,19 @@ func (t *table) botTick() {
 		decision := decideBotAction(t.botKind, view, view.ActionNum, histories)
 		switch decision.kind {
 		case "fold":
-			t.broadcast <- createNewLog(fmt.Sprintf("%s folds", actor.Username))
+			t.broadcast <- createNewLogKey(logKeyFolds, actor.Username)
 			handleFold(bot)
 		case "check":
-			t.broadcast <- createNewLog(fmt.Sprintf("%s checks", actor.Username))
+			t.broadcast <- createNewLogKey(logKeyChecks, actor.Username)
 			handleCheck(bot)
 		case "call":
-			t.broadcast <- createNewLog(fmt.Sprintf("%s calls", actor.Username))
+			t.broadcast <- createNewLogKey(logKeyCalls, actor.Username)
 			handleCall(bot)
 		case "raise":
 			if decision.amount >= actor.Stack {
-				t.broadcast <- createNewLog(fmt.Sprintf("%s is all in", actor.Username))
+				t.broadcast <- createNewLogKey(logKeyAllIn, actor.Username)
 			} else {
-				t.broadcast <- createNewLog(fmt.Sprintf("%s bets %d", actor.Username, decision.amount))
+				t.broadcast <- createNewLogKey(logKeyBets, actor.Username, strconv.Itoa(int(decision.amount)))
 			}
 			handleRaise(bot, decision.amount)
 		}

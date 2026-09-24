@@ -50,10 +50,15 @@ export function sendMessage(
   });
 }
 
-export function sendLog(socket: WebSocket, message: string) {
+// Hand-log lines are keyed events (see backend/server/logs.go): the client
+// sends the key and its parameters, and every client renders the line in
+// its own language. The server fills message with the English fallback.
+export function sendLog(socket: WebSocket, key: string, params: string[] = []) {
   send(socket, {
     action: "send-log",
-    message: message,
+    message: "",
+    key: key,
+    params: params,
   });
 }
 

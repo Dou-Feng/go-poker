@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"strconv"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -234,7 +235,7 @@ func (t *table) timeoutPlayer(playerUUID string) {
 		return
 	}
 	if username != "" {
-		t.broadcast <- createNewLog(fmt.Sprintf("%s timed out and left the table", username))
+		t.broadcast <- createNewLogKey(logKeyTimedOutLeft, username)
 	}
 	t.broadcastGame()
 	t.destroyIfEmpty()
@@ -759,11 +760,11 @@ func (t *table) voteSettle(c *Client) {
 
 	switch {
 	case voted:
-		t.broadcast <- createNewLog(fmt.Sprintf("%s cancelled their settle vote (%d/%d)", c.username, votes, seatedCount))
+		t.broadcast <- createNewLogKey(logKeyCancelledVote, c.username, strconv.Itoa(votes), strconv.Itoa(seatedCount))
 	case approved:
-		t.broadcast <- createNewLog("early settlement approved — will settle after this hand")
+		t.broadcast <- createNewLogKey(logKeySettleApproved)
 	default:
-		t.broadcast <- createNewLog(fmt.Sprintf("%s voted to settle (%d/%d)", c.username, votes, seatedCount))
+		t.broadcast <- createNewLogKey(logKeyVotedSettle, c.username, strconv.Itoa(votes), strconv.Itoa(seatedCount))
 	}
 
 	t.broadcastGame()
@@ -931,7 +932,7 @@ func (t *table) autoSpectateBusted() {
 		// them from taking a seat again this session (no buy-ins left).
 		t.notifyAccount(p.AccountUUID, createError(msgBustedOut))
 		t.markBusted(p.AccountUUID)
-		t.broadcast <- createNewLog(fmt.Sprintf("%s is out of chips and moves to the spectators", p.Username))
+		t.broadcast <- createNewLogKey(logKeyOutOfChips, p.Username)
 	}
 }
 

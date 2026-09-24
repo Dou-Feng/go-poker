@@ -144,9 +144,9 @@ func (t *table) enforceActionClock(key string) {
 		}
 	}
 	var err error
-	what := "folds"
+	what := logKeyTimeoutFold
 	if p.Bet >= maxBet {
-		what = "checks"
+		what = logKeyTimeoutCheck
 		err = poker.Bet(t.game, pn, 0)
 	} else {
 		err = poker.Fold(t.game, pn, 0)
@@ -156,11 +156,11 @@ func (t *table) enforceActionClock(key string) {
 		// enforce any more.
 		return
 	}
-	if what == "checks" {
+	if what == logKeyTimeoutCheck {
 		t.recordAIBet(view, pn, 0)
 	} else {
 		t.recordAIFold(view, pn)
 	}
-	t.broadcast <- createNewLog(fmt.Sprintf("%s ran out of time and %s", p.Username, what))
+	t.broadcast <- createNewLogKey(what, p.Username)
 	t.broadcastGame()
 }

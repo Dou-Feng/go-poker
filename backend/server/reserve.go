@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"sort"
+	"strconv"
 
 	"github.com/evanofslack/go-poker/poker"
 	"github.com/go-redis/redis/v8"
@@ -239,7 +240,12 @@ func (t *table) seatReservedClient(c *Client, r seatReservation) error {
 	if err := t.seatHumanLocked(c, seatID, view.Config.BuyIn); err != nil {
 		return err
 	}
-	t.broadcast <- createNewLog(fmt.Sprintf("%s sits down at seat %d for %d", c.username, seatID, view.Config.BuyIn))
+	t.broadcast <- createNewLogKey(
+		logKeySitsDown,
+		c.username,
+		strconv.Itoa(int(seatID)),
+		strconv.Itoa(int(view.Config.BuyIn)),
+	)
 	return nil
 }
 

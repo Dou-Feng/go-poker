@@ -390,7 +390,7 @@ func (c *Client) processEvents(rawMessage []byte) error {
 		if err != nil {
 			return err
 		}
-		handleSendLog(c, log.Message)
+		handleSendLog(c, log.Message, log.Key, log.Params)
 		return nil
 
 	case actionNewPlayer:

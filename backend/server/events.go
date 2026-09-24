@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strconv"
 	"strings"
 	"time"
 
@@ -663,7 +664,11 @@ func handleSendMessage(c *Client, _ string, message string) {
 	c.table.broadcast <- createNewMessage(c.username, message)
 }
 
-func handleSendLog(c *Client, message string) {
+func handleSendLog(c *Client, message string, key string, params []string) {
+	if key != "" {
+		c.table.broadcast <- createNewLogKey(key, params...)
+		return
+	}
 	c.table.broadcast <- createNewLog(message)
 }
 
@@ -1466,10 +1471,10 @@ func createPong() []byte {
 
 func createNewLog(message string) []byte {
 	log := newLog{
-		base{actionNewLog},
-		uuid.New().String(),
-		message,
-		currentTime(),
+		base:      base{actionNewLog},
+		Id:        uuid.New().String(),
+		Message:   message,
+		Timestamp: currentTime(),
 	}
 	resp, err := json.Marshal(log)
 	if err != nil {
@@ -1556,18 +1561,19 @@ func createUpdatedPlayerUUID(c *Client) []byte {
 func broadcastDeal(table *table) {
 	view := table.game.GenerateOmniView()
 
-	startMsg := "starting new hand"
-	table.broadcast <- createNewLog(startMsg)
+	table.broadcast <- createNewLogKey(logKeyStartHand)
 
-	sbUser := view.Players[view.SBNum].Username
-	sb := view.Config.SmallBlind
-	sbMsg := fmt.Sprintf("%s is small blind (%d)", sbUser, sb)
-	table.broadcast <- createNewLog(sbMsg)
+	table.broadcast <- createNewLogKey(
+		logKeySmallBlind,
+		view.Players[view.SBNum].Username,
+		strconv.Itoa(int(view.Config.SmallBlind)),
+	)
 
-	bbUser := view.Players[view.BBNum].Username
-	bb := view.Config.BigBlind
-	bbMsg := fmt.Sprintf("%s is big blind (%d)", bbUser, bb)
-	table.broadcast <- createNewLog(bbMsg)
+	table.broadcast <- createNewLogKey(
+		logKeyBigBlind,
+		view.Players[view.BBNum].Username,
+		strconv.Itoa(int(view.Config.BigBlind)),
+	)
 }
 
 func currentTime() string {

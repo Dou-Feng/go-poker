@@ -86,7 +86,10 @@ function handleWinner(game: GameType | null, socket: WebSocket | null) {
   }
   if (game.stage === Stage.Showdown && game.pots.length !== 0) {
     for (const result of getWinners(game)) {
-      sendLog(socket, result.player.username + " wins " + result.amount);
+      sendLog(socket, "logWins", [
+        result.player.username,
+        String(result.amount),
+      ]);
     }
   }
 }
@@ -306,7 +309,7 @@ export default function Table() {
     if (forfeitPot) {
       playSfx("error");
       if (socket) {
-        sendLog(socket, "chips forfeited");
+        sendLog(socket, "logChipsForfeited");
       }
     } else {
       // Pot won at showdown, kept overlap-free. If revealed hands flip open,

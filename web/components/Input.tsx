@@ -21,8 +21,7 @@ export default function Input() {
     if (socket) {
       // Fold has its own card-drop sound: no tick prefix.
       playSfx("fold");
-      let foldMessage = user + " folds";
-      sendLog(socket, foldMessage);
+      sendLog(socket, "logFolds", [user ?? ""]);
       playerFold(socket);
     }
   };
@@ -68,11 +67,11 @@ export default function Input() {
     if (canCheck) {
       // Check is a quiet action: no tick prefix, just the felt sound.
       playSfx("check");
-      sendLog(socket, user + " checks");
+      sendLog(socket, "logChecks", [user ?? ""]);
       playerCheck(socket);
     } else {
       playTickedAction("heroBet");
-      sendLog(socket, user + " calls " + callAmount);
+      sendLog(socket, "logCallsAmount", [user ?? "", String(callAmount)]);
       playerCall(socket);
     }
   };
@@ -82,7 +81,7 @@ export default function Input() {
       return;
     }
     playTickedAction("allin");
-    sendLog(socket, user + " is all in");
+    sendLog(socket, "logAllIn", [user ?? ""]);
     playerRaise(socket, player.stack);
   };
 

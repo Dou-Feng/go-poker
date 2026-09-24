@@ -10,11 +10,7 @@ export default function Log() {
   return (
     <div ref={scrollRef} className="game-hand-log selectable">
       {appState.logs.map((log, index) => (
-        <LogMessage
-          key={index}
-          message={log.message}
-          timestamp={log.timestamp}
-        />
+        <LogMessage key={index} log={log} />
       ))}
     </div>
   );

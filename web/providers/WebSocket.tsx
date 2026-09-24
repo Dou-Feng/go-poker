@@ -154,6 +154,8 @@ export function SocketProvider(props: SocketProviderProps) {
             let newLog: Log = {
               message: event.message,
               timestamp: event.timestamp,
+              key: event.key,
+              params: event.params,
             };
             dispatch({ type: "addLog", payload: newLog });
             return;

@@ -111,8 +111,10 @@ type sendMessage struct {
 }
 
 type sendLog struct {
-	base           // actionSendLog
-	Message string `json:"message"`
+	base             // actionSendLog
+	Message string   `json:"message"`
+	Key     string   `json:"key,omitempty"`
+	Params  []string `json:"params,omitempty"`
 }
 
 type newPlayer struct {
@@ -331,10 +333,12 @@ type newMessage struct {
 }
 
 type newLog struct {
-	base             // actionNewLog
-	Id        string `json:"uuid"`
-	Message   string `json:"message"`
-	Timestamp string `json:"timestamp"`
+	base               // actionNewLog
+	Id        string   `json:"uuid"`
+	Message   string   `json:"message"`
+	Key       string   `json:"key,omitempty"`
+	Params    []string `json:"params,omitempty"`
+	Timestamp string   `json:"timestamp"`
 }
 
 type updateGame struct {

@@ -9,6 +9,9 @@ export type Message = {
 export type Log = {
   message: string;
   timestamp: string;
+  /** Translation key: when set, LogMessage renders this with params. */
+  key?: string;
+  params?: string[];
 };
 
 export type Friend = {
