@@ -1,17 +1,15 @@
-yaml
 name: publish
 
 on:
   workflow_dispatch:
   push:
     branches:
-      - 'main'
+      - main
     tags:
       - 'v*'
 
 env:
   REGISTRY: docker.io
-  # 注意：Docker Hub 的镜像名必须是小写
   IMAGE_NAME: ${{ github.repository }}
 
 jobs:
