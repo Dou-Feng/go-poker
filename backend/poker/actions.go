@@ -59,6 +59,7 @@ func bet(g *Game, pn uint, data uint) error {
 	callAmount := minBet - p.Bet
 	total := p.Bet + betVal
 	allIn := betVal == p.Stack
+	threeBetOpportunity := g.canThreeBet(pn)
 
 	if !g.canOpen(pn) {
 		//Won't hit now, reserved for future implementations
@@ -96,6 +97,9 @@ func bet(g *Game, pn uint, data uint) error {
 		return ErrIllegalAction
 	}
 
+	if threeBetOpportunity {
+		g.recordThreeBetOpportunity(pn)
+	}
 	g.players[pn].putInChips(betVal)
 	g.players[pn].Called = true
 
@@ -107,7 +111,7 @@ func bet(g *Game, pn uint, data uint) error {
 	} else {
 		g.players[pn].Stats.Raises++
 		g.betsThisStreet++
-		if g.betsThisStreet == 2 {
+		if g.getStage() == PreFlop && g.betsThisStreet == 2 && threeBetOpportunity {
 			g.players[pn].Stats.ThreeBets++
 		}
 	}
@@ -364,6 +368,7 @@ func deal(g *Game, pn uint, data uint) error {
 		for i, p := range g.players {
 			if p.Ready {
 				g.players[i].Stats.PreparePositionStats()
+				g.players[i].Stats.PrepareThreeBetStats()
 				g.players[i].HandPosition = PosLabelCount
 				if trackPositions {
 					g.players[i].HandPosition = g.positionLabel(uint(i))
@@ -383,6 +388,7 @@ func deal(g *Game, pn uint, data uint) error {
 			g.players[i].Revealed = false
 			g.players[i].BestHand = ""
 			g.players[i].VoluntaryPreflop = false
+			g.players[i].ThreeBetOpportunity = false
 			g.players[i].WonThisHand = false
 		}
 
@@ -460,6 +466,9 @@ func fold(g *Game, pn uint, data uint) error {
 	// and readied for the next one (Ready=true). The Ready flag must survive
 	// the fold so heads-up and multiway hands auto-start the next hand
 	// without everyone having to click ready again.
+	if g.canThreeBet(pn) {
+		g.recordThreeBetOpportunity(pn)
+	}
 	p.setState(PlayerReady)
 	p.Stats.Folds++
 
@@ -530,6 +539,9 @@ func leaveHand(g *Game, pn uint) error {
 	// If it is already their turn (and they are not all-in), fold them now so
 	// the hand doesn't hang.
 	if !allIn && g.actionNum == pn && p.In {
+		if g.canThreeBet(pn) {
+			g.recordThreeBetOpportunity(pn)
+		}
 		p.setState(PlayerNotReady)
 		p.Stats.Folds++
 		g.updateRoundInfo()
@@ -546,6 +558,9 @@ func SitOut(g *Game, pn uint, data uint) error {
 
 	p := g.getPlayer(pn)
 	if p.In {
+		if g.canThreeBet(pn) {
+			g.recordThreeBetOpportunity(pn)
+		}
 		p.setState(PlayerNotReady)
 		p.Stats.Folds++
 		g.updateRoundInfo()
@@ -603,4 +618,20 @@ func toggleReady(g *Game, pn uint, data uint) error {
 	p.Left = false
 
 	return nil
+}
+
+// An opportunity is an action facing the first preflop raise, with chips
+// beyond a call and permission to re-raise. Count it once whether the player
+// folds, calls, or raises; later streets and 4-bets are excluded.
+func (g *Game) canThreeBet(pn uint) bool {
+	p := &g.players[pn]
+	return g.getStage() == PreFlop && g.betsThisStreet == 1 && !p.Called && p.Stack > g.toCall()-p.Bet
+}
+
+func (g *Game) recordThreeBetOpportunity(pn uint) {
+	p := &g.players[pn]
+	if !p.ThreeBetOpportunity {
+		p.Stats.ThreeBetOpportunities++
+		p.ThreeBetOpportunity = true
+	}
 }

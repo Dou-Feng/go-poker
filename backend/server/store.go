@@ -266,13 +266,16 @@ func mergeStats(dst *poker.PlayerStats, src poker.PlayerStats) {
 	// Legacy records did not distinguish table sizes; keep only the sample
 	// explicitly recorded under the five-or-more-player rule.
 	dst.PreparePositionStats()
+	dst.PrepareThreeBetStats()
 	src.PreparePositionStats()
+	src.PrepareThreeBetStats()
 	dst.HandsPlayed += src.HandsPlayed
 	dst.HandsWon += src.HandsWon
 	dst.Folds += src.Folds
 	dst.Calls += src.Calls
 	dst.Raises += src.Raises
 	dst.ThreeBets += src.ThreeBets
+	dst.ThreeBetOpportunities += src.ThreeBetOpportunities
 	dst.VPIP += src.VPIP
 	for i := range src.VPIPByPos {
 		dst.VPIPByPos[i] += src.VPIPByPos[i]

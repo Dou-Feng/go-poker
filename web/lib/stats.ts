@@ -41,3 +41,16 @@ export function positionVpipRate(
   if (totalHands > handsPlayed) return "—";
   return vpipRate(vpipByPos[pos], handsByPos[pos]);
 }
+
+export function threeBetRate(stats: PlayerStats | null): string {
+  if (!stats || stats.threeBetStatsVersion !== 1) return "—";
+  const opportunities = stats.threeBetOpportunities;
+  if (
+    !Number.isSafeInteger(stats.handsPlayed) ||
+    stats.handsPlayed < 0 ||
+    opportunities === undefined ||
+    opportunities > stats.handsPlayed
+  )
+    return "—";
+  return vpipRate(stats.threeBets, opportunities);
+}

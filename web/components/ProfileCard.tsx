@@ -15,7 +15,7 @@ import { API_BASE } from "../lib/api";
 import { loadToken } from "../lib/session";
 import { useVoice } from "../hooks/useVoice";
 import { voice } from "../lib/voice";
-import { positionVpipRate, vpipRate } from "../lib/stats";
+import { positionVpipRate, vpipRate, threeBetRate } from "../lib/stats";
 import Avatar from "./Avatar";
 import MicIcon from "./MicIcon";
 import PlusIcon from "./PlusIcon";
@@ -174,7 +174,7 @@ export default function ProfileCard() {
   ];
   const behaviorStats: Array<{ key: TranslationKey; value: string }> = [
     { key: "foldRate", value: rate(stats?.folds ?? 0, hands) },
-    { key: "threeBetRate", value: rate(stats?.threeBets ?? 0, hands) },
+    { key: "threeBetRate", value: threeBetRate(stats) },
     { key: "raises", value: String(stats?.raises ?? 0) },
     { key: "calls", value: String(stats?.calls ?? 0) },
   ];

@@ -72,6 +72,8 @@ export type PlayerStats = {
   calls: number;
   raises: number;
   threeBets: number;
+  threeBetOpportunities?: number;
+  threeBetStatsVersion?: number;
   maxPotWon: number;
   vpip: number;
   vpipByPos: number[];

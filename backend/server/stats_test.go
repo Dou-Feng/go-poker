@@ -60,3 +60,17 @@ func TestMergeStatsRejectsIncompleteButPlausibleLegacyPositions(t *testing.T) {
 		t.Fatalf("incomplete legacy session entered the valid sample: %+v", good)
 	}
 }
+
+func TestMergeThreeBetStatsExcludesLegacyAndKeepsNewOpportunities(t *testing.T) {
+	old := poker.PlayerStats{HandsPlayed: 10, ThreeBets: 30, VPIP: 5}
+	fresh := poker.PlayerStats{HandsPlayed: 3, ThreeBets: 1, ThreeBetOpportunities: 2, ThreeBetStatsVersion: poker.ThreeBetStatsVersion}
+	mergeStats(&old, fresh)
+	mergeStats(&old, fresh)
+	if old.ThreeBets != 2 || old.ThreeBetOpportunities != 4 || old.HandsPlayed != 16 || old.VPIP != 5 {
+		t.Fatalf("legacy contaminated new three-bet sample: %+v", old)
+	}
+	mergeStats(&old, poker.PlayerStats{HandsPlayed: 2, ThreeBets: 6})
+	if old.ThreeBets != 2 || old.ThreeBetOpportunities != 4 || old.HandsPlayed != 18 {
+		t.Fatalf("legacy source contaminated sample: %+v", old)
+	}
+}

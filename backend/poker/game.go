@@ -362,6 +362,16 @@ func Pause(g *Game) {
 }
 
 func (g *Game) resetForNextHand() {
+	// Select the next button before removing seats, while clockwise order is
+	// still intact. Readiness may be cleared below when someone busts.
+	nextButton := ""
+	for offset := 1; offset <= len(g.players); offset++ {
+		p := g.players[(int(g.dealerNum)+offset)%len(g.players)]
+		if !p.Left {
+			nextButton = p.UUID
+			break
+		}
+	}
 
 	// Remove players who have left the room (iterate backwards so indices
 	// stay valid while dropping).
@@ -376,6 +386,13 @@ func (g *Game) resetForNextHand() {
 	if len(g.players) == 0 {
 		g.setStageAndBetting(NotReady, false)
 		return
+	}
+
+	for i := range g.players {
+		if g.players[i].UUID == nextButton {
+			g.dealerNum = uint(i)
+			break
+		}
 	}
 
 	g.handsPlayed++
@@ -429,7 +446,6 @@ func (g *Game) resetForNextHand() {
 
 	}
 
-	g.dealerNum = (g.dealerNum + 1) % uint(len(g.players))
 	n := uint(len(g.players))
 	seen := uint(0)
 	for !g.players[g.dealerNum].Ready && seen < n {
@@ -465,6 +481,9 @@ func (g *Game) updateRoundInfo() {
 	// are resolved at showdown (their winnings are forfeited below).
 	for i := range g.players {
 		if g.players[i].In && g.players[i].Left && !g.players[i].allIn() {
+			if g.canThreeBet(uint(i)) {
+				g.recordThreeBetOpportunity(uint(i))
+			}
 			g.players[i].setState(PlayerNotReady)
 			g.players[i].Stats.Folds++
 		}

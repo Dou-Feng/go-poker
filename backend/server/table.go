@@ -49,9 +49,11 @@ type table struct {
 	flush         flushFunc     // nil means flushPlayerSession against t.rdb
 	// Departures and resets share the seat lock so a stack cannot be paid
 	// while its seat is being changed or bought into.
-	seatMu    sync.Mutex // serializes seating, seat changes, starts and resets
-	payoutMu  sync.Mutex
-	paidSeats map[string]uint
+	seatMu         sync.Mutex // serializes seating, seat changes, starts and resets
+	payoutMu       sync.Mutex
+	paidSeats      map[string]uint
+	pendingPayouts map[string]seatPayout // payoutMu; survives game/session resets
+	payoutRetry    *time.Timer           // payoutMu
 	// Failed settlement keeps its roster frozen until all payouts and the
 	// shared history record are saved. seatMu guards the retry timer.
 	settlementPending atomic.Bool
@@ -118,38 +120,6 @@ func newTable(name string, redisClient *redis.Client, hub *Hub) *table {
 	}
 }
 
-// flushSession persists a player's session through the injected flushFunc,
-// falling back to Redis.
-func (t *table) flushSession(accountUUID string, totalBuyIn uint, stack uint, stats poker.PlayerStats) (uint, error) {
-	if isBotAccount(accountUUID) {
-		// Bots have no wallet, stats or history to persist.
-		return stack, nil
-	}
-	if t.flush != nil {
-		return t.flush(accountUUID, t.name, totalBuyIn, stack, stats)
-	}
-	return flushPlayerSession(t.rdb, accountUUID, t.name, t.sessionID, totalBuyIn, stack, stats)
-}
-
-// flushSeat pays each seat once, including when a reset is retried after a
-// partial storage failure. Re-seating creates a new UUID and a new payout.
-func (t *table) flushSeat(seatUUID, accountUUID string, totalBuyIn, stack uint, stats poker.PlayerStats) (uint, error) {
-	t.payoutMu.Lock()
-	defer t.payoutMu.Unlock()
-	if balance, ok := t.paidSeats[seatUUID]; ok {
-		return balance, nil
-	}
-	balance, err := t.flushSession(accountUUID, totalBuyIn, stack, stats)
-	if err != nil {
-		return 0, err
-	}
-	if t.paidSeats == nil {
-		t.paidSeats = make(map[string]uint)
-	}
-	t.paidSeats[seatUUID] = balance
-	return balance, nil
-}
-
 func (t *table) run() {
 	go t.subscribeToMessages()
 
@@ -178,6 +148,12 @@ func (t *table) shutdown() {
 			t.settlementRetry.Stop()
 		}
 		t.seatMu.Unlock()
+		t.payoutMu.Lock()
+		if t.payoutRetry != nil {
+			t.payoutRetry.Stop()
+			t.payoutRetry = nil
+		}
+		t.payoutMu.Unlock()
 		t.offlineMu.Lock()
 		for _, timer := range t.offlineTimers {
 			timer.Stop()
@@ -303,13 +279,28 @@ func (t *table) evictPlayer(playerUUID string) (string, bool) {
 		slog.Default().Warn("Leave hand", "error", err)
 	}
 
-	// Settle the session with the stack as it stood when they left. The fold
-	// is counted here even if it happens later, when the action reaches the
-	// departed player. An all-in player who leaves is shown down instead of
-	// folded, so no fold is counted for them.
+	// Settle the session with the stack as it stood when they left. A
+	// departure on the player's own turn is folded by LeaveHand on the
+	// spot: the fold (and any 3-bet opportunity they faced) is already in
+	// the engine stats, so prefer those numbers over the pre-departure
+	// snapshot. Otherwise the fold happens later, when the action reaches
+	// the departed player, and is counted on the snapshot. An all-in
+	// player who leaves is shown down instead of folded, so no fold is
+	// counted for them.
 	stats := pre.Stats
-	if pre.In && pre.Stack > 0 {
-		stats.Folds++
+	if pre.In {
+		foldedNow := false
+		post := t.game.GenerateOmniView()
+		for i := range post.Players {
+			if post.Players[i].UUID == playerUUID && !post.Players[i].In {
+				stats = post.Players[i].Stats
+				foldedNow = true
+				break
+			}
+		}
+		if !foldedNow && pre.Stack > 0 {
+			stats.Folds++
+		}
 	}
 	// PendingBuyIn was already debited from the wallet and included in
 	// TotalBuyIn, but has not reached Stack. Return it when the seat leaves.

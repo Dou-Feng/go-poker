@@ -19,20 +19,23 @@ const (
 )
 
 const PositionStatsVersion uint = 2
+const ThreeBetStatsVersion uint = 1
 
 // PlayerStats accumulates a single session's worth of per-player statistics.
 // The server merges these into a user's lifetime record when they leave.
 type PlayerStats struct {
-	HandsPlayed uint                `json:"handsPlayed"`
-	HandsWon    uint                `json:"handsWon"`
-	Folds       uint                `json:"folds"`
-	Calls       uint                `json:"calls"`
-	Raises      uint                `json:"raises"`
-	ThreeBets   uint                `json:"threeBets"`
-	MaxPotWon   uint                `json:"maxPotWon"`
-	VPIP        uint                `json:"vpip"`
-	VPIPByPos   [PosLabelCount]uint `json:"vpipByPos"`
-	HandsByPos  [PosLabelCount]uint `json:"handsByPos"`
+	HandsPlayed           uint                `json:"handsPlayed"`
+	HandsWon              uint                `json:"handsWon"`
+	Folds                 uint                `json:"folds"`
+	Calls                 uint                `json:"calls"`
+	Raises                uint                `json:"raises"`
+	ThreeBets             uint                `json:"threeBets"`
+	ThreeBetOpportunities uint                `json:"threeBetOpportunities"`
+	ThreeBetStatsVersion  uint                `json:"threeBetStatsVersion,omitempty"`
+	MaxPotWon             uint                `json:"maxPotWon"`
+	VPIP                  uint                `json:"vpip"`
+	VPIPByPos             [PosLabelCount]uint `json:"vpipByPos"`
+	HandsByPos            [PosLabelCount]uint `json:"handsByPos"`
 	// Version 2 includes only hands dealt to at least five players. Earlier
 	// versions mixed table sizes and cannot be filtered retrospectively.
 	PositionStatsVersion uint `json:"positionStatsVersion,omitempty"`
@@ -62,6 +65,16 @@ func (s *PlayerStats) PreparePositionStats() {
 		s.HandsByPos = [PosLabelCount]uint{}
 	}
 	s.PositionStatsVersion = PositionStatsVersion
+}
+
+// PrepareThreeBetStats excludes legacy counts that mixed postflop raises
+// with preflop re-raises and did not record opportunities.
+func (s *PlayerStats) PrepareThreeBetStats() {
+	if s.ThreeBetStatsVersion != ThreeBetStatsVersion || s.ThreeBets > s.ThreeBetOpportunities || s.ThreeBetOpportunities > s.HandsPlayed {
+		s.ThreeBets = 0
+		s.ThreeBetOpportunities = 0
+	}
+	s.ThreeBetStatsVersion = ThreeBetStatsVersion
 }
 
 // PlayerState is the player state machine (change.md「玩家状态」章节):
@@ -115,9 +128,10 @@ type player struct {
 	// name of their best five-card hand (e.g. "full house").
 	BestHand string `json:"bestHand,omitempty"`
 	// Per-hand guards keep rates based on hands rather than action/pot count.
-	VoluntaryPreflop bool          `json:"-"`
-	WonThisHand      bool          `json:"-"`
-	HandPosition     PositionLabel `json:"-"` // PosLabelCount excludes hands with fewer than five players
+	ThreeBetOpportunity bool          `json:"-"`
+	VoluntaryPreflop    bool          `json:"-"`
+	WonThisHand         bool          `json:"-"`
+	HandPosition        PositionLabel `json:"-"` // PosLabelCount excludes hands with fewer than five players
 }
 
 // setState assigns a state and keeps the derived fast-path flags in sync.

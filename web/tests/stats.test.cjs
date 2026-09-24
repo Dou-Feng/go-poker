@@ -76,3 +76,27 @@ test("missing and malformed positional data stays unavailable", () => {
   ])
     assert.equal(positionVpipRate(stats, 3), "—");
 });
+
+test("3-bet rate uses versioned preflop opportunities, not total hands", () => {
+  const { threeBetRate } = api.exports;
+  const stats = {
+    handsPlayed: 100,
+    threeBets: 2,
+    threeBetOpportunities: 5,
+    threeBetStatsVersion: 1,
+  };
+  assert.equal(threeBetRate(stats), "40%");
+  assert.equal(threeBetRate({ ...stats, threeBets: 0 }), "0%");
+  for (const bad of [
+    null,
+    { ...stats, threeBetStatsVersion: undefined },
+    { ...stats, threeBetStatsVersion: 2 },
+    { ...stats, threeBetOpportunities: undefined },
+    { ...stats, threeBetOpportunities: 0 },
+    { ...stats, threeBets: 6 },
+    { ...stats, threeBetOpportunities: 101 },
+    { ...stats, threeBetOpportunities: NaN },
+  ]) {
+    assert.equal(threeBetRate(bad), "—");
+  }
+});
