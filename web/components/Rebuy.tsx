@@ -57,7 +57,7 @@ export default function Rebuy({ onDone }: rebuyProps) {
           onClick={decrement}
           disabled={amount <= 0}
           aria-label={t("decreaseBuyIn")}
-          className="btn btn-secondary h-11 min-w-0 rounded-md px-0 text-xl font-bold"
+          className="btn btn-secondary h-9 min-w-0 rounded-md px-0 text-xl font-bold"
         >
           −
         </button>
@@ -65,7 +65,7 @@ export default function Rebuy({ onDone }: rebuyProps) {
           onClick={increment}
           disabled={amount >= remaining}
           aria-label={t("increaseBuyIn")}
-          className="btn btn-secondary h-11 min-w-0 rounded-md px-0 text-xl font-bold"
+          className="btn btn-secondary h-9 min-w-0 rounded-md px-0 text-xl font-bold"
         >
           +
         </button>
@@ -73,7 +73,7 @@ export default function Rebuy({ onDone }: rebuyProps) {
       <button
         onClick={handleRebuy}
         disabled={amount <= 0}
-        className="btn btn-room-control mt-2 w-full"
+        className="btn btn-room-control btn-compact mt-2 w-full"
       >
         {t("rebuy")}
       </button>

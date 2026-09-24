@@ -355,6 +355,12 @@
   box-shadow: inset 0 1px 0 #ffffff08, 0 2px 5px #0000001a;
 }
 
+/* Compact room-control for inline popup panels (rebuy): drops the 40px
+   touch floor back to the .btn intrinsic height. */
+.btn-room-control.btn-compact {
+  min-height: 34px;
+}
+
 .btn-room-control:hover {
   color: #e3ebf1;
   background: linear-gradient(180deg, #30414db3, #24333eb3);

@@ -28,15 +28,13 @@ export default function RoomBalanceButton({
       aria-label={`${label}: ${amount}`}
       aria-expanded={expanded}
       title={`${label}: ${amount}`}
-      className="relative inline-flex h-11 w-28 items-center justify-center gap-2 overflow-hidden rounded-md bg-card/60 px-3 text-amber-300 shadow transition-colors hover:bg-cardhi/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300 sm:w-32"
+      className="relative inline-grid h-9 w-28 grid-cols-[auto_1fr_auto] items-center gap-1 overflow-hidden rounded-md bg-card/60 px-3 text-amber-300 shadow transition-colors hover:bg-cardhi/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300 sm:w-32"
     >
       {icon}
-      <span className="flex min-w-0 items-center gap-1">
-        <span className="type-num min-w-0 truncate text-sm leading-none">
-          {amount}
-        </span>
-        <FiPlus size={14} className="shrink-0" aria-hidden="true" />
+      <span className="type-num min-w-0 truncate text-center text-sm leading-none">
+        {amount}
       </span>
+      <FiPlus size={14} className="justify-self-end" aria-hidden="true" />
       <img
         src={WALLET_FRAME_IMAGE}
         alt=""
