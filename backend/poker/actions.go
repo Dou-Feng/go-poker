@@ -113,7 +113,9 @@ func bet(g *Game, pn uint, data uint) error {
 	}
 	if g.getStage() == PreFlop && betVal > 0 && !g.players[pn].VoluntaryPreflop {
 		g.players[pn].Stats.VPIP++
-		g.players[pn].Stats.VPIPByPos[g.positionLabel(pn)]++
+		if pos := g.players[pn].HandPosition; pos < PosLabelCount {
+			g.players[pn].Stats.VPIPByPos[pos]++
+		}
 		g.players[pn].VoluntaryPreflop = true
 	}
 
@@ -357,14 +359,21 @@ func deal(g *Game, pn uint, data uint) error {
 			return err
 		}
 
+		// Eligibility is fixed at the deal, not recomputed after players fold.
+		trackPositions := g.readyCount() >= 5
 		for i, p := range g.players {
 			if p.Ready {
+				g.players[i].Stats.PreparePositionStats()
+				g.players[i].HandPosition = PosLabelCount
+				if trackPositions {
+					g.players[i].HandPosition = g.positionLabel(uint(i))
+					g.players[i].Stats.HandsByPos[g.players[i].HandPosition]++
+				}
 				g.players[i].Cards[0] = g.deck.Pop()
 				g.players[i].Cards[1] = g.deck.Pop()
 				g.players[i].In = true
 				g.players[i].State = PlayerPlaying
 				g.players[i].Stats.HandsPlayed++
-				g.players[i].Stats.HandsByPos[g.positionLabel(uint(i))]++
 			} else {
 				g.players[i].Cards[0] = 0
 				g.players[i].Cards[1] = 0

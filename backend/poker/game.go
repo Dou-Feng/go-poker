@@ -200,8 +200,12 @@ func (g *Game) toCall() uint {
 }
 
 // positionLabel returns the preflop position bucket for the given player,
-// relative to the current button. It is only meaningful after blinds are set.
+// relative to the current button, skipping seats not dealt into this hand.
+// Call at deal time, after blinds are set and before readiness can change.
 func (g *Game) positionLabel(pn uint) PositionLabel {
+	if pn >= uint(len(g.players)) || !g.players[pn].Ready {
+		return PosLabelCount
+	}
 	if pn == g.dealerNum {
 		return PosBTN
 	}
@@ -212,14 +216,21 @@ func (g *Game) positionLabel(pn uint) PositionLabel {
 		return PosBB
 	}
 
-	n := uint(len(g.players))
-	d := (pn + n - g.dealerNum) % n // seats clockwise from the button
-
-	if d == 3 {
+	if pn == g.utgNum {
 		return PosUTG
 	}
-	if d == n-1 {
-		return PosCO
+
+	// CO is the last participating seat before the button, not necessarily
+	// the preceding entry in the full player slice. Remaining seats share MP.
+	n := uint(len(g.players))
+	for offset := uint(1); offset < n; offset++ {
+		co := (g.dealerNum + n - offset) % n
+		if g.players[co].Ready {
+			if pn == co {
+				return PosCO
+			}
+			break
+		}
 	}
 	return PosMP
 }

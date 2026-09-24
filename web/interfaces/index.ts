@@ -76,6 +76,7 @@ export type PlayerStats = {
   vpip: number;
   vpipByPos: number[];
   handsByPos: number[];
+  positionStatsVersion?: number;
 };
 
 export type Profile = {

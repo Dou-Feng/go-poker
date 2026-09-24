@@ -114,6 +114,8 @@ export const translations = {
     vpip: "VPIP",
     gameBehavior: "Game behavior",
     vpipByPosition: "VPIP by position",
+    positionStatsHint:
+      "Only hands dealt to 5+ players count. — means no qualifying data.",
     posBTN: "Button",
     posSB: "Small blind",
     posBB: "Big blind",
@@ -414,6 +416,7 @@ export const translations = {
     vpip: "入池率",
     gameBehavior: "牌局行为",
     vpipByPosition: "按位置入池率",
+    positionStatsHint: "仅统计发牌时至少 5 人参与的牌局；— 表示暂无有效数据。",
     posBTN: "按钮位",
     posSB: "小盲",
     posBB: "大盲",

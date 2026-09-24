@@ -18,6 +18,8 @@ const (
 	PosLabelCount
 )
 
+const PositionStatsVersion uint = 2
+
 // PlayerStats accumulates a single session's worth of per-player statistics.
 // The server merges these into a user's lifetime record when they leave.
 type PlayerStats struct {
@@ -31,6 +33,35 @@ type PlayerStats struct {
 	VPIP        uint                `json:"vpip"`
 	VPIPByPos   [PosLabelCount]uint `json:"vpipByPos"`
 	HandsByPos  [PosLabelCount]uint `json:"handsByPos"`
+	// Version 2 includes only hands dealt to at least five players. Earlier
+	// versions mixed table sizes and cannot be filtered retrospectively.
+	PositionStatsVersion uint `json:"positionStatsVersion,omitempty"`
+}
+
+// ValidPositionStats checks the sample of hands dealt to five or more players.
+// This sample can cover fewer hands than the lifetime totals.
+func (s PlayerStats) ValidPositionStats() bool {
+	if s.PositionStatsVersion != PositionStatsVersion {
+		return false
+	}
+	var hands uint
+	for i := range s.HandsByPos {
+		if s.VPIPByPos[i] > s.HandsByPos[i] || s.HandsByPos[i] > s.HandsPlayed-hands {
+			return false
+		}
+		hands += s.HandsByPos[i]
+	}
+	return true
+}
+
+// PreparePositionStats starts a trustworthy sample when the old counts cannot
+// be recovered. All other lifetime statistics remain intact.
+func (s *PlayerStats) PreparePositionStats() {
+	if !s.ValidPositionStats() {
+		s.VPIPByPos = [PosLabelCount]uint{}
+		s.HandsByPos = [PosLabelCount]uint{}
+	}
+	s.PositionStatsVersion = PositionStatsVersion
 }
 
 // PlayerState is the player state machine (change.md「玩家状态」章节):
@@ -84,8 +115,9 @@ type player struct {
 	// name of their best five-card hand (e.g. "full house").
 	BestHand string `json:"bestHand,omitempty"`
 	// Per-hand guards keep rates based on hands rather than action/pot count.
-	VoluntaryPreflop bool `json:"-"`
-	WonThisHand      bool `json:"-"`
+	VoluntaryPreflop bool          `json:"-"`
+	WonThisHand      bool          `json:"-"`
+	HandPosition     PositionLabel `json:"-"` // PosLabelCount excludes hands with fewer than five players
 }
 
 // setState assigns a state and keeps the derived fast-path flags in sync.

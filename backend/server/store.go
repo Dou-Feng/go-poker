@@ -263,6 +263,10 @@ func loadHistory(rdb *redis.Client, uuid string) ([]HistoryRecord, error) {
 
 // mergeStats accumulates a single session's stats into a lifetime record.
 func mergeStats(dst *poker.PlayerStats, src poker.PlayerStats) {
+	// Legacy records did not distinguish table sizes; keep only the sample
+	// explicitly recorded under the five-or-more-player rule.
+	dst.PreparePositionStats()
+	src.PreparePositionStats()
 	dst.HandsPlayed += src.HandsPlayed
 	dst.HandsWon += src.HandsWon
 	dst.Folds += src.Folds

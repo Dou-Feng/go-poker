@@ -15,6 +15,7 @@ import { API_BASE } from "../lib/api";
 import { loadToken } from "../lib/session";
 import { useVoice } from "../hooks/useVoice";
 import { voice } from "../lib/voice";
+import { positionVpipRate, vpipRate } from "../lib/stats";
 import Avatar from "./Avatar";
 import MicIcon from "./MicIcon";
 import PlusIcon from "./PlusIcon";
@@ -168,7 +169,7 @@ export default function ProfileCard() {
   const headStats: Array<{ key: TranslationKey; value: string }> = [
     { key: "handsPlayed", value: String(hands) },
     { key: "winRate", value: rate(stats?.handsWon ?? 0, hands) },
-    { key: "vpip", value: rate(stats?.vpip ?? 0, hands) },
+    { key: "vpip", value: vpipRate(stats?.vpip ?? 0, hands) },
     { key: "maxPotWon", value: String(stats?.maxPotWon ?? 0) },
   ];
   const behaviorStats: Array<{ key: TranslationKey; value: string }> = [
@@ -486,15 +487,13 @@ export default function ProfileCard() {
 
               <section className={s.detailSection}>
                 <h4 className={s.detailSectionTitle}>{t("vpipByPosition")}</h4>
+                <p className="mb-3 text-xs text-muted">
+                  {t("positionStatsHint")}
+                </p>
                 <dl className={`${s.detailGrid} ${s.positionGrid}`}>
                   {POSITION_KEYS.map((key, i) => (
                     <div className={s.positionMetric} key={key}>
-                      <dd>
-                        {rate(
-                          stats?.vpipByPos?.[i] ?? 0,
-                          stats?.handsByPos?.[i] ?? 0
-                        )}
-                      </dd>
+                      <dd>{positionVpipRate(stats, i)}</dd>
                       <span>{POSITION_CODES[i]}</span>
                       <dt>{t(key)}</dt>
                     </div>
