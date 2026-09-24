@@ -1,15 +1,39 @@
-import { useContext, useState } from "react";
+import { useContext, useEffect, useRef, useState } from "react";
 import { AppContext } from "../providers/AppStore";
 import { useTranslation } from "../hooks/useTranslation";
 import Chip from "./Chip";
 import Rebuy from "./Rebuy";
+import RoomBalanceButton from "./RoomBalanceButton";
 
-// The player's table stack in the top-right. Tapping it drops down the rebuy
-// panel ("- amount +").
+// Keep the rebuy affordance visible on touch screens, where hover titles
+// cannot explain that the table-stack counter is also a button.
 export default function Stack() {
   const { appState } = useContext(AppContext);
   const { t } = useTranslation();
   const [showRebuy, setShowRebuy] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (!showRebuy) return;
+    const outside = (event: PointerEvent) => {
+      if (!containerRef.current?.contains(event.target as Node)) {
+        setShowRebuy(false);
+      }
+    };
+    const escape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setShowRebuy(false);
+        triggerRef.current?.focus();
+      }
+    };
+    document.addEventListener("pointerdown", outside);
+    document.addEventListener("keydown", escape);
+    return () => {
+      document.removeEventListener("pointerdown", outside);
+      document.removeEventListener("keydown", escape);
+    };
+  }, [showRebuy]);
 
   const game = appState.game;
   const me = game?.players.find((p) => p.uuid === appState.clientID);
@@ -18,18 +42,17 @@ export default function Stack() {
   }
 
   return (
-    <div className="relative flex flex-col items-end">
-      <button
+    <div ref={containerRef} className="relative flex flex-col items-end">
+      <RoomBalanceButton
+        buttonRef={triggerRef}
+        amount={me.stack}
+        label={t("tapToRebuy")}
+        icon={<Chip className="h-4 w-4 shrink-0" amount={me.stack} />}
+        expanded={showRebuy}
         onClick={() => setShowRebuy((s) => !s)}
-        aria-label={`${t("rebuy")}: ${me.stack}`}
-        title={t("rebuy")}
-        className="inline-flex w-20 flex-row items-center justify-between rounded-md bg-card/60 px-2.5 py-1 text-sm text-amber-300 shadow hover:bg-cardhi/60"
-      >
-        <Chip className="h-4 w-4" amount={me.stack} />
-        <span className="type-num leading-none">{me.stack}</span>
-      </button>
+      />
       {showRebuy && (
-        <div className="absolute right-0 top-full z-50 mt-1 w-44">
+        <div className="absolute right-0 top-full z-50 mt-1 w-full">
           <Rebuy onDone={() => setShowRebuy(false)} />
         </div>
       )}

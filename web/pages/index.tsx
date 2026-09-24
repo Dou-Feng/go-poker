@@ -6,8 +6,10 @@ import Preloader from "../components/Preloader";
 import ProfileCard from "../components/ProfileCard";
 import SessionBoard from "../components/SessionBoard";
 import Toast from "../components/Toast";
-import { useContext, useEffect, useState } from "react";
+import ConnectionStatus from "../components/ConnectionStatus";
+import { useContext, useEffect, useRef, useState } from "react";
 import { AppContext } from "../providers/AppStore";
+import { ConnectionContext } from "../providers/WebSocket";
 import { useSocket } from "../hooks/useSocket";
 import { joinTable, reconnectUser } from "../actions/actions";
 import { preloadIdleAssets } from "../lib/preload";
@@ -23,6 +25,16 @@ import { detectLanguage } from "../lib/language";
 export default function IndexPage() {
   const { appState, dispatch } = useContext(AppContext);
   const socket = useSocket();
+  const connectionStatus = useContext(ConnectionContext);
+  const contentRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    // Block keyboard focus as well as pointer input while the room snapshot
+    // is stale; the connection indicator itself stays outside this subtree.
+    contentRef.current?.toggleAttribute(
+      "inert",
+      !!appState.table && connectionStatus !== "connected"
+    );
+  }, [appState.table, connectionStatus]);
   // The preloader gates the whole UI behind the first-paint assets (fonts +
   // login wallpaper) so the screens are never seen half-styled. Screens
   // still mount underneath — their own loads run in parallel with the
@@ -116,16 +128,19 @@ export default function IndexPage() {
   return (
     <Layout title="Poker" themeColor={appState.table ? "#1a222a" : "#0e1319"}>
       {!assetsReady && <Preloader onComplete={() => setAssetsReady(true)} />}
-      {!appState.username ? (
-        <Register />
-      ) : !appState.table ? (
-        <Lobby />
-      ) : (
-        <Game />
-      )}
-      <SessionBoard />
-      <ProfileCard />
+      <div ref={contentRef}>
+        {!appState.username ? (
+          <Register />
+        ) : !appState.table ? (
+          <Lobby />
+        ) : (
+          <Game />
+        )}
+        <SessionBoard />
+        <ProfileCard />
+      </div>
       <Toast />
+      <ConnectionStatus />
     </Layout>
   );
 }

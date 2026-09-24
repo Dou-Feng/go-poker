@@ -27,7 +27,14 @@ import {
   saveToken,
   saveUser,
   saveUsername,
+  loadUser,
+  loadToken,
+  tabAuthAccount,
 } from "../lib/session";
+import {
+  createSocketConnection,
+  ConnectionStatus,
+} from "../lib/socketConnection";
 import { emitFx } from "../lib/fxBus";
 import { voice } from "../lib/voice";
 import {
@@ -45,6 +52,7 @@ dispatches websocket messages to update the central state store.
 */
 
 export const SocketContext = createContext<WebSocket | null>(null);
+export const ConnectionContext = createContext<ConnectionStatus>("connecting");
 
 type SocketProviderProps = {
   children: ReactChild;
@@ -53,6 +61,7 @@ type SocketProviderProps = {
 export function SocketProvider(props: SocketProviderProps) {
   const [socket, setSocket] = useState<WebSocket | null>(null);
   const { dispatch } = useContext(AppContext);
+  const [status, setStatus] = useState<ConnectionStatus>("connecting");
 
   useEffect(() => {
     // WebSocket api is browser side only.
@@ -70,69 +79,67 @@ export function SocketProvider(props: SocketProviderProps) {
       (window.location.protocol === "https:"
         ? `wss://${window.location.host}/ws`
         : `ws://${window.location.hostname}:8080/ws`);
-    let ws: WebSocket | null = null;
-    let disposed = false;
-    let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
-    let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
-    let lastPongAt = 0;
-
-    const scheduleReconnect = () => {
-      if (disposed) {
-        return;
-      }
-      if (reconnectTimer) {
-        clearTimeout(reconnectTimer);
-      }
-      reconnectTimer = setTimeout(connect, 1000);
-    };
-
-    const connect = () => {
-      if (disposed) {
-        return;
-      }
-      console.log("websocket url: ", wsUrl);
-      ws = new WebSocket(wsUrl);
-      ws.onopen = () => {
-        // A stale socket from a previous effect pass (React StrictMode
-        // mounts twice in dev) may still be draining; only the live one
-        // updates state.
-        if (disposed) {
-          ws?.close();
-          return;
-        }
-        console.log("websocket connected");
-        lastPongAt = Date.now();
+    let abandonedRoom = false;
+    const connection = createSocketConnection({
+      url: wsUrl,
+      onStatus: setStatus,
+      onOpen: (ws) => {
         setSocket(ws);
-        // Voice signalling rides on this socket; a reconnect rebuilds the
-        // peer mesh (peers were told we left when the old socket dropped).
         voice.setSocket(ws);
         voice.onSocketConnected();
-        // Preference pushes ride on it too, and anything changed while
-        // offline is sent as soon as it is back.
         setSettingsSocket(ws);
-      };
-      ws.onclose = () => {
-        // StrictMode's first-pass socket is closed intentionally by the
-        // cleanup; that close must not trigger a reconnect (the second
-        // mount owns the connection now).
-        if (disposed) {
-          console.log("websocket closed (stale)");
-          return;
-        }
-        console.log("websocket disconnected");
+      },
+      onDisconnect: () => {
         setSocket(null);
         voice.setSocket(null);
         setSettingsSocket(null);
-        scheduleReconnect();
-      };
-      ws.onerror = (error) => {
-        console.error("websocket error: ", error);
-      };
-      ws.onmessage = (e) => {
+      },
+      onTimeout: () => {
+        const wasInRoom = !!loadSession()?.table;
+        abandonedRoom = true;
+        clearSession();
+        voice.leaveRoom();
+        dispatch({ type: "leaveRoom" });
+        dispatch({ type: "setSettlement", payload: null });
+        dispatch({ type: "setProfile", payload: null });
+        dispatch({ type: "setSessionView", payload: null });
+        if (wasInRoom) {
+          dispatch({ type: "setNotice", payload: "connectionLost" });
+        }
+      },
+      onMessage: (e, ws) => {
         const event = JSON.parse(e.data);
         if (event.action === "pong") {
-          lastPongAt = Date.now();
+          if (!loadUser() || !loadToken() || tabAuthAccount() !== loadUser())
+            connection.ready();
           return;
+        }
+        // Authentication can restore an orphaned seat automatically. After
+        // giving up on that room, release it instead of pulling the user
+        // straight back from the lobby. A deliberate new join ends this guard.
+        if (abandonedRoom) {
+          if (
+            (event.action === "join-result" ||
+              event.action === "create-result") &&
+            event.ok
+          ) {
+            abandonedRoom = false;
+          } else if (event.action === "update-player-uuid") {
+            if (event.tablename) {
+              ws.send(
+                JSON.stringify({
+                  action: "leave-table",
+                  tablename: event.tablename,
+                })
+              );
+            }
+            return;
+          } else if (
+            event.action === "update-game" ||
+            event.action === "settlement"
+          ) {
+            return;
+          }
         }
         switch (event.action) {
           case "new-message":
@@ -187,6 +194,7 @@ export function SocketProvider(props: SocketProviderProps) {
               biggestPotWinners: event.game.biggestPotWinners ?? [],
             };
             dispatch({ type: "updateGame", payload: newGame });
+            connection.ready();
             emitFx(newGame);
             return;
           case "update-player-uuid":
@@ -320,6 +328,7 @@ export function SocketProvider(props: SocketProviderProps) {
               handsByPos: [0, 0, 0, 0, 0, 0],
             };
             if (event.self) {
+              if (!loadSession()?.table) connection.ready();
               saveUser(event.uuid);
               dispatch({ type: "setUuid", payload: event.uuid ?? null });
               // Preferences stored on the account follow the player across
@@ -381,6 +390,7 @@ export function SocketProvider(props: SocketProviderProps) {
             });
             return;
           case "session-expired": {
+            connection.ready();
             // No tablename means the account-level session is over (another
             // device logged in, or the server's Redis was reset): forget the
             // login and return to the register screen instead of showing a
@@ -454,87 +464,16 @@ export function SocketProvider(props: SocketProviderProps) {
             console.warn("unknown websocket action", event.action);
             return;
         }
-      };
-    };
-
-    const sendPing = () => {
-      if (ws && ws.readyState === WebSocket.OPEN) {
-        try {
-          ws.send(JSON.stringify({ action: "ping" }));
-        } catch {
-          try {
-            ws.close();
-          } catch {
-            // ignore
-          }
-          scheduleReconnect();
-        }
-      }
-    };
-
-    // Detect silently-dead connections. This is common on iOS when the
-    // page is backgrounded: the socket is killed without onclose firing.
-    heartbeatTimer = setInterval(() => {
-      sendPing();
-      if (Date.now() - lastPongAt > 45000) {
-        try {
-          ws?.close();
-        } catch {
-          // ignore
-        }
-        scheduleReconnect();
-      }
-    }, 15000);
-
-    const handleVisibility = () => {
-      if (document.visibilityState !== "visible") {
-        return;
-      }
-      if (!ws || ws.readyState !== WebSocket.OPEN) {
-        scheduleReconnect();
-        return;
-      }
-      // The socket may have been killed while backgrounded even though
-      // the browser still reports it as open. Probe it and reconnect if
-      // the server does not answer.
-      const before = lastPongAt;
-      sendPing();
-      setTimeout(() => {
-        if (!disposed && lastPongAt === before) {
-          try {
-            ws?.close();
-          } catch {
-            // ignore
-          }
-          scheduleReconnect();
-        }
-      }, 2500);
-    };
-
-    document.addEventListener("visibilitychange", handleVisibility);
-    window.addEventListener("focus", handleVisibility);
-    window.addEventListener("pageshow", handleVisibility);
-
-    connect();
-
-    return () => {
-      disposed = true;
-      if (reconnectTimer) {
-        clearTimeout(reconnectTimer);
-      }
-      if (heartbeatTimer) {
-        clearInterval(heartbeatTimer);
-      }
-      document.removeEventListener("visibilitychange", handleVisibility);
-      window.removeEventListener("focus", handleVisibility);
-      window.removeEventListener("pageshow", handleVisibility);
-      ws?.close();
-    };
+      },
+    });
+    return () => connection.dispose();
   }, [dispatch]);
 
   return (
-    <SocketContext.Provider value={socket}>
-      {props.children}
-    </SocketContext.Provider>
+    <ConnectionContext.Provider value={status}>
+      <SocketContext.Provider value={socket}>
+        {props.children}
+      </SocketContext.Provider>
+    </ConnectionContext.Provider>
   );
 }

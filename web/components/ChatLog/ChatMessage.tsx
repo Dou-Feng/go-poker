@@ -1,3 +1,4 @@
+import { formatLocalTime } from "../../lib/time";
 import { Message } from "../../interfaces";
 import { useTranslation } from "../../hooks/useTranslation";
 import Avatar from "../Avatar";
@@ -29,7 +30,7 @@ export default function ChatMessage({
     return (
       <div className="game-chat-system">
         <span>{systemMessage}</span>
-        <time>{timestamp}</time>
+        <time>{formatLocalTime(timestamp)}</time>
       </div>
     );
   }
@@ -51,7 +52,7 @@ export default function ChatMessage({
       <div className="game-chat-message-body">
         {!own && <strong>{name}</strong>}
         <p>{message}</p>
-        <time>{timestamp}</time>
+        <time>{formatLocalTime(timestamp)}</time>
       </div>
     </div>
   );

@@ -82,7 +82,8 @@ type table struct {
 	botKind string
 	botState
 	// Per-turn action clock (see clock.go); zero timeout = off.
-	clock actionClock
+	clock       actionClock
+	progression progressionClock
 	// busted tracks accounts that busted out of a tournament session (max
 	// buy-ins used, stack 0). Their clients are not offered empty seats until
 	// the session resets (see autoSpectateBusted / clearBusted).
@@ -117,6 +118,7 @@ func newTable(name string, redisClient *redis.Client, hub *Hub) *table {
 		botKind:         botKindNormal,
 		settlementDelay: time.Second,
 		botState:        botState{botDelays: defaultBotDelays},
+		progression:     progressionClock{runoutDelay: 2 * time.Second, showdownDelay: 7 * time.Second},
 	}
 }
 
@@ -163,6 +165,7 @@ func (t *table) shutdown() {
 
 		t.stopBots()
 		t.stopActionClock()
+		t.stopProgression()
 	})
 }
 
@@ -546,7 +549,9 @@ func (t *table) broadcastGame() {
 	t.autoSpectateBusted()
 	// Arm (or keep, or clear) the action clock for the turn the view is in,
 	// so the update carries the right remaining time.
-	t.armActionClock(t.game.GenerateOmniView())
+	view := t.game.GenerateOmniView()
+	t.armActionClock(view)
+	t.armProgression(view)
 	t.broadcast <- createUpdatedGameBytes(t)
 	t.scheduleBots()
 }
@@ -621,6 +626,7 @@ func (t *table) settleLocked() {
 
 	t.stopBots()
 	t.stopActionClock()
+	t.stopProgression()
 
 	// One row per account. Departed players already had their session flushed
 	// when they left, so they are only added to the display (not settled

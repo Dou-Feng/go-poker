@@ -582,6 +582,8 @@ export default function Table() {
               className={classNames(
                 "poker-table-seat absolute",
                 isMine && "z-10",
+                // Empty-seat controls stay above the central waiting card (z=3).
+                game && !game.running && !isMine && "z-[4]",
                 shrink && "seat-shrunk"
               )}
               style={{

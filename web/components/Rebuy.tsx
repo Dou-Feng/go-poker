@@ -48,24 +48,24 @@ export default function Rebuy({ onDone }: rebuyProps) {
   };
 
   return (
-    <div className="rounded-lg border border-muted/30 bg-tablehi/95 p-2 shadow-lg">
-      <div className="flex flex-row items-center justify-center gap-2">
+    <div className="w-full min-w-0 rounded-lg border border-muted/30 bg-tablehi/95 p-2 shadow-lg">
+      <div className="type-num mb-2 break-all text-center text-base text-amber-300">
+        {amount}
+      </div>
+      <div className="grid grid-cols-2 gap-1">
         <button
           onClick={decrement}
           disabled={amount <= 0}
           aria-label={t("decreaseBuyIn")}
-          className="btn btn-secondary h-9 w-9 rounded-md px-0 text-xl font-bold"
+          className="btn btn-secondary h-11 min-w-0 rounded-md px-0 text-xl font-bold"
         >
           −
         </button>
-        <span className="min-w-16 type-num text-center text-lg text-amber-300">
-          {amount}
-        </span>
         <button
           onClick={increment}
           disabled={amount >= remaining}
           aria-label={t("increaseBuyIn")}
-          className="btn btn-secondary h-9 w-9 rounded-md px-0 text-xl font-bold"
+          className="btn btn-secondary h-11 min-w-0 rounded-md px-0 text-xl font-bold"
         >
           +
         </button>

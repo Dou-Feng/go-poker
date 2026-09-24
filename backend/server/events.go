@@ -1031,6 +1031,8 @@ func handleDealGame(c *Client) {
 	if c.table == nil {
 		return
 	}
+	c.table.actionMu.Lock()
+	defer c.table.actionMu.Unlock()
 	if c.table.settlementPending.Load() {
 		c.trySend(createError(msgSettlementPending))
 		return
@@ -1040,70 +1042,76 @@ func handleDealGame(c *Client) {
 		c.send <- createError("you are not seated")
 		return
 	}
-	view := c.table.game.GenerateOmniView()
+	c.table.advanceGame()
+}
+
+// advanceGame is shared by browser/bot requests and the server watchdog.
+// The caller holds actionMu so a watchdog and a deal request cannot overlap.
+func (t *table) advanceGame() {
+	view := t.game.GenerateOmniView()
 
 	// The client's showdown display (hand types → toast) has finished: close
 	// the showdown, reset the table, and deal the next hand.
 	if view.Stage == poker.Showdown {
-		if err := poker.SettleShowdown(c.table.game); err != nil {
+		if err := poker.SettleShowdown(t.game); err != nil {
 			slog.Default().Warn("Settle showdown", "error", err)
 		}
 		// Apply any queued spectate moves before deciding how to continue.
-		c.table.applySpectateReservations()
+		t.applySpectateReservations()
 
 		// Honour an early-settle vote or a reached hand limit first: the
 		// session ends instead of automatically dealing another hand.
-		if c.table.maybeSettleAfterHand() {
+		if t.maybeSettleAfterHand() {
 			return
 		}
-		if c.table.maybeSettle() {
+		if t.maybeSettle() {
 			return
 		}
 
 		// Seat the spectators who claimed a seat during the hand. They
 		// arrive not ready, so the auto-start below does not fire and the
 		// table waits in the not-ready phase for them.
-		c.table.seatReservedPlayers()
+		t.seatReservedPlayers()
 
 		// Everyone is still ready: auto-start the next hand. Otherwise
 		// broadcast the ready phase and wait for players to re-ready.
-		if autoStartIfReady(c.table) {
-			c.table.broadcastGame()
+		if autoStartIfReady(t) {
+			t.broadcastGame()
 			return
 		}
-		c.table.broadcastGame()
+		t.broadcastGame()
 		return
 	}
 
 	// All-in runout: reveal the board one card at a time and resolve at the
 	// river. Betting is off and the board is incomplete in this state.
 	if !view.Betting && view.Stage >= poker.PreFlop && view.Stage <= poker.River {
-		if err := poker.RunoutNext(c.table.game); err != nil {
+		if err := poker.RunoutNext(t.game); err != nil {
 			slog.Default().Warn("Runout next", "error", err)
 		}
-		c.table.broadcastGame()
+		t.broadcastGame()
 		return
 	}
 
 	// Apply pending spectate reservations before dealing the next hand. This
 	// lets the previous hand's settlement animation play out first.
-	c.table.applySpectateReservations()
+	t.applySpectateReservations()
 
 	// If the room paused (e.g. a player just moved to spectate) or no longer
 	// has enough players, broadcast the paused state instead of dealing.
-	view = c.table.game.GenerateOmniView()
+	view = t.game.GenerateOmniView()
 	if !view.Running || len(view.Players) < 2 {
-		c.table.broadcastGame()
+		t.broadcastGame()
 		return
 	}
 
 	// Normal flow: deal the next hand (PreDeal) or next street.
-	broadcastDeal(c.table)
-	err := poker.Deal(c.table.game, view.DealerNum, 0)
+	broadcastDeal(t)
+	err := poker.Deal(t.game, view.DealerNum, 0)
 	if err != nil {
 		slog.Default().Warn("Deal table", "error", err)
 	}
-	c.table.broadcastGame()
+	t.broadcastGame()
 }
 
 func clientOwnsSeat(c *Client) bool {
@@ -1563,5 +1571,5 @@ func broadcastDeal(table *table) {
 }
 
 func currentTime() string {
-	return fmt.Sprintf("%d:%02d", time.Now().Hour(), time.Now().Minute())
+	return time.Now().UTC().Format(time.RFC3339)
 }

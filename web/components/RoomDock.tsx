@@ -1,4 +1,4 @@
-import { Ref, useContext } from "react";
+import { Ref, useContext, useState } from "react";
 import { FiCheck, FiEye, FiLock, FiUnlock } from "react-icons/fi";
 import { AppContext } from "../providers/AppStore";
 import { useTranslation } from "../hooks/useTranslation";
@@ -10,6 +10,7 @@ import ChatLog from "./ChatLog";
 import RoomMenu from "./RoomMenu";
 import SpectatorList from "./SpectatorList";
 import RoomStats from "./RoomStats";
+import Recharge from "./Recharge";
 
 type RoomDockProps = { dockRef: Ref<HTMLDivElement> };
 
@@ -17,6 +18,7 @@ export default function RoomDock({ dockRef }: RoomDockProps) {
   const { appState } = useContext(AppContext);
   const { t } = useTranslation();
   const socket = useSocket();
+  const [showRecharge, setShowRecharge] = useState(false);
 
   const game = appState.game;
   if (!game) return null;
@@ -43,6 +45,27 @@ export default function RoomDock({ dockRef }: RoomDockProps) {
 
   return (
     <div className="room-dock" ref={dockRef}>
+      {!me && !reservation && blocked === "notEnoughChips" && (
+        <div
+          role="status"
+          className="flex w-full items-center justify-between gap-2 rounded-lg border border-amber-300/20 bg-card/95 px-3 py-2 text-xs text-amber-200 sm:text-sm"
+        >
+          <span>
+            {t("notEnoughChips")} · {t("walletBalance")}: {appState.chips ?? 0}
+            {" / "}
+            {t("buyIn")}: {game.config.buyIn}
+          </span>
+          <button
+            type="button"
+            className="btn btn-room-control shrink-0"
+            onClick={() => setShowRecharge(true)}
+            disabled={!socket}
+          >
+            {t("recharge")}
+          </button>
+        </div>
+      )}
+      {showRecharge && <Recharge onClose={() => setShowRecharge(false)} />}
       {!me && game.running && (
         <section className="spectator-card" aria-label={t("spectatorPanel")}>
           <div className="spectator-identity">

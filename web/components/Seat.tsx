@@ -24,6 +24,7 @@ import PlusIcon from "./PlusIcon";
 import MicIcon from "./MicIcon";
 import { useVoice } from "../hooks/useVoice";
 import { playSfx } from "../lib/sfx";
+import { seatJoinBlockReason } from "../lib/spectatorSeat";
 
 type seatProps = {
   player: Player | null;
@@ -435,8 +436,9 @@ export default function Seat({
   // A viewer who cannot actually join (busted out of a tournament session, or
   // not enough chips in the wallet) must not be offered empty seats: the
   // server would only reject them.
-  const cannotJoin =
-    !!game.busted || (appState.chips != null && appState.chips < buyIn);
+  const joinBlocked = seatJoinBlockReason(game, appState.chips);
+  // A cached seat ID can outlive settlement; only the current roster seats us.
+  const me = game.players.find((p) => p.uuid === appState.clientID && !p.left);
   // take-seat: sits down between hands; during a hand it claims the seat for
   // the next hand instead (the server seats the claimant, not ready, when the
   // hand ends). Tapping an own claim again cancels it.
@@ -487,8 +489,8 @@ export default function Seat({
   // A logged-in spectator is the exception: they need a target to tap, so for
   // them the empty slots stay visible as claimable "next hand" seats.
   if (running) {
-    const canClaim = !appState.clientID && !!appState.username;
-    if (!canClaim || cannotJoin) {
+    const canClaim = !me && !!appState.username;
+    if (!canClaim || joinBlocked) {
       return null;
     }
     return (
@@ -518,19 +520,18 @@ export default function Seat({
     );
   }
 
-  const me = game.players.find((p) => p.uuid === appState.clientID);
   const canMove = !!me && !me.ready && !running;
-  const canSit = !appState.clientID || canMove;
+  const canSit = !me || canMove;
   // A seated player may still move; a spectator who cannot join is offered
   // nothing at all.
-  const spectatorBlocked = !appState.clientID && cannotJoin;
+  const spectatorBlocked = !me ? joinBlocked : null;
 
   if (canSit && !spectatorBlocked) {
     const handleClick = () => {
       if (!socket) {
         return;
       }
-      if (appState.clientID) {
+      if (me) {
         // Already seated but not ready: move to this seat.
         moveSeat(socket, id);
       } else {
@@ -548,6 +549,11 @@ export default function Seat({
   }
 
   return (
-    <SeatPlaceholder disabled label={String(id)} caption={t("waitingToJoin")} />
+    <SeatPlaceholder
+      disabled
+      label={String(id)}
+      caption={t(spectatorBlocked ?? "waitingToJoin")}
+      title={spectatorBlocked ? t(spectatorBlocked) : undefined}
+    />
   );
 }

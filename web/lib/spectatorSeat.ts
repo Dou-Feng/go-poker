@@ -1,5 +1,11 @@
 import { Game } from "../interfaces";
 
+export function seatJoinBlockReason(game: Game, chips: number | null) {
+  if (game.busted) return "bustedOut";
+  if (chips !== null && chips < game.config.buyIn) return "notEnoughChips";
+  return null;
+}
+
 export function spectatorSeatState(
   game: Game,
   accountUuid: string | null,
@@ -18,12 +24,6 @@ export function spectatorSeatState(
     }
   }
   const blocked: "bustedOut" | "notEnoughChips" | "tableIsFull" | null =
-    game.busted
-      ? "bustedOut"
-      : chips !== null && chips < game.config.buyIn
-      ? "notEnoughChips"
-      : !seatID
-      ? "tableIsFull"
-      : null;
+    seatJoinBlockReason(game, chips) ?? (!seatID ? "tableIsFull" : null);
   return { reservation, seatID, blocked };
 }
