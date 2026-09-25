@@ -251,6 +251,18 @@ export default function Lobby() {
         </div>
         <nav className={styles.tools} aria-label={t("lobbyTools")}>
           <button
+            type="button"
+            onClick={() => setShowRecharge(true)}
+            title={t("recharge")}
+            aria-label={`${t("recharge")} · ${t("walletBalance")}: ${
+              appState.chips ?? 0
+            }`}
+            className={`${styles.toolButton} ${styles.desktopWallet}`}
+          >
+            <FiCreditCard aria-hidden="true" />
+            <span>{appState.chips ?? 0}</span>
+          </button>
+          <button
             onClick={() => setShowFriends(true)}
             title={t("friends")}
             aria-label={t("friends")}
