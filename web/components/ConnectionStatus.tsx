@@ -19,18 +19,18 @@ export default function ConnectionStatus() {
     <div
       role="status"
       aria-live="polite"
-      className="border-white/15 flex items-center gap-3 rounded-xl border bg-slate-900 px-4 py-3 text-sm text-white shadow-xl"
+      className="flex items-center gap-2.5 rounded-xl bg-slate-900/60 px-4 py-2.5 text-sm text-slate-100 shadow-md shadow-black/10 backdrop-blur-sm"
     >
       <span
         aria-hidden="true"
-        className="h-5 w-5 shrink-0 animate-spin rounded-full border-2 border-white/25 border-t-cyan-300"
+        className="h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-white/20 border-t-cyan-200/80"
       />
       <span>{t(message)}</span>
     </div>
   );
   return appState.table ? (
     <div
-      className="bg-slate-950/60 fixed inset-0 z-[100] flex items-center justify-center p-4"
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/10 p-4"
       aria-busy="true"
     >
       {content}

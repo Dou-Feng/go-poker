@@ -140,7 +140,7 @@ export default function IndexPage() {
         <ProfileCard />
       </div>
       <Toast />
-      <ConnectionStatus />
+      {assetsReady && <ConnectionStatus />}
     </Layout>
   );
 }
