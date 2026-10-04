@@ -576,23 +576,24 @@ func (g *Game) updateRoundInfo() {
 	// Everybody has matched the highest bet or is all-in. If at most one
 	// player is not all-in, nobody can ever match the top bettor's excess over
 	// the second-highest total, so it goes back to them (an uncalled bet) and
-	// the pots are rebuilt without it. Only players still in the hand count:
-	// chips from folded players are dead money that stays in the pot.
+	// the pots are rebuilt without it. Folded contributions still match bets:
+	// refunding past them would shrink the top bettor's Bet below toCall(),
+	// making the river wait for another call with betting already disabled.
 	canAct := len(inPlayerNums) - len(allInPlayerNums)
 	if canAct < 2 {
 		var top, second uint
-		topPn := inPlayerNums[0]
-		for _, ndx := range inPlayerNums {
-			tb := g.players[ndx].TotalBet
+		topPn := uint(0)
+		for ndx, p := range g.players {
+			tb := p.TotalBet
 			if tb > top {
 				second = top
 				top = tb
-				topPn = ndx
+				topPn = uint(ndx)
 			} else if tb > second {
 				second = tb
 			}
 		}
-		if top > second {
+		if top > second && g.players[topPn].In {
 			g.players[topPn].returnChips(top - second)
 			g.rebuildPots(allInPlayerNums)
 		}

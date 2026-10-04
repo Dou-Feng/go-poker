@@ -43,6 +43,12 @@ func (t *table) armProgression(view *poker.GameView) {
 	default:
 	}
 	key := progressionKey(view)
+	// Presence and reveal broadcasts can race a deal. While holding the
+	// clock lock, reject old snapshots so they cannot replace the timer for
+	// the live stage with one that enforceProgression will later discard.
+	if key != progressionKey(t.game.GenerateOmniView()) {
+		return
+	}
 	if c.key == key {
 		return
 	}
